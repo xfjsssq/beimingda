@@ -225,7 +225,8 @@ export function listPosts({ kind, limit } = {}) {
 // ──────────────────────────── 候选检索（评分 + 双选状态） ────────────────────────────
 
 function normalizeTopK(v) {
-  const n = Math.round(Number(v ?? 5));
+  const raw = v == null || v === "" ? 5 : v; // 未传 / 传空 -> 契约默认 5
+  const n = Math.round(Number(raw));
   if (!Number.isFinite(n) || n < 1 || n > 20) {
     reject(CODES.SCHEMA_REJECTED, "top_k 必须是 1..20 之间的整数（默认 5）");
   }
