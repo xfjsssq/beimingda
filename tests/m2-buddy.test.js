@@ -545,6 +545,95 @@ test("双选状态机：三条路径 + revealed=0 时 toResponse 不含 contact_
   assert.throws(() => opt.applyConsent(s1, "seeker", "yes"), /SCHEMA_REJECTED|布尔/);
 });
 
+test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口以状态机推导为准）", async () => {
+  // ── 方向一：脏行不该揭示（存储列说 1，但两个 bit 没同时为真）──
+  for (const dirty of [
+    { author_ok: 0, seeker_ok: 0, revealed: 1 },
+    { author_ok: 0, seeker_ok: 1, revealed: 1 },
+    { author_ok: 1, seeker_ok: 0, revealed: 1 },
+  ]) {
+    const resp = opt.toResponse(dirty, "ct_dirty");
+    assert.equal(
+      Object.hasOwn(resp, "contact_code"),
+      false,
+      `脏行不得吐出 contact_code: ${JSON.stringify(dirty)}`,
+    );
+    assert.equal("contact_code" in resp, false);
+    assert.equal(resp.revealed, 0, "revealed 必须由 author_ok && seeker_ok 推导，不读存储列");
+    assert.equal(opt.normalizeConsent(dirty).revealed, 0);
+    assert.equal(opt.isMutual(dirty), false);
+    assert.equal(opt.revealStatus(dirty), "pending");
+  }
+
+  // ── 方向二（反证）：存储列是 0，但两个 bit 都为真 -> 按推导必须揭示 ──
+  const derived = opt.toResponse({ author_ok: 1, seeker_ok: 1, revealed: 0 }, "ct_ok");
+  assert.equal(derived.revealed, 1, "两个 bit 都为真时按推导应揭示");
+  assert.equal(Object.hasOwn(derived, "contact_code"), true);
+  assert.equal(derived.contact_code, "ct_ok");
+  assert.equal(opt.normalizeConsent({ author_ok: 1, seeker_ok: 1, revealed: 0 }).revealed, 1);
+
+  // ── 方向三（服务层）：手工 UPDATE revealed=1（author_ok 保持 0）后走对外接口 ──
+  const pub = await callTool("buddy_publish", {
+    author_handle: "脏数据作者",
+    kind: "study",
+    text_profile: STUDY_TEXT,
+  });
+  assert.equal(pub.ok, true, JSON.stringify(pub.error));
+  const postId = pub.data.post_id;
+
+  const voted = await callTool("buddy_consent", {
+    post_id: postId,
+    seeker_handle: "脏数据寻找者",
+    agree: true,
+  });
+  assert.equal(voted.ok, true, JSON.stringify(voted.error));
+  assert.equal(voted.data.revealed, 0);
+  assert.equal(Object.hasOwn(voted.data, "contact_code"), false);
+
+  // 把库里这一行手工改脏：revealed=1 而 author_ok 仍为 0
+  const seeker = svc.findUser("脏数据寻找者");
+  assert.ok(seeker);
+  getDb()
+    .prepare("UPDATE buddy_consents SET revealed = 1 WHERE post_id = ? AND seeker_id = ?")
+    .run(postId, seeker.id);
+  const dirtyRow = getDb()
+    .prepare("SELECT author_ok, seeker_ok, revealed FROM buddy_consents WHERE post_id = ? AND seeker_id = ?")
+    .get(postId, seeker.id);
+  assert.deepEqual(
+    { ...dirtyRow },
+    { author_ok: 0, seeker_ok: 1, revealed: 1 },
+    "前置条件：库里这行已经是脏数据",
+  );
+
+  // 对外接口一：MCP buddy_search 的候选
+  const search = await callTool("buddy_search", {
+    seeker_handle: "脏数据寻找者",
+    kind: "study",
+    text_profile: STUDY_TEXT,
+  });
+  assert.equal(search.ok, true, JSON.stringify(search.error));
+  const cand = search.data.candidates.find((c) => c.post_id === postId);
+  assert.ok(cand, "该帖应仍在候选列表里（脏数据只影响揭示，不该让帖子消失）");
+  assert.equal(cand.reveal_status, "pending", "脏数据不得让候选变成 mutual");
+  assert.equal(Object.hasOwn(cand, "contact_code"), false, "脏数据不得让候选吐出 contact_code");
+
+  // 对外接口二：我的申请（GET /api/buddies/mine 用的同一个 service）
+  const mine = svc.myApplications({ seeker_handle: "脏数据寻找者" }).find((m) => m.post_id === postId);
+  assert.ok(mine);
+  assert.equal(mine.revealed, 0, "我的申请也必须以推导为准");
+  assert.equal(mine.reveal_status, "pending");
+
+  // 收尾反证：作者真实同意后（两个 bit 都为真）才该揭示
+  const both = await callTool("buddy_consent", {
+    post_id: postId,
+    seeker_handle: "脏数据作者",
+    agree: true,
+  });
+  assert.equal(both.ok, true, JSON.stringify(both.error));
+  assert.equal(both.data.revealed, 1);
+  assert.equal(Object.hasOwn(both.data, "contact_code"), true);
+});
+
 // ──────────────────────────── 结果白名单（反推身份） ────────────────────────────
 
 test("候选 / 列表结果里不出现任何可反推身份的字段", async () => {
