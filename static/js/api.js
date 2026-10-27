@@ -293,9 +293,99 @@ export async function apiHealth(opts = {}) {
   return apiSafe("/api/health", opts);
 }
 
+/* ---------------------------------------------------------------------------
+   MCP 端点（远程 Streamable HTTP：POST /mcp，JSON-RPC 2.0）
+   用于 /agent 页"实时核对 14 个工具是否已注册"。
+   ⛔ 不做 SSE 长连接保活（CF 隧道 100 秒硬限制）；令牌走 Authorization: Bearer。
+   --------------------------------------------------------------------------- */
+
+/** POST 一次 JSON-RPC，返回 result（失败抛 ApiError） */
+export async function mcpRpc(method, params, opts = {}) {
+  const token = opts.token !== undefined ? opts.token : apiToken();
+  const headers = {
+    "Content-Type": "application/json",
+    Accept: "application/json, text/event-stream",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const payload = { jsonrpc: "2.0", id: opts.id || Date.now(), method };
+  if (params !== undefined) payload.params = params;
+
+  const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : DEFAULT_TIMEOUT_MS;
+  let timer = null;
+  const init = { method: "POST", headers, body: JSON.stringify(payload), credentials: "same-origin", cache: "no-store" };
+  if (typeof AbortController !== "undefined" && !opts.signal) {
+    const ctrl = new AbortController();
+    timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    init.signal = ctrl.signal;
+  } else if (opts.signal) {
+    init.signal = opts.signal;
+  }
+
+  let res;
+  try {
+    res = await fetch("/mcp", init);
+  } catch (e) {
+    const err = new ApiError(`/mcp ${method} 请求失败：${e && e.message ? e.message : e}`, "INTERNAL", 0);
+    rememberError("/mcp", err);
+    throw err;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+
+  const raw = await res.text().catch(() => "");
+  // 兼容 application/json 与 text/event-stream 两种回法（取最后一条 data: 行）
+  let json = null;
+  const looksSse = /text\/event-stream/i.test(res.headers.get("content-type") || "") || /^\s*data:/m.test(raw);
+  const text = looksSse
+    ? raw
+        .split(/\r?\n/)
+        .filter((l) => /^\s*data:/.test(l))
+        .map((l) => l.replace(/^\s*data:\s?/, ""))
+        .pop() || ""
+    : raw;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = null;
+  }
+
+  if (!res.ok || !json) {
+    const err = new ApiError(
+      `/mcp ${method} HTTP ${res.status}${raw ? "：" + raw.slice(0, 160) : ""}`,
+      codeForStatus(res.status),
+      res.status,
+    );
+    rememberError("/mcp", err);
+    throw err;
+  }
+  if (json.error) {
+    const err = new ApiError(
+      `MCP ${method} 失败：${json.error.message || "unknown"}`,
+      json.error.code ? String(json.error.code) : "INTERNAL",
+      res.status,
+    );
+    rememberError("/mcp", err);
+    throw err;
+  }
+  return json.result;
+}
+
+/** 实时取 MCP 工具名清单；未就绪 / 无令牌 → 返回 null（页面回退到内置清单） */
+export async function mcpToolNames(opts = {}) {
+  try {
+    const result = await mcpRpc("tools/list", undefined, opts);
+    const tools = result && Array.isArray(result.tools) ? result.tools : [];
+    return tools.map((t) => t && t.name).filter((n) => typeof n === "string");
+  } catch (e) {
+    rememberError("/mcp", e);
+    return null;
+  }
+}
+
 /** 便于调试/自证：把最近失败一览打印到 console（只在显式调用时执行） */
 export function dumpErrors() {
   return [...lastErrors.entries()].map(([path, info]) => ({ path, ...info }));
 }
 
-export default { api, apiSafe, apiList, apiHealth, apiToken, setApiToken, hasWriteToken, siteDomain, appVersion, lastError, clearErrors, dumpErrors, ApiError };
+export default { api, apiSafe, apiList, apiHealth, apiToken, setApiToken, hasWriteToken, siteDomain, appVersion, lastError, clearErrors, dumpErrors, mcpRpc, mcpToolNames, ApiError };
