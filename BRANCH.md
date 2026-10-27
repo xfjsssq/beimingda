@@ -1,31 +1,28 @@
-# 分支：main
+# 分支：feat/m2-buddy
 
 ## 本分支做什么
-主分支。**只接受 PR**，不直接推。当前已包含 T0 骨架与核心层（由 `feat/core` 合入）。
+**M2 搭子匹配**：11 字段画像抽取 + 匹配评分（35/30/20/15）+ 双选揭示状态机 + MCP 3 个工具 + `GET/POST /api/buddies` + `static/buddy.html`。
 
 ## 依赖什么
-- 无（这是基准分支）
+- `contracts/core.md`（表结构、信封、鉴权）
+- `contracts/m2-buddy.md`（画像 schema、算法权重、状态机，**双选状态机不得简化**）
+- `tasks/M2-搭子匹配.md`（任务卡）
+- T0 骨架已合入 `main`
 
 ## 完成标准
-- 所有模块分支的验收清单合并后，`npm start` + `npm run seed` + `npm test` + `npm run smoke` 全绿
-- 部署站点 `https://demo.knowingly.dpdns.org` 可用
+`contracts/m2-buddy.md` §8 自测清单全部勾上，外加断言测试覆盖「`revealed=0` 时返回对象里不含 `contact_code` 键」。
 
 ## 不能碰什么
-- ⛔ 不许直接 push（必须走 PR）
-- ⛔ 不许把 `.env` / `*.db` / `node_modules` 提交进来
+- `src/db/schema.sql`、`contracts/` 下任何文件
+- `src/mcp/tools.js` / `handlers.js` 里其他模块的区块
+- ⛔ 由 user_id 派生 `anon_token`、未双选成功就返回联系方式、结果里出现院系全名/班级/学号/宿舍号/真实姓名
+- ⛔ 把照片纳入评分、承接恋爱匹配需求
 
 ## 当前进度
-- [x] T0 骨架与核心（`feat/core`）：目录结构、`package.json`、`schema.sql`、DB 初始化、
-      auth/ratelimit 中间件、`GET /api/health`、`POST /mcp`（initialize / tools/list / tools/call）、
-      `npm run seed`、`npm run smoke`、`npm test`
-- [x] G0 协作文件：`.gitignore`、`.env.example`、PR 模板、`CONTRIBUTING.md`、7 个分支与各自 `BRANCH.md`
-- [ ] M1 代取撮合（`feat/m1-takeout`）
-- [ ] M2 搭子匹配（`feat/m2-buddy`）
-- [ ] M3 迎新导览（`feat/m3-welcome`）
-- [ ] M4 日程与提醒（`feat/m4-schedule`）
-- [ ] F0 门户与 `/agent` 页（`feat/frontend`）
-- [ ] 参赛材料（`docs/materials`）
-
-## 合并完成后要做的两件事（仓库管理员）
-1. `main` 开分支保护（Settings → Branches），禁止直接 push
-2. 给对方 GitHub 账号加 Write 权限（Settings → Collaborators）
+- [ ] `src/engine/buddy.js` 画像抽取 + 评分
+- [ ] `src/engine/doubleOpt.js` 双选揭示状态机（单独文件，便于评审对照）
+- [ ] `src/services/buddy.js`
+- [ ] MCP 3 工具注册与 handler
+- [ ] `src/api/routes.js` 2 条路由
+- [ ] `static/buddy.html` 4 区块
+- [ ] `fixtures/buddy-posts.json` ≥10 条（覆盖 5 种 kind + 语义冲突组合）
