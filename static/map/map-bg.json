@@ -1,0 +1,20 @@
+{
+  "_comment": "M3 底图配置（⭐ 截图方案）。页面 welcome.html 读这两个字段：image（底图路径，相对站点根）+ points（每个节点在底图上的百分比坐标，左上角 0,0 → 右下角 100,100）。换底图只改 image 一行。",
+  "image": "/map/campus-map.svg",
+  "_howto": "① 手机地图 App（微信/高德/腾讯都行）打开校园，调整到你满意的范围与缩放，截图；② 存成 static/map/campus-map.jpg（建议宽 1200~2000px，压到 500KB 以内）；③ 把上面的 image 改成 /map/campus-map.jpg；④ 用浏览器打开 welcome.html，按需要微调 points 里的百分比坐标（改完刷新即可，无需重启服务）。",
+  "attribution": "底图为手机地图截图（示意，非在线地图服务）",
+  "points": {
+    "dorm-12":         { "x_pct": 62, "y_pct": 56 },
+    "dorm-15":         { "x_pct": 70, "y_pct": 74 },
+    "dorm-3":          { "x_pct": 24, "y_pct": 62 },
+    "canteen-1":       { "x_pct": 36, "y_pct": 42 },
+    "canteen-2":       { "x_pct": 56, "y_pct": 44 },
+    "teaching-a":      { "x_pct": 44, "y_pct": 30 },
+    "library":         { "x_pct": 52, "y_pct": 22 },
+    "playground":      { "x_pct": 78, "y_pct": 34 },
+    "gate-south":      { "x_pct": 47, "y_pct": 88 },
+    "gate-north":      { "x_pct": 45, "y_pct": 10 },
+    "service-express": { "x_pct": 66, "y_pct": 48 },
+    "service-clinic":  { "x_pct": 30, "y_pct": 22 }
+  }
+}

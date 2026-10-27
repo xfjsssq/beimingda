@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" width="1200" height="800" role="img" aria-label="校园示意图占位底图">
+  <!-- 占位底图：等真正的手机地图截图（static/map/campus-map.jpg）到位后，把 static/map/map-bg.json 的 image 换掉即可 -->
+  <rect width="1200" height="800" fill="#EAF0E6"/>
+  <!-- 绿地 -->
+  <rect x="60" y="60" width="1080" height="680" rx="24" fill="#DFEAD8"/>
+  <path d="M0 300 H1200" stroke="#F2F2EF" stroke-width="34"/>
+  <path d="M0 620 H1200" stroke="#F2F2EF" stroke-width="26"/>
+  <path d="M420 0 V800" stroke="#F2F2EF" stroke-width="30"/>
+  <path d="M880 0 V800" stroke="#F2F2EF" stroke-width="22"/>
+  <!-- 水域 -->
+  <ellipse cx="230" cy="450" rx="120" ry="70" fill="#CFE3F0"/>
+  <!-- 建筑块（只画体量，名字由页面上的标记给出） -->
+  <g fill="#C8D2DC" stroke="#AEBAC6" stroke-width="2">
+    <rect x="470" y="150" width="150" height="90" rx="8"/>
+    <rect x="360" y="430" width="140" height="80" rx="8"/>
+    <rect x="640" y="430" width="170" height="80" rx="8"/>
+    <rect x="700" y="180" width="150" height="90" rx="8"/>
+    <rect x="900" y="380" width="170" height="120" rx="8"/>
+    <rect x="160" y="180" width="180" height="90" rx="8"/>
+    <rect x="140" y="610" width="200" height="90" rx="8"/>
+    <rect x="740" y="640" width="180" height="80" rx="8"/>
+    <rect x="500" y="300" width="190" height="70" rx="8"/>
+  </g>
+  <!-- 跑道 -->
+  <rect x="900" y="380" width="170" height="120" rx="60" fill="none" stroke="#C0392B" stroke-width="6" opacity="0.5"/>
+  <text x="600" y="770" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#6B7A85">
+    占位示意图底图 · 请替换为手机地图截图（static/map/campus-map.jpg）
+  </text>
+</svg>
