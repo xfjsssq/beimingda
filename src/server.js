@@ -49,10 +49,14 @@ export function createApp() {
   app.use(express.urlencoded({ extended: false, limit: "256kb" }));
 
   // 前端配置注入：TILE_PROVIDER_KEY 等只在这里透出，⛔ 页面里不许硬编码
+  //   ⚠️ __DEMO_TOKEN__ 是「演示令牌」，按 contracts/core.md §4 它本就是公开给评委的
+  //      （只读 + 限频 + 短周期轮换，泄露无风险）。注入它只为让页面上的写接口
+  //      （发布代取任务 / 发搭子帖）零操作可用；⛔ 页面不许把它回显到界面上。
   app.get("/config.js", (req, res) => {
     res.type("application/javascript").send(
       `window.__TILE_KEY__=${JSON.stringify(process.env.TILE_PROVIDER_KEY || "")};` +
         `window.__SITE_DOMAIN__=${JSON.stringify(process.env.SITE_DOMAIN || "")};` +
+        `window.__DEMO_TOKEN__=${JSON.stringify(process.env.DEMO_TOKEN || "")};` +
         `window.__APP_VERSION__=${JSON.stringify(process.env.npm_package_version || "0.1.0")};\n`,
     );
   });

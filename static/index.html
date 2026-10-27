@@ -1,72 +1,344 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-page="index">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>北名大小助手 · 骨架就绪</title>
-  <style>
-    :root { --pri:#1F4E8C; --ok:#2E8B76; --bg:#F5F7FA; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:#1c1c1e;
-      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
-    main { max-width:860px; margin:0 auto; padding:32px 20px 64px; }
-    h1 { color:var(--pri); font-size:24px; margin:0 0 8px; }
-    .sub { color:#5b6470; margin:0 0 24px; }
-    .card { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px;
-      box-shadow:0 1px 3px rgba(16,24,40,.08); }
-    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); }
-    code, pre { font-family:Consolas,"Courier New",monospace; font-size:13px; }
-    pre { background:#0f172a; color:#e2e8f0; padding:12px 14px; border-radius:8px; overflow:auto; }
-    .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px;
-      background:rgba(46,139,118,.12); color:var(--ok); margin-left:6px; }
-    ul { margin:8px 0 0; padding-left:20px; }
-    a { color:var(--pri); }
-  </style>
+  <meta name="description" content="北名大小助手 —— 把散落的校园服务收进一个对话：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 MCP 开放给 WorkBuddy。" />
+  <title>北名大小助手 · 把散落的校园服务，收进一个对话</title>
+  <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body>
-<main>
-  <h1>北名大小助手 <span class="tag">骨架已就绪</span></h1>
-  <p class="sub">把散落的校园服务，收进一个对话。</p>
+  <!-- 页头导航由 /js/nav.js 注入（6 页共用，移动端自动收成底部 tab） -->
+  <noscript>
+    <div class="page"><p class="notice notice--warn">本页的「实时运行统计」需要 JavaScript 才能从后端接口取数；请开启后刷新。</p></div>
+  </noscript>
 
-  <div class="card">
-    <h2>这一页是占位页，不是最终首页</h2>
-    <p>最终门户首页由 <code>feat/frontend</code> 分支交付（<code>contracts/frontend.md</code> 规定 4 个区块）。
-       本文件只保证骨架阶段 <code>GET /</code> 不 404。</p>
-  </div>
+  <main class="page">
 
-  <div class="card">
-    <h2>骨架自检</h2>
-    <pre>curl -s http://127.0.0.1:3000/api/health
-curl -s -X POST http://127.0.0.1:3000/mcp \
-  -H "Authorization: Bearer $DEMO_TOKEN" -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
-    <p id="health">正在探测 /api/health …</p>
-  </div>
+    <!-- ============ 区块一 · 顶部标语 ============ -->
+    <section class="section section--plain" aria-labelledby="hero-title">
+      <h1 id="hero-title">北名大小助手 ｜ 把散落的校园服务，收进一个对话</h1>
+      <p class="lead">
+        取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
+        我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
+        在对话框里说一句话就能办事。
+      </p>
+      <div class="row" style="margin-top:12px">
+        <a class="btn" href="/agent">看怎么接入 Agent（评委页）</a>
+        <a class="btn btn--ghost" href="#features">看看四个功能</a>
+      </div>
+    </section>
 
-  <div class="card">
-    <h2>六个页面的路由（最终形态）</h2>
-    <ul>
-      <li><code>/</code> 门户首页 · <code>feat/frontend</code></li>
-      <li><code>/takeout</code> 代取看板 · <code>feat/m1-takeout</code></li>
-      <li><code>/buddy</code> 搭子墙 · <code>feat/m2-buddy</code></li>
-      <li><code>/welcome</code> 迎新地图 · <code>feat/m3-welcome</code></li>
-      <li><code>/schedule</code> 日程表 · <code>feat/m4-schedule</code></li>
-      <li><code>/agent</code> ⭐ 评委核心页 · <code>feat/frontend</code></li>
-    </ul>
-  </div>
+    <!-- ============ 区块二 · 四张功能卡片 ============ -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <h2 class="section__title" id="features-title"><span class="section__index">2</span>四个功能，一个入口</h2>
+      <div class="grid grid--cards">
+        <article class="card">
+          <span class="card__icon" aria-hidden="true">📦</span>
+          <h3 class="card__title">代取撮合</h3>
+          <p class="card__desc">发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。</p>
+          <a class="btn btn--ghost btn--sm card__action" href="/takeout">进入代取看板</a>
+        </article>
+        <article class="card">
+          <span class="card__icon" aria-hidden="true">🤝</span>
+          <h3 class="card__title">搭子匹配</h3>
+          <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）才互相可见联系方式，单方面看不到。</p>
+          <a class="btn btn--ghost btn--sm card__action" href="/buddy">进入搭子墙</a>
+        </article>
+        <article class="card">
+          <span class="card__icon" aria-hidden="true">🗺️</span>
+          <h3 class="card__title">迎新导览</h3>
+          <p class="card__desc">校园地图 + 360° 实景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
+          <a class="btn btn--ghost btn--sm card__action" href="/welcome">进入迎新导览</a>
+        </article>
+        <article class="card">
+          <span class="card__icon" aria-hidden="true">⏰</span>
+          <h3 class="card__title">日程提醒</h3>
+          <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。快到点了提前两小时喊你一声。</p>
+          <a class="btn btn--ghost btn--sm card__action" href="/schedule">进入日程表</a>
+        </article>
+      </div>
+    </section>
 
-  <div class="card">
-    <h2>协作</h2>
-    <p>分支与 PR 规范见仓库根 <code>CONTRIBUTING.md</code> 与 <code>BRANCH.md</code>；
-       需求契约见 <code>contracts/</code>；任务卡见 <code>tasks/</code>。</p>
-  </div>
-</main>
-<script src="/config.js"></script>
-<script>
-  fetch("/api/health").then(r => r.json()).then(j => {
-    document.getElementById("health").textContent =
-      j.ok ? "✅ /api/health 正常：" + JSON.stringify(j.data) : "❌ 异常：" + JSON.stringify(j);
-  }).catch(e => { document.getElementById("health").textContent = "❌ " + e.message; });
-</script>
+    <!-- ============ 区块三 · 实时运行统计（⭐ 全部走真实 API，页面不写死任何数字） ============ -->
+    <section class="section" id="stats" aria-labelledby="stats-title">
+      <h2 class="section__title" id="stats-title"><span class="section__index">3</span>实时运行统计</h2>
+
+      <div class="grid grid--stats">
+        <div class="stat stat--pending" id="stat-tasks">
+          <p class="stat__label">开放代取任务数</p>
+          <div class="stat__value">—</div>
+          <p class="stat__src">读取中…</p>
+        </div>
+        <div class="stat stat--pending" id="stat-runners">
+          <p class="stat__label">活跃跑腿者数</p>
+          <div class="stat__value">—</div>
+          <p class="stat__src">读取中…</p>
+        </div>
+        <div class="stat stat--pending" id="stat-buddies">
+          <p class="stat__label">搭子帖数</p>
+          <div class="stat__value">—</div>
+          <p class="stat__src">读取中…</p>
+        </div>
+        <div class="stat stat--pending" id="stat-score">
+          <p class="stat__label">平均匹配得分</p>
+          <div class="stat__value">—</div>
+          <p class="stat__src">读取中…</p>
+        </div>
+      </div>
+
+      <div class="row row--between" style="margin-top:12px">
+        <p class="section__note" id="stats-note">
+          口径：以上四个数字<b>全部来自后端真实接口</b>，页面里没有任何写死的数值；点「刷新」即可看到它随数据变化。
+        </p>
+        <button class="btn btn--quiet btn--sm" type="button" id="refresh-stats">刷新统计</button>
+      </div>
+
+      <p class="section__note" id="server-note">服务端：探测中…</p>
+      <p class="notice notice--warn hidden" id="demo-note">
+        演示模式：以下数字由 <code class="inline">GET /api/demo/seed</code> 灌入的虚构演示数据（<code class="inline">demo=1</code>）统计而来，不对应任何真实的人或事。
+      </p>
+      <p class="notice hidden" id="pending-note"></p>
+    </section>
+
+    <!-- ============ 区块四 · Agent 入口提示 ============ -->
+    <section class="section" aria-labelledby="agent-title">
+      <h2 class="section__title" id="agent-title"><span class="section__index">4</span>也可以只在 WorkBuddy 里说一句话</h2>
+      <p class="lead">
+        这个平台把能力做成了 <b>MCP 工具</b>，所以不用打开这些网页 —— 在 WorkBuddy 里接一次，
+        之后直接说：
+      </p>
+      <ul class="hint-list">
+        <li>「帮我发个代取，12 号楼取快递送到 15 号楼，今晚 8 点前，报酬 3 到 5 块」</li>
+        <li>「我今晚 6 点到 9 点有空，12 到 16 号楼都能去，报酬 2 块以上就行」</li>
+      </ul>
+      <p class="section__note">
+        完整配置、四步接入指引、每个模块的对话示例与工具清单，都在评委页里：
+      </p>
+      <div class="row" style="margin-top:6px">
+        <a class="btn" href="/agent">打开 /agent · MCP 接入页 →</a>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <p>
+      北名大小助手 · 第一届「银移杯」校园 AI Agent 创新大赛 赛道 17 智慧校园 Agent 创意赛道 ·
+      演示数据全部虚构（<code class="inline">demo=1</code>），全站不收集真实姓名 / 学号 / 手机号。
+    </p>
+    <p>本页不依赖任何外部 CDN：样式与脚本都是本站文件，断网也能打开。</p>
+  </footer>
+
+  <script src="/config.js"></script>
+  <script type="module">
+    import { apiSafe, apiHealth, lastError } from "/js/api.js";
+    import { mountNav } from "/js/nav.js";
+    import { initDemo, isDemo } from "/js/demo.js";
+
+    mountNav();
+
+    /* ------------------------------------------------------------------
+       统计口径：每个 stat 依次尝试候选接口，第一个能给出数字的胜出。
+       ⛔ 页面里没有任何写死的数值；接口未就绪就显示「—」并说明原因。
+       （/api/tasks 属 feat/m1-takeout、/api/buddies 属 feat/m2-buddy，
+         它们与本分支并行开发，未就绪不得让页面报错或白屏）
+       ------------------------------------------------------------------ */
+
+    /** 从任意响应里抽出数组（兼容 data 直接是数组 / {items:[]} / {list:[]}） */
+    function listOf(d) {
+      if (Array.isArray(d)) return d;
+      if (d && Array.isArray(d.items)) return d.items;
+      if (d && Array.isArray(d.list)) return d.list;
+      if (d && Array.isArray(d.data)) return d.data;
+      return null;
+    }
+
+    /** 从对象里按候选字段名取数字 */
+    function numField(d, names) {
+      if (!d || typeof d !== "object") return null;
+      for (const n of names) {
+        const v = d[n];
+        if (typeof v === "number" && Number.isFinite(v)) return v;
+        if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v))) return Number(v);
+      }
+      return null;
+    }
+
+    const STATS = [
+      {
+        key: "tasks",
+        label: "开放代取任务数",
+        unit: "个",
+        paths: ["/api/tasks?limit=200", "/api/tasks"],
+        owner: "feat/m1-takeout",
+        pick(d) {
+          const list = listOf(d);
+          if (list) {
+            // 契约：/api/tasks 只回 open 且未过期；模型若带 raw_status 就再兜一层
+            return list.filter((t) => !t || t.raw_status === undefined || t.raw_status === "open").length;
+          }
+          return numField(d, ["open_tasks", "task_count"]);
+        },
+      },
+      {
+        key: "runners",
+        label: "活跃跑腿者数",
+        unit: "人",
+        paths: ["/api/runners", "/api/stats"],
+        owner: "feat/m1-takeout",
+        pick(d) {
+          const list = listOf(d);
+          if (list) return list.filter((r) => !r || r.active === undefined || Number(r.active) === 1).length;
+          return numField(d, ["active_runners", "runner_count", "runners"]);
+        },
+      },
+      {
+        key: "buddies",
+        label: "搭子帖数",
+        unit: "条",
+        paths: ["/api/buddies", "/api/stats"],
+        owner: "feat/m2-buddy",
+        pick(d) {
+          const list = listOf(d);
+          if (list) return list.filter((p) => !p || !p.raw_status || p.raw_status === "open").length;
+          return numField(d, ["buddy_posts", "buddy_count"]);
+        },
+      },
+      {
+        key: "score",
+        label: "平均匹配得分",
+        unit: "分",
+        paths: ["/api/matches", "/api/stats"],
+        owner: "feat/m1-takeout",
+        pick(d) {
+          const list = listOf(d);
+          if (list && list.length) {
+            const scores = list.map((m) => Number(m && m.score)).filter((n) => Number.isFinite(n));
+            if (scores.length) {
+              const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+              return Math.round(avg * 10) / 10;
+            }
+          }
+          return numField(d, ["avg_match_score", "avg_score", "match_score_avg"]);
+        },
+      },
+    ];
+
+    function fmt(spec, v) {
+      return spec.key === "score" ? Number(v).toFixed(1) : String(Math.round(Number(v)));
+    }
+
+    async function resolveStat(spec) {
+      for (const path of spec.paths) {
+        const data = await apiSafe(path);
+        if (data === null) continue;
+        const v = spec.pick(data);
+        if (typeof v === "number" && Number.isFinite(v)) return { value: v, from: path };
+      }
+      return { value: null, from: spec.paths[0] };
+    }
+
+    /** 失败原因翻译成人话：区分「还没上线」和「打太勤被限频」 */
+    function failHint(code) {
+      if (code === "NOT_FOUND") return null; // 交给调用方补 owner
+      if (code === "QUOTA") return "触发限频（单 IP 60 次/分钟）· 稍等一下再点「刷新统计」";
+      if (code === "TIMEOUT") return "请求超时 · 稍后重试";
+      if (code === "SCHEMA_REJECTED") return "接口拒绝（鉴权或参数）· 读接口不需要令牌，可能是写接口";
+      return code ? "读取失败（" + code + "）" : "读取失败";
+    }
+
+    function paint(spec, res) {
+      const box = document.getElementById("stat-" + spec.key);
+      if (!box) return;
+      const valueEl = box.querySelector(".stat__value");
+      const srcEl = box.querySelector(".stat__src");
+      if (res.value === null) {
+        box.classList.add("stat--pending");
+        valueEl.textContent = "—";
+        const err = lastError(spec.paths[0]) || lastError(spec.paths[spec.paths.length - 1]);
+        const hint = failHint(err && err.code);
+        srcEl.textContent = hint
+          ? hint
+          : "接口未就绪（" + ((err && err.code) || "…") + "）· 等待 " + spec.owner;
+        return;
+      }
+      box.classList.remove("stat--pending");
+      valueEl.textContent = fmt(spec, res.value);
+      const unit = document.createElement("span");
+      unit.className = "stat__unit";
+      unit.textContent = spec.unit;
+      valueEl.appendChild(unit);
+      srcEl.textContent = "来源 " + res.from + " · " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    }
+
+    function summarizePending(results) {
+      const pending = STATS.filter((s) => results[s.key].value === null);
+      const note = document.getElementById("pending-note");
+      if (!pending.length) {
+        note.classList.add("hidden");
+        note.textContent = "";
+        return;
+      }
+      note.classList.remove("hidden");
+      note.textContent =
+        "仍有 " + pending.length + " 项统计的接口还没就绪（" +
+        pending.map((s) => s.paths[0] + " · " + s.owner).join("；") +
+        "）。这里显示「—」而不是编一个数字 —— 接口一上线刷新就会自动出现。";
+    }
+
+    async function loadServer() {
+      const h = await apiHealth();
+      const el = document.getElementById("server-note");
+      if (!h || !h.version) {
+        el.textContent = "服务端：健康检查不可用（GET /api/health）";
+        return;
+      }
+      el.textContent =
+        "服务端：v" + h.version + " 在线 · MCP 端点 " + (h.mcp || "/mcp") +
+        " · 页面加载于 " + new Date().toLocaleTimeString("zh-CN", { hour12: false });
+    }
+
+    async function refresh() {
+      const results = {};
+      await Promise.all(
+        STATS.map(async (spec) => {
+          const res = await resolveStat(spec);
+          results[spec.key] = res;
+          paint(spec, res);
+        }),
+      );
+      summarizePending(results);
+      document.getElementById("stats-note").textContent =
+        "口径：以上四个数字全部来自后端真实接口，页面里没有任何写死的数值；" +
+        "最近一次刷新 " + new Date().toLocaleTimeString("zh-CN", { hour12: false }) + "。";
+    }
+
+    document.getElementById("refresh-stats").addEventListener("click", (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "刷新中…";
+      Promise.all([loadServer(), refresh()]).finally(() => {
+        btn.disabled = false;
+        btn.textContent = "刷新统计";
+      });
+    });
+
+    /* ---- 启动顺序：先确定是否演示模式（demo=1 会灌一次演示数据），再取统计 ---- */
+    (async function main() {
+      const demo = await initDemo();
+      if (demo.demo) {
+        document.getElementById("demo-note").classList.remove("hidden");
+        if (demo.seedPending) {
+          const note = document.getElementById("demo-note");
+          note.textContent =
+            "演示模式已开启，但演示数据接口尚未就绪（GET /api/demo/seed · 核心层/各模块分支负责）；" +
+            "下面能看到多少数字取决于当前库里已有的数据。";
+        }
+      }
+      await loadServer();
+      await refresh();
+    })();
+  </script>
 </body>
 </html>

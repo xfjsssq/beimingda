@@ -1,5 +1,10 @@
 {
-  "_comment": "⭐ 占位示例，M1 分支必须补到：≥8 条任务 + 故意构造'匹配/不匹配'两类样本。owner_handle 一律用'同学A/同学B'这类假名。deadline 可写 deadline_iso / deadline_in_minutes（相对当前时间）。",
+  "_comment": "⭐ M1 代取任务演示数据（全虚构，seed 一律写 demo=1）。楼栋名必须与 config/map-nodes.json 的 label 字面一致。时间用 *_in_minutes（相对执行 npm run seed 的时刻）。_scenario 只是给评委看的设计意图，seed 会忽略这个字段。",
+  "_scenarios": {
+    "可匹配": "demo-task-1 / 2 / 3 / 4 / 6 / 7 / 8 —— 至少 3 名跑腿者 >= 60 分",
+    "无人可接": "demo-task-5 —— 期限 15 小时，所有时段都只能覆盖 < 50%，最高 50 分 < 阈值 60",
+    "看板不展示": "demo-task-9（已过期）/ demo-task-10（raw_status=done）"
+  },
   "tasks": [
     {
       "id": "demo-task-1",
@@ -7,12 +12,139 @@
       "from_building": "12号宿舍楼",
       "to_building": "15号宿舍楼",
       "station": "快递驿站",
-      "deadline_in_minutes": 360,
+      "deadline_in_minutes": 240,
       "reward_min": 3,
       "reward_max": 5,
       "note": "小件，两个包裹",
       "screenshot_path": null,
-      "raw_status": "open"
+      "raw_status": "open",
+      "_scenario": "主力演示任务：命中送达楼(+40) / 仅命中取件楼(+20) / 不可达 三类候选都会出现，引擎明显在筛"
+    },
+    {
+      "id": "demo-task-2",
+      "owner_handle": "同学B",
+      "from_building": "15号宿舍楼",
+      "to_building": "12号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 90,
+      "reward_min": 4,
+      "reward_max": 6,
+      "note": "一箱牛奶，有点重",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "反向路径（15 → 12）：只有登记了 12 号楼的跑腿者能拿 40 分"
+    },
+    {
+      "id": "demo-task-3",
+      "owner_handle": "同学A",
+      "from_building": "12号宿舍楼",
+      "to_building": "15号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 60,
+      "reward_min": 2,
+      "reward_max": 3,
+      "note": "两个文件袋，轻",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "时间很紧（1 小时）：只在 45 分钟内回话的跑腿者会被时间分筛掉一部分"
+    },
+    {
+      "id": "demo-task-4",
+      "owner_handle": "同学C",
+      "from_building": "15号宿舍楼",
+      "to_building": "12号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 180,
+      "reward_min": 5,
+      "reward_max": 8,
+      "note": "代取水果，请轻拿轻放",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "高报酬：报酬分容易拿满，报酬下限 8 元的跑腿者拿 0 分 → 总分掉到 50 分以下"
+    },
+    {
+      "id": "demo-task-5",
+      "owner_handle": "同学B",
+      "from_building": "12号宿舍楼",
+      "to_building": "15号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 900,
+      "reward_min": 0,
+      "reward_max": 0,
+      "note": "室友的件，免费顺路带（0 元）",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "⭐「无人可接」样本：期限 15 小时 + 报酬 0 元 → 可达 40 + 部分时间 10 + 报酬 0 = 50 分，全员低于阈值 60，结果为空"
+    },
+    {
+      "id": "demo-task-6",
+      "owner_handle": "同学A",
+      "from_building": "15号宿舍楼",
+      "to_building": "12号宿舍楼",
+      "station": "南门",
+      "deadline_in_minutes": 45,
+      "reward_min": 3,
+      "reward_max": 4,
+      "note": "急件，尽快取",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "取件点在「南门」；45 分钟内截止 → 只留完全覆盖/高覆盖的跑腿者"
+    },
+    {
+      "id": "demo-task-7",
+      "owner_handle": "同学C",
+      "from_building": "12号宿舍楼",
+      "to_building": "15号宿舍楼",
+      "station": "南门",
+      "deadline_in_minutes": 120,
+      "reward_min": 2,
+      "reward_max": 4,
+      "note": "滞留件，尽快取",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "同分对照：多个候选落在 70~80 分区间，可按 score 降序看排序稳定性"
+    },
+    {
+      "id": "demo-task-8",
+      "owner_handle": "同学B",
+      "from_building": "15号宿舍楼",
+      "to_building": "12号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 300,
+      "reward_min": 6,
+      "reward_max": 10,
+      "note": "两台显示器，需要小推车",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "高报酬 + 长时段：报酬下限 8 元的跑腿者只拿到 55 分（差 5 分被阈值筛掉）"
+    },
+    {
+      "id": "demo-task-9",
+      "owner_handle": "同学A",
+      "from_building": "12号宿舍楼",
+      "to_building": "15号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": -45,
+      "reward_min": 3,
+      "reward_max": 5,
+      "note": "已过期样本：看板与撮合都不应出现",
+      "screenshot_path": null,
+      "raw_status": "open",
+      "_scenario": "⭐ 已过期但 raw_status 仍是 open —— 用来验证 task_list_open / GET /api/tasks 的 deadline 过滤"
+    },
+    {
+      "id": "demo-task-10",
+      "owner_handle": "同学B",
+      "from_building": "15号宿舍楼",
+      "to_building": "12号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 240,
+      "reward_min": 4,
+      "reward_max": 6,
+      "note": "已完成的样本：看板不应出现",
+      "screenshot_path": null,
+      "raw_status": "done",
+      "_scenario": "⭐ raw_status=done —— 用来验证「只返回 open」"
     }
   ]
 }

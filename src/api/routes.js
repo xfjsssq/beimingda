@@ -21,6 +21,12 @@
 import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
+import { createMapRouter } from "./map.js";
+import { createDemoRouter } from "./demo.js";
+import { createBuddiesRouter } from "./buddies.js";
+import { createTaskRouter } from "./tasks.js";
+import { createRunnersRouter } from "./runners.js";
+import { createMatchesRouter } from "./matches.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -39,11 +45,27 @@ export function createApiRouter() {
     );
   });
 
-  // ---------- 骨架占位：模块路由挂载点 ----------
-  // 各模块在自己的分支里 import 自己的 router，并 router.use(...) 到下面这两个前缀上。
-  // 例：router.use("/tasks", createTaskRouter());
-  //     router.use("/buddies", createBuddyRouter());
-  // ⛔ 不要在这里写具体业务逻辑。
+  // ---------- 模块路由挂载点 ----------
+  // 各模块在自己的分支里 import 自己的 router，并 router.use(...) 到对应前缀上。
+  // ⛔ 只加自己模块的那一行，不要动别人的；⛔ 不要在这里写具体业务逻辑。
+
+  // ---------- 核心：演示数据（契约 core.md §3：GET /api/demo/seed） ----------
+  router.use("/demo", createDemoRouter());
+
+  // M3 迎新导览（GET /api/map/nodes、/api/map/summary）
+  router.use("/map", createMapRouter());
+
+  // ---------- M1 代取撮合 ----------
+  router.use("/tasks", createTaskRouter());
+  router.use("/runners", createRunnersRouter()); // M1 只读：活跃跑腿者（门户统计，已脱敏）
+  router.use("/matches", createMatchesRouter()); // M1 只读：最近撮合记录（门户「平均匹配得分」）
+
+  // ---------- M2 搭子匹配 ----------
+  router.use("/buddies", createBuddiesRouter());
+
+  // ---------- M4 日程提醒（待合） ----------
+  // router.use("/schedule", createScheduleRouter());
+  // router.use("/scrub",    createScrubRouter());
 
   router.use((req, res) => {
     res.status(404).json({
