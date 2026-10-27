@@ -1,10 +1,34 @@
 {
-  "_comment": "⭐ 占位示例，M2 分支必须补到 ≥10 条、覆盖 5 种 kind，并故意构造 must_have vs deal_breaker 语义冲突的组合。profile 结构照抄 contracts/m2-buddy.md §1 的 11 字段。",
+  "_comment": "⭐ M2 演示数据（全虚构，demo=1）。12 条，覆盖 5 种 kind；demo-buddy-3 / -4 / -11 故意构造 must_have vs deal_breaker 语义冲突组合，用来让评审看到一票否决真的生效。profile 严格照 contracts/m2-buddy.md §1 的 11 字段结构（字段名不得增删改）。anon_token 是随机 12 位十六进制，与 user_id / 昵称无任何推导关系。",
+  "_conflict_pairs": [
+    {
+      "seeker_must_have": "室友必须安静，半夜别吵",
+      "post": "demo-buddy-3",
+      "post_deal_breaker": "受不了室友凌晨打游戏外放（半夜戴耳机也行，外放绝对不行）",
+      "theme": "噪音",
+      "note": "字符串完全不等，但语义冲突 -> 必须出一票否决"
+    },
+    {
+      "seeker_must_have": "不接受抽烟",
+      "post": "demo-buddy-4",
+      "post_deal_breaker": "室友抽烟（阳台抽也不行）",
+      "theme": "抽烟",
+      "note": "同主题 + 否定语义 -> 一票否决"
+    },
+    {
+      "seeker_must_have": "要求每周一起打扫卫生",
+      "post": "demo-buddy-11",
+      "post_deal_breaker": "房间乱一点就焦虑，会一直念叨别人不收拾",
+      "theme": "卫生整洁",
+      "note": "反义立场（爱干净 ↔ 被念叨不收拾）-> 一票否决（规则化兜底判据）"
+    }
+  ],
   "posts": [
     {
-      "id": "demo-post-1",
+      "id": "demo-buddy-1",
       "author_handle": "同学A",
       "kind": "study",
+      "anon_token": "anon_9f3a2c1b8d47",
       "profile": {
         "kind": "study",
         "grade": "大二",
@@ -16,11 +40,259 @@
         },
         "interests": ["算法", "摄影"],
         "traits": { "chatty": 0.4, "planner": 0.7, "tidy": 0.6 },
-        "wanted": "想找一起刷算法题的同学，晚上七点后有空",
-        "must_have": ["安静，不半夜吵闹"],
-        "deal_breaker": ["凌晨打游戏外放"]
+        "wanted": "想找一起刷算法题、周末一起扫街拍照的同学，晚上七点后都有空",
+        "must_have": ["能一起去图书馆自习"],
+        "deal_breaker": ["约了不来也不说一声"]
       },
       "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-2",
+      "author_handle": "同学B",
+      "kind": "study",
+      "anon_token": "anon_4c7e1a9d2b06",
+      "profile": {
+        "kind": "study",
+        "grade": "大三",
+        "major_group": "工科",
+        "schedule": {
+          "early_bird": 0.15,
+          "weekend_free": 0.6,
+          "busy_slots": [
+            { "weekday": 1, "period_start": 1, "period_end": 4 },
+            { "weekday": 4, "period_start": 5, "period_end": 6 }
+          ]
+        },
+        "interests": ["算法", "考研"],
+        "traits": { "chatty": 0.3, "planner": 0.8, "tidy": 0.5 },
+        "wanted": "找一起刷算法题、一起备考考研的搭子，能长期坚持，凌晨还在线",
+        "must_have": ["能接受晚上十点以后自习"],
+        "deal_breaker": ["三天打鱼两天晒网"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-3",
+      "author_handle": "同学C",
+      "kind": "roommate",
+      "anon_token": "anon_1b8d5e2f9a30",
+      "profile": {
+        "kind": "roommate",
+        "grade": "研一",
+        "major_group": "理科",
+        "schedule": {
+          "early_bird": 0.2,
+          "weekend_free": 0.5,
+          "busy_slots": [{ "weekday": 2, "period_start": 1, "period_end": 3 }]
+        },
+        "interests": ["游戏", "动漫"],
+        "traits": { "chatty": 0.7, "planner": 0.3, "tidy": 0.4 },
+        "wanted": "找作息接近的室友，晚上能一起开黑聊两句，白天各忙各的",
+        "must_have": ["能接受晚上打游戏"],
+        "deal_breaker": ["受不了室友凌晨打游戏外放（半夜戴耳机也行，外放绝对不行）"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-4",
+      "author_handle": "同学D",
+      "kind": "roommate",
+      "anon_token": "anon_7e2c6f0d3a95",
+      "profile": {
+        "kind": "roommate",
+        "grade": "大四",
+        "major_group": "经管",
+        "schedule": {
+          "early_bird": 0.75,
+          "weekend_free": 0.3,
+          "busy_slots": [
+            { "weekday": 5, "period_start": 1, "period_end": 4 },
+            { "weekday": 6, "period_start": 1, "period_end": 4 }
+          ]
+        },
+        "interests": ["实习", "读书"],
+        "traits": { "chatty": 0.35, "planner": 0.85, "tidy": 0.8 },
+        "wanted": "找爱干净、作息规律的室友，实习期早出晚归，希望互相尊重安静时间",
+        "must_have": ["能保持公共区域整洁"],
+        "deal_breaker": ["室友抽烟（阳台抽也不行）"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-5",
+      "author_handle": "同学E",
+      "kind": "project",
+      "anon_token": "anon_3a9b4d7c1e62",
+      "profile": {
+        "kind": "project",
+        "grade": "大三",
+        "major_group": "工科",
+        "schedule": {
+          "early_bird": 0.4,
+          "weekend_free": 0.9,
+          "busy_slots": [{ "weekday": 3, "period_start": 5, "period_end": 8 }]
+        },
+        "interests": ["编程", "剪辑"],
+        "traits": { "chatty": 0.6, "planner": 0.75, "tidy": 0.7 },
+        "wanted": "想组队做校园小程序，前端后端都行，周末集中开发，能一起写代码到深夜",
+        "must_have": ["会写代码或愿意学"],
+        "deal_breaker": ["只挂名不出力"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-6",
+      "author_handle": "同学F",
+      "kind": "project",
+      "anon_token": "anon_5d1f8b2a6c47",
+      "profile": {
+        "kind": "project",
+        "grade": "大二",
+        "major_group": "理科",
+        "schedule": {
+          "early_bird": 0.55,
+          "weekend_free": 0.55,
+          "busy_slots": [{ "weekday": 2, "period_start": 5, "period_end": 6 }]
+        },
+        "interests": ["数学建模", "编程"],
+        "traits": { "chatty": 0.45, "planner": 0.9, "tidy": 0.6 },
+        "wanted": "备战数学建模竞赛找队友，需要会编程和论文写作，能一起熬夜赶稿",
+        "must_have": ["有建模或编程基础"],
+        "deal_breaker": ["比赛前一晚失联"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-7",
+      "author_handle": "同学G",
+      "kind": "sport",
+      "anon_token": "anon_8c4a0e6b9d13",
+      "profile": {
+        "kind": "sport",
+        "grade": "大一",
+        "major_group": "不限",
+        "schedule": {
+          "early_bird": 0.6,
+          "weekend_free": 0.7,
+          "busy_slots": [{ "weekday": 4, "period_start": 7, "period_end": 8 }]
+        },
+        "interests": ["篮球", "健身"],
+        "traits": { "chatty": 0.8, "planner": 0.4, "tidy": 0.5 },
+        "wanted": "找固定球搭子，每周两三次，下午没课就约球，一起撸铁也行",
+        "must_have": ["能固定时间"],
+        "deal_breaker": ["老是放鸽子"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-8",
+      "author_handle": "同学H",
+      "kind": "sport",
+      "anon_token": "anon_2f6c9e3d8b54",
+      "profile": {
+        "kind": "sport",
+        "grade": "大二",
+        "major_group": "文科",
+        "schedule": {
+          "early_bird": 0.85,
+          "weekend_free": 0.9,
+          "busy_slots": [{ "weekday": 1, "period_start": 1, "period_end": 2 }]
+        },
+        "interests": ["羽毛球", "跑步", "早起"],
+        "traits": { "chatty": 0.5, "planner": 0.6, "tidy": 0.7 },
+        "wanted": "想找晨跑和打羽毛球的搭子，周末一起去体育馆，早睡早起型",
+        "must_have": ["周末能早起"],
+        "deal_breaker": ["约了早上又赖床"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-9",
+      "author_handle": "同学A",
+      "kind": "study",
+      "anon_token": "anon_6b0d3f7a2c81",
+      "profile": {
+        "kind": "study",
+        "grade": "大一",
+        "major_group": "工科",
+        "schedule": {
+          "early_bird": 0.5,
+          "weekend_free": 0.5,
+          "busy_slots": []
+        },
+        "interests": [],
+        "traits": { "chatty": 0.5, "planner": 0.5, "tidy": 0.5 },
+        "wanted": "想找一起自习的搭子",
+        "must_have": [],
+        "deal_breaker": []
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-10",
+      "author_handle": "同学I",
+      "kind": "other",
+      "anon_token": "anon_0e5a8c1b4f72",
+      "profile": {
+        "kind": "other",
+        "grade": "大三",
+        "major_group": "艺术",
+        "schedule": {
+          "early_bird": 0.25,
+          "weekend_free": 0.85,
+          "busy_slots": [{ "weekday": 5, "period_start": 5, "period_end": 8 }]
+        },
+        "interests": ["桌游", "电影", "音乐"],
+        "traits": { "chatty": 0.9, "planner": 0.35, "tidy": 0.45 },
+        "wanted": "周末想找人一起玩桌游看片，剧本杀也可，人多热闹点更好",
+        "must_have": ["愿意一起约周末"],
+        "deal_breaker": ["临时放鸽子"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-11",
+      "author_handle": "同学J",
+      "kind": "other",
+      "anon_token": "anon_9a7b2d5e0c38",
+      "profile": {
+        "kind": "other",
+        "grade": "研二",
+        "major_group": "文科",
+        "schedule": {
+          "early_bird": 0.45,
+          "weekend_free": 0.4,
+          "busy_slots": [{ "weekday": 2, "period_start": 9, "period_end": 10 }]
+        },
+        "interests": ["咖啡", "读书", "摄影"],
+        "traits": { "chatty": 0.3, "planner": 0.7, "tidy": 0.9 },
+        "wanted": "想找安静一点的咖啡探店/看展搭子，一周一次，慢慢聊",
+        "must_have": ["能安静聊天"],
+        "deal_breaker": ["房间乱一点就焦虑，会一直念叨别人不收拾"]
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-12",
+      "author_handle": "同学K",
+      "kind": "study",
+      "anon_token": "anon_c1d4e7f0a2b5",
+      "profile": {
+        "kind": "study",
+        "grade": "大四",
+        "major_group": "经管",
+        "schedule": {
+          "early_bird": 0.7,
+          "weekend_free": 0.2,
+          "busy_slots": [{ "weekday": 3, "period_start": 9, "period_end": 12 }]
+        },
+        "interests": ["考研", "英语"],
+        "traits": { "chatty": 0.4, "planner": 0.85, "tidy": 0.65 },
+        "wanted": "考研冲刺找背书搭子，图书馆四楼常年驻扎",
+        "must_have": ["每天能固定时间"],
+        "deal_breaker": ["半夜还在宿舍大声背书"]
+      },
+      "raw_status": "closed"
     }
   ]
 }
