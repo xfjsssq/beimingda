@@ -22,10 +22,10 @@
       "user_handle": "同学E",
       "contact_code": "demo-contact-2",
       "reachable_buildings": ["15号宿舍楼"],
-      "reward_floor": 5,
+      "reward_floor": 4,
       "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 120 }],
       "active": true,
-      "_scenario": "只到 15 号楼 + 报酬下限 5 元：能做送 15 号楼的任务，做 15→12 的任务只能拿取件楼 20 分"
+      "_scenario": "只到 15 号楼 + 报酬下限 4 元：能做「送到 15 号楼」的任务；做 15→12 的任务只能拿取件楼 20 分，靠时间/报酬补分（刻意留在 60 分以上，避免演示中途从候选里消失）"
     },
     {
       "id": "demo-runner-3",
