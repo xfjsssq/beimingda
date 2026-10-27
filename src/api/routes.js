@@ -22,6 +22,8 @@ import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
 import { createTaskRouter } from "./tasks.js";
+import { createRunnersRouter } from "./runners.js";
+import { createMatchesRouter } from "./matches.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -47,6 +49,8 @@ export function createApiRouter() {
   // ⛔ 不要在这里写具体业务逻辑。
 
   router.use("/tasks", createTaskRouter()); // M1 代取撮合（feat/m1-takeout）
+  router.use("/runners", createRunnersRouter()); // M1 只读：活跃跑腿者（门户统计，已脱敏）
+  router.use("/matches", createMatchesRouter()); // M1 只读：最近撮合记录（门户「平均匹配得分」）
 
   router.use((req, res) => {
     res.status(404).json({

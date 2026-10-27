@@ -1,7 +1,8 @@
 # 分支：feat/m1-takeout
 
 ## 本分支做什么
-**M1 代取撮合**：撮合评分引擎 + 任务/跑腿 service + MCP 5 个工具 + `GET/POST /api/tasks` 路由 + `static/takeout.html`。
+**M1 代取撮合**：撮合评分引擎 + 任务/跑腿 service + MCP 5 个工具 + `GET/POST /api/tasks` 路由 + `static/takeout.html`
++ 两条**只读**门户辅助口 `GET /api/runners`、`GET /api/matches`（F0 首页统计用，契约外、已按 M3 `/api/map/summary` 的先例处理）。
 
 ## 依赖什么
 - `contracts/core.md`（表结构、信封、鉴权）
@@ -37,7 +38,9 @@
 | `src/mcp/handlers/takeout.js` | 新增。5 个工具 schema（照抄契约）+ handler（不写 SQL） |
 | `src/mcp/handlers.js` | **只加 2 行**：顶部 `import { registerTakeoutTools }`；`MODULE_REGISTRARS` 里 `{ module: "m1", register: registerTakeoutTools }`（m2/m3/m4 的注释行未动） |
 | `src/api/tasks.js` | 新增。4 条路由，写接口 `requireWriteToken` |
-| `src/api/routes.js` | **只加 2 行**：`import { createTaskRouter } from "./tasks.js";`；`router.use("/tasks", createTaskRouter());`（挂在 404 兜底之前） |
+| `src/api/runners.js` | 新增。`GET /api/runners` 只读、脱敏（不出 `user_id` / 联系方式），门户「活跃跑腿者数」用 |
+| `src/api/matches.js` | 新增。`GET /api/matches?limit=` 只读，最近撮合记录（含 `score`），门户「平均匹配得分」用 |
+| `src/api/routes.js` | **只加 5 行**：3 个 import + `router.use("/tasks"/"/runners"/"/matches", …)`（挂在 404 兜底之前），其他模块的行未动 |
 | `static/takeout.html` | 新增。自包含（内联样式+脚本），只外链 `/config.js` |
 | `fixtures/tasks.json` `fixtures/runners.json` | 覆盖写（原来各 1 条占位） |
 | `tests/m1-takeout.test.js` | 新增 |
@@ -66,10 +69,12 @@
 4. 本分支**没有** `static/js/api.js` / `nav.js`，页面自带内联脚本；F0 合入后若要统一样式，只需替换 `<style>` 与外链，别动脚本逻辑（匹配结果区的 `score` / `reason` 渲染是评委看点）。
 5. fixtures 的时间是 `*_in_minutes` 相对时间 → **路演/录制前请重跑 `npm run seed -- --reset`**，否则任务会全部过期。
 6. `demo-runner-2`（同学E）刻意把报酬下限设成 4 元，让它稳定在 65~75 分；避免演示中途从候选里消失（50% 覆盖边界会随时间把 60 分卡在阈值上下）。
+7. **门户两格数据**：`GET /api/runners` 已能点亮「活跃跑腿者数」（seed 后 = 8）。`GET /api/matches` 在 `seed` 之后是 **0 条**（库里的 `matches` 只有撮合过才有行）→ F0 的「平均匹配得分」会显示「—」，在 `/takeout` 点一次「查看匹配」（或调 `match_find_for_task`）后即变为真实平均分（实测 86.7）。若希望**首页开箱即有数**，需要在核心层加一步「对 open 任务跑一遍撮合」（`scripts/seed.js` 末尾或 `/api/demo/seed`）——这两个都是核心层文件/路由，我没动，请 lead 定。
 
 ## 验收证据（本分支提交时实测）
-- `npm test` → **26/26 通过**（T0 的 10 条 + M1 的 16 条）
+- `npm test` → **27/27 通过**（T0 的 10 条 + M1 的 17 条）
 - `npm run smoke` → **8/8 通过**
 - `node scripts/verify-integration.js`（lead 的跨模块验证器，临时拷入后已删）→ M1 相关 `tools/schema/call/guard/page( /takeout )/route( /api/tasks* )` 全 ✅；❌ 仅 buddy*/map*/schedule* 与 `/buddy /welcome /schedule /agent`（其他模块未合并）
 - `npm run seed -- --reset && npm run seed -- --check` → tasks 10 / runners 9 灌库成功
 - 起服务实测：MCP 5 工具注册、`GET/POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/match`（含 5 分钟去重）、`demo-task-1` 6 名候选按 score 降序、`demo-task-5` 0 候选（无人可接）、`/takeout` HTTP 200
+- 门户辅助口实测（复刻 F0 `index.html` 的 `listOf()` 消费逻辑）：`GET /api/runners` → 8 人（9 名里 1 名 `active=false` 被排除），返回里**不含** `user_id` / `contact_code`；撮合一次后 `GET /api/matches?limit=20` → 3 条、平均得分 **86.7**
