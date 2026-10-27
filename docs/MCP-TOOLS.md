@@ -35,8 +35,8 @@
 
 **所有工具 `inputSchema.additionalProperties` 必须为 `false`** —— 多传一个字段即 `SCHEMA_REJECTED`。
 
-> **当前接入状态（2026-10-27）**：`tools/list` 实测返回 **10 个**（M1 5 + M2 3 + M3 2）；
-> M4 的 4 个（`schedule_*`）在 `feat/m4-schedule` 分支，合入后为 14 个。
+> **当前接入状态（2026-10-27，四模块全部合入 main 后实测）**：`tools/list` 返回 **14 个**
+> （M1 5 + M2 3 + M3 2 + M4 4）。
 > 这条状态的机检入口：`npm run verify`（会自动发现已注册工具并逐个真调）。
 
 ### M1 · 代取撮合（5 个）｜分支 `feat/m1-takeout`
