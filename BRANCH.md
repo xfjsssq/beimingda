@@ -9,7 +9,7 @@
 | `feat/m1-takeout` | M1 代取撮合 | `src/engine/match.js` · `src/services/{task,runner,users}.js` · `src/api/tasks.js` · `src/mcp/handlers/takeout.js` · `static/takeout.html` · fixtures | ✅ 已合（契约 §7 八条逐条过） |
 | `feat/frontend` | F0 前端与门户 | `static/css/app.css` · `static/js/{api,nav,demo,mcp-config}.js` · `static/index.html` · `static/agent.html` | ✅ 已合（契约 §7 过） |
 | `feat/m2-buddy` | M2 搭子匹配 | `src/engine/{doubleOpt,buddy}.js` · `src/services/buddy.js` · `src/api/buddies.js` · `src/mcp/handlers/buddy.js` · `static/buddy.html` · fixtures | ✅ 已合（契约 §8 九条逐条过） |
-| `feat/m4-schedule` | M4 日程提醒 | 由协作者 `CJY-sys` 负责，不列在本名册 | ⏳ 队友分支 |
+| `feat/m4-schedule` | M4 日程提醒 | `src/services/{scrub,schedule}.js` · `src/mcp/handlers/schedule.js` · `src/api/routes.js`（3 路由） · `scripts/reminder.js` · `static/schedule.html` · `fixtures/schedule.json` | ✅ 已合（协作者 `CJY-sys` 交付，PR #10 + upsert 修复 #13） |
 | `chore/integration` | 集成校验 | 跨模块合并、`scripts/verify-integration.js`、核心层收尾 | Lead 维护 |
 
 ## 共享文件接触面（多人同时改，合并时只看这几处）
@@ -38,3 +38,5 @@ npm run verify    # 模块级集成：自动发现 MCP 工具真调 + 6 页面 +
 4. **M2 发布方"拒绝后不可反悔"仅在进程内记忆**：三个 bit 列无法区分"没表态"与"拒绝了"；寻找方侧由数据库 `UNIQUE(post_id, seeker_id)` 硬保证（契约要求的那一条）。
 5. **M3 底图与全景是人工素材**：底图需一张手机地图截图（`static/map/campus-map.jpg`），全景按 `pano/HOWTO-补全景.md` 补；缺素材时页面诚实提示，不拿别的图糊弄。
 6. **本机 3000 端口被无关常驻进程占用**：本地演示请 `PORT=3080 npm start`，MCP 地址相应变为 `http://<host>:3080/mcp`。
+7. **M4 的 upsert 键是 `(user_id, weekday, period_start, period_end, title)`**：同一时段但**改了课程名**会新增一条而不是更新。页面「提醒设置」带原 title，所以正常；**批量导入请走 `schedule_import`**（先清空该用户旧课表再插入），不要和 upsert 混用。
+8. **M4 的 `config/periods.json` 作息未核实**：`scripts/reminder.js` 完全靠这张表把 `period_start` 换算成当天时刻，**作息错了提醒时刻就错**。演示前必须由负责人从教务/学生手册核实 1–10 节开始时刻与课间并更新该文件；核实之前，材料与口头汇报只能说「按**可配置的**节次时间表」，不能说「按学校作息」。

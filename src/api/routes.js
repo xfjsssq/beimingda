@@ -25,7 +25,7 @@ import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
 import { getDb } from "../db/index.js";
 import { requireWriteToken } from "../middleware/auth.js";
-import { addScheduleItem, listScrubAudit, querySchedule } from "../services/schedule.js";
+import { addScheduleItem, getScheduleItem, listScrubAudit, querySchedule } from "../services/schedule.js";
 import { createMapRouter } from "./map.js";
 import { createDemoRouter } from "./demo.js";
 import { createBuddiesRouter } from "./buddies.js";
@@ -77,6 +77,15 @@ export function createApiRouter() {
         weekday: weekday === undefined || weekday === "" ? undefined : Number(weekday),
       });
       res.json(ok(items));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // 单条详情（只读）：评委点单条看详情时用
+  router.get("/schedule/:id", (req, res, next) => {
+    try {
+      res.json(ok(getScheduleItem(getDb(), req.params.id)));
     } catch (e) {
       next(e);
     }
