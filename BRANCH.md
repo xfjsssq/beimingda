@@ -35,6 +35,14 @@
 - [x] `static/vendor/pannellum/`（pannellum.js / pannellum.css / COPYING / VERSION，v2.5.7，MIT）
 - [x] `pano/HOWTO-补全景.md`：补素材保姆级 SOP（拍摄、是否需缝合、360 判定、参数、验证）
 - [x] 自测：`npm test` 10/10、`npm run smoke` 8/8、接口与 MCP 工具全部实测通过
-- [ ] 真实底图替换（`static/map/campus-map.jpg`）＋坐标微调
-- [ ] 全景素材补齐（≥2 个点位互加 `hotSpots` 即可演示跳转）
-- [ ] PR 到 `main`（依赖 `chore/contracts-m3-basemap` 的契约修订先合入）
+- [x] 独立复验（2026-10-27，lead，worktree `bm/m3`）：`npm test` 10/10；起服务后
+      `/api/health` `/api/map/nodes` `/api/map/summary` `/welcome` `/map/map-bg.json`
+      `/map/campus-map.svg` `/vendor/pannellum/pannellum.js` `/pano/manifest.json` 全部 200；
+      `npm run seed` 后 `/api/map/nodes` 返回 12 个节点（5 类齐全）、`/api/map/summary` 报 `total=12, with_pano=0`
+      → 页面走「该点暂无实景」诚实提示路径 ✓
+- [ ] 真实底图替换（`static/map/campus-map.jpg`）＋坐标微调 —— **卡在素材**：需人工用手机地图截一张校园图存成
+      `static/map/campus-map.jpg`，再把 `static/map/map-bg.json` 的 `image` 改成 `/map/campus-map.jpg`
+      （该文件 `_howto` 字段里有 4 步流程图；改完刷新页面按需微调 `points` 百分比，不用重启服务）
+- [ ] 全景素材补齐（≥2 个点位互加 `hotSpots` 即可演示跳转）—— 卡在素材，SOP 见 `pano/HOWTO-补全景.md`
+- [x] PR 到 `main`：依赖的契约修订（PR #2 / #3）已合入 `main`，本分支已具备开 PR 条件
+- [ ] 全景「无实景」这条验收：当前 0 张素材即通过（页面如实显示"该点暂无实景"）
