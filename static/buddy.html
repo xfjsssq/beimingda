@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>搭子墙 · 北名大小助手</title>
+  <!--
+    静态自包含页：样式/脚本全内联，⛔ 不引用外部 CDN、⛔ 不引用本分支不存在的 /js/api.js、/js/nav.js
+    配色沿用主色 #1F4E8C
+    契约：contracts/m2-buddy.md §6（4 个区块）
+    ⚠️ 候选卡片上不得出现任何可反推身份的字段：本页只渲染接口白名单字段
+        （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
+    照片：仅本地预览，既不参与评分也不会上传（契约 §7）
+  -->
+  <style>
+    :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:var(--bg); color:#1c1c1e;
+      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:920px; margin:0 auto; padding:24px 16px 64px; }
+    h1 { color:var(--pri); font-size:22px; margin:0 0 4px; }
+    .sub { color:#5b6470; font-size:13px; margin:0 0 16px; }
+    .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(16,24,40,.08); }
+    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); display:flex; align-items:center; gap:8px; }
+    .card h2 .n { display:inline-flex; width:20px; height:20px; border-radius:50%;
+      background:var(--pri); color:#fff; font-size:12px; align-items:center; justify-content:center; }
+    label { display:block; font-size:13px; color:#5b6470; margin:10px 0 4px; }
+    input, select, textarea { width:100%; font:inherit; font-size:14px; padding:8px 10px;
+      border:1px solid var(--line); border-radius:8px; background:#fff; color:#1c1c1e; }
+    textarea { min-height:96px; resize:vertical; line-height:1.5; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .row > * { flex:1 1 160px; }
+    button { font:inherit; font-size:14px; padding:9px 16px; border:0; border-radius:8px;
+      background:var(--pri); color:#fff; cursor:pointer; }
+    button.ghost { background:#eef2f8; color:var(--pri); }
+    button:disabled { opacity:.55; cursor:default; }
+    .hint { font-size:12px; color:#7a8593; margin:6px 0 0; line-height:1.6; }
+    .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; }
+    .b-pending { background:rgba(192,57,43,.10); color:var(--warn); }
+    .b-mutual { background:rgba(46,139,118,.14); color:var(--ok); }
+    .cand { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+    .cand .top { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
+    .cand .anon { font-family:Consolas,"Courier New",monospace; font-size:12px; color:#5b6470; }
+    .score { font-size:20px; font-weight:700; color:var(--pri); }
+    .bars { margin:8px 0 4px; }
+    .bar { display:flex; align-items:center; gap:8px; font-size:12px; color:#5b6470; margin:3px 0; }
+    .bar b { width:38px; color:#33404f; font-weight:600; }
+    .bar .track { flex:1; height:6px; border-radius:3px; background:#eef2f8; overflow:hidden; }
+    .bar .fill { height:100%; background:var(--pri); }
+    .reason { font-size:12px; color:#33404f; background:#f8fafc; border-radius:8px; padding:8px 10px;
+      margin-top:8px; line-height:1.6; }
+    .code { font-family:Consolas,"Courier New",monospace; color:var(--ok); font-weight:600; }
+    pre { background:#0f172a; color:#e2e8f0; padding:10px 12px; border-radius:8px; overflow:auto;
+      font-size:12px; margin:10px 0 0; }
+    .msg { font-size:13px; margin-top:8px; }
+    .msg.err { color:var(--warn); }
+    .msg.ok { color:var(--ok); }
+    .empty { font-size:13px; color:#7a8593; }
+    table { width:100%; border-collapse:collapse; font-size:13px; }
+    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+    th { color:#5b6470; font-weight:500; font-size:12px; }
+    #photoPrev { max-width:120px; border-radius:8px; margin-top:8px; display:none; }
+    @media (max-width:768px) {
+      main { padding:16px 12px 48px; }
+      .row { flex-direction:column; }
+      th:nth-child(3), td:nth-child(3) { display:none; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>搭子墙 <span class="badge b-mutual">双向同意才可见</span></h1>
+  <p class="sub">学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。</p>
+
+  <div class="card">
+    <h2>我的身份（只填匿名昵称）</h2>
+    <div class="row">
+      <div>
+        <label for="handle">匿名昵称（如 同学A）</label>
+        <input id="handle" placeholder="同学A" />
+      </div>
+      <div>
+        <label for="token">演示令牌（仅发布需要，写入接口 X-Demo-Token）</label>
+        <input id="token" placeholder="留空则从 ?token= 或 localStorage 读取" />
+      </div>
+    </div>
+    <p class="hint">⛔ 本页不收集姓名 / 学号 / 手机号 / 邮箱。令牌只存在你本机浏览器 localStorage，不硬编码在页面里。</p>
+  </div>
+
+  <!-- 区块一 · 发布 -->
+  <div class="card">
+    <h2><span class="n">1</span>发布搭子帖</h2>
+    <div class="row">
+      <div>
+        <label for="pubKind">类型</label>
+        <select id="pubKind">
+          <option value="study">学习</option>
+          <option value="roommate">室友</option>
+          <option value="project">项目</option>
+          <option value="sport">运动</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div>
+        <label for="photo">照片（可选，仅本地预览）</label>
+        <input id="photo" type="file" accept="image/*" />
+      </div>
+    </div>
+    <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
+    <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
+    <img id="photoPrev" alt="照片预览" />
+    <p class="hint">照片不参与评分、也不会上传（服务端根本没有照片字段）。</p>
+    <div class="row" style="margin-top:10px">
+      <button id="btnPublish">发布</button>
+      <button id="btnPreview" class="ghost">先看画像抽取结果</button>
+    </div>
+    <div id="pubMsg" class="msg"></div>
+    <pre id="pubOut" style="display:none"></pre>
+  </div>
+
+  <!-- 区块二 · 搜索 -->
+  <div class="card">
+    <h2><span class="n">2</span>找搭子</h2>
+    <div class="row">
+      <div>
+        <label for="searchKind">类型</label>
+        <select id="searchKind">
+          <option value="study">学习</option>
+          <option value="roommate">室友</option>
+          <option value="project">项目</option>
+          <option value="sport">运动</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div>
+        <label for="topK">返回条数（1-20）</label>
+        <input id="topK" type="number" min="1" max="20" value="5" />
+      </div>
+    </div>
+    <label for="seekText">描述你想要的搭子</label>
+    <textarea id="seekText" placeholder="例：大二 工科 想找一起刷算法题和摄影的同学，作息偏夜猫，周末有空，周三1-2节有课"></textarea>
+    <div class="row" style="margin-top:10px">
+      <button id="btnSearch">搜索候选</button>
+      <button id="btnList" class="ghost">只看搭子墙（不评分）</button>
+    </div>
+    <div id="searchMsg" class="msg"></div>
+  </div>
+
+  <!-- 区块三 · 候选卡片 -->
+  <div class="card">
+    <h2><span class="n">3</span>候选（只显示评分 ≥ 60 的候选）</h2>
+    <div id="cands"><p class="empty">还没有候选，先在上面搜索。</p></div>
+    <p class="hint">同意 / 拒绝在 WorkBuddy 里让 Agent 调用 MCP 工具 <code>buddy_consent</code>（同一帖只能表决一次）；双方都同意后这里会出现中转码。</p>
+  </div>
+
+  <!-- 区块四 · 我的申请 -->
+  <div class="card">
+    <h2><span class="n">4</span>我的申请</h2>
+    <div id="mine"><p class="empty">还没有发出过意愿。</p></div>
+    <div style="margin-top:10px"><button id="btnMine" class="ghost">刷新我的申请</button></div>
+  </div>
+</main>
+
+<script>
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const LS = { handle: "beimingda.handle", token: "beimingda.token" };
+  const params = new URLSearchParams(location.search);
+
+  const getHandle = () => ($("handle").value || "").trim() || "同学A";
+  const getToken = () => ($("token").value || "").trim();
+
+  // 初始化：地址栏 ?handle= / ?token= 优先，其次 localStorage
+  $("handle").value = params.get("handle") || localStorage.getItem(LS.handle) || "同学A";
+  $("token").value = params.get("token") || localStorage.getItem(LS.token) || "";
+  $("handle").addEventListener("change", () => localStorage.setItem(LS.handle, getHandle()));
+  $("token").addEventListener("change", () => localStorage.setItem(LS.token, getToken()));
+
+  function say(el, text, kind) {
+    const node = $(el);
+    node.className = "msg" + (kind ? " " + kind : "");
+    node.textContent = text || "";
+  }
+
+  async function api(path, opts) {
+    const res = await fetch(path, opts);
+    let body = null;
+    try { body = await res.json(); } catch (e) { throw new Error("响应不是 JSON（HTTP " + res.status + "）"); }
+    if (!body.ok) throw new Error((body.error && body.error.code ? body.error.code + ": " : "") + (body.error && body.error.message || "请求失败"));
+    return body.data;
+  }
+
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  // ---------- 照片：本地预览，不参与评分、不上传 ----------
+  $("photo").addEventListener("change", () => {
+    const f = $("photo").files && $("photo").files[0];
+    const img = $("photoPrev");
+    if (!f) { img.style.display = "none"; img.removeAttribute("src"); return; }
+    img.src = URL.createObjectURL(f);
+    img.style.display = "block";
+  });
+
+  // ---------- 区块一：发布 ----------
+  async function publish() {
+    const text = $("pubText").value.trim();
+    if (text.length < 4) { say("pubMsg", "先把需求写清楚一点（至少一句话）。", "err"); return; }
+    say("pubMsg", "发布中…");
+    try {
+      const data = await api("/api/buddies", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-demo-token": getToken() },
+        // photo_path 传的是文件名占位 —— 服务端接收但不落库、不参与评分
+        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text, photo_path: "" }),
+      });
+      say("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
+      $("pubOut").style.display = "block";
+      $("pubOut").textContent = "抽取出的 11 字段画像：\n" + JSON.stringify(data.profile, null, 2);
+    } catch (e) {
+      say("pubMsg", e.message, "err");
+    }
+  }
+  $("btnPublish").addEventListener("click", publish);
+
+  $("btnPreview").addEventListener("click", async () => {
+    const text = $("pubText").value.trim();
+    if (!text) { say("pubMsg", "先写一段描述。", "err"); return; }
+    say("pubMsg", "正在抽取画像（不落库）…");
+    try {
+      // 走 search 接口即可拿到服务端对这段文字的画像抽取效果（不会写入任何帖子）
+      const rows = await api("/api/buddies/search?kind=" + $("pubKind").value +
+        "&handle=" + encodeURIComponent(getHandle()) + "&text=" + encodeURIComponent(text));
+      say("pubMsg", "抽取完成：这段描述能匹配到 " + rows.length + " 个候选（下面的候选卡片可以看到评分与理由）", "ok");
+      renderCandidates(rows);
+    } catch (e) { say("pubMsg", e.message, "err"); }
+  });
+
+  // ---------- 区块二 / 三：搜索与候选卡片 ----------
+  function renderCandidates(rows) {
+    const box = $("cands");
+    if (!rows || !rows.length) { box.innerHTML = '<p class="empty">没有评分 ≥ 60 的候选（可以换个类型或把描述写得更具体）。</p>'; return; }
+    box.innerHTML = rows.map((c) => {
+      const p = c.parts || {};
+      const bar = (label, val, max) =>
+        '<div class="bar"><b>' + label + '</b><span class="track"><span class="fill" style="width:' +
+        Math.round((Number(val) || 0) / max * 100) + '%"></span></span><span>' + (Number(val) || 0) + "/" + max + "</span></div>";
+      const mutual = c.reveal_status === "mutual";
+      const badge = mutual
+        ? '<span class="badge b-mutual">已互相可见</span>'
+        : '<span class="badge b-pending">待对方同意</span>';
+      const code = mutual && c.contact_code
+        ? '<div class="hint">中转码：<span class="code">' + esc(c.contact_code) + "</span>（双方已同意才会下发）</div>"
+        : "";
+      return '<div class="cand">' +
+        '<div class="top"><span class="anon">' + esc(c.anon_token) + "</span>" + badge +
+        '<span class="score">' + c.score + ' 分</span></div>' +
+        '<div class="bars">' + bar("兴趣", p.interest, 35) + bar("作息", p.schedule, 30) +
+        bar("性格", p.traits, 20) + bar("语义", p.semantic, 15) + "</div>" +
+        '<div class="reason">' + esc(c.reason) + "</div>" + code + "</div>";
+    }).join("");
+  }
+
+  $("btnSearch").addEventListener("click", async () => {
+    const text = $("seekText").value.trim();
+    if (text.length < 2) { say("searchMsg", "先写一句「我想要什么样的搭子」。", "err"); return; }
+    say("searchMsg", "检索中…");
+    try {
+      const rows = await api("/api/buddies/search?kind=" + $("searchKind").value +
+        "&handle=" + encodeURIComponent(getHandle()) +
+        "&top_k=" + encodeURIComponent($("topK").value) +
+        "&text=" + encodeURIComponent(text));
+      renderCandidates(rows);
+      say("searchMsg", "命中 " + rows.length + " 个候选（仅显示评分 ≥ 60 且未被一票否决的）", "ok");
+    } catch (e) { say("searchMsg", e.message, "err"); }
+  });
+
+  $("btnList").addEventListener("click", async () => {
+    say("searchMsg", "读取搭子墙…");
+    try {
+      const rows = await api("/api/buddies?kind=" + $("searchKind").value);
+      $("cands").innerHTML = rows.length
+        ? rows.map((p) => '<div class="cand"><div class="top"><span class="anon">' + esc(p.anon_token) +
+            '</span><span class="hint">' + esc(p.kind) + " · " + esc(p.created_at) + '</span></div><div class="reason">' +
+            esc(p.profile.wanted || "") + "</div></div>").join("")
+        : '<p class="empty">搭子墙还没有内容。</p>';
+      say("searchMsg", "共 " + rows.length + " 条（列表不含评分）", "ok");
+    } catch (e) { say("searchMsg", e.message, "err"); }
+  });
+
+  // ---------- 区块四：我的申请 ----------
+  async function loadMine() {
+    try {
+      const rows = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
+      const box = $("mine");
+      if (!rows.length) { box.innerHTML = '<p class="empty">还没有发出过意愿。</p>'; return; }
+      box.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分</th><th>状态</th><th>时间</th></tr></thead><tbody>" +
+        rows.map((r) => "<tr><td>" + esc(r.anon_token) + "</td><td>" + r.score + "</td><td>" +
+          (r.reveal_status === "mutual" ? '<span class="badge b-mutual">已互相可见</span>'
+            : r.my_ok === 1 ? '<span class="badge b-pending">待对方同意</span>' : '<span class="badge b-pending">我已拒绝</span>') +
+          "</td><td>" + esc(r.created_at) + "</td></tr>").join("") + "</tbody></table>";
+    } catch (e) { say("searchMsg", e.message, "err"); }
+  }
+  $("btnMine").addEventListener("click", loadMine);
+  loadMine();
+})();
+</script>
+</body>
+</html>
