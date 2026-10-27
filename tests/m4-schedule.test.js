@@ -343,3 +343,37 @@ test("reminder.js --dry-run 能在测试数据上算出触发时刻", () => {
   assert.match(out, /第1节 提前15分钟/);
   assert.match(out, /课程A/);
 });
+
+test("upsert：改提醒不会清空 room/weeks（只更新请求里带了的字段）", async () => {
+  freshDb();
+  const db = getDb();
+  const first = addScheduleItem(db, {
+    user_handle: "同学A",
+    weekday: 2,
+    period_start: 3,
+    period_end: 4,
+    title: "课程A",
+    room: "教学楼A-201",
+    weeks: "1-16",
+  });
+  assert.ok(first.item_id);
+  assert.equal(first.updated, false, "首次提交应为新建");
+
+  // 页面「提醒设置」只提交 remind_before —— 不能把 room/weeks 清成 null
+  const second = addScheduleItem(db, {
+    user_handle: "同学A",
+    weekday: 2,
+    period_start: 3,
+    period_end: 4,
+    title: "课程A",
+    remind_before: 30,
+  });
+  assert.equal(second.item_id, first.item_id, "同一门课应更新而不是新增");
+  assert.equal(second.updated, true);
+
+  const rows = querySchedule(db, { user_handle: "同学A" });
+  assert.equal(rows.length, 1, "不应产生重复条目");
+  assert.equal(rows[0].remind_before, 30);
+  assert.equal(rows[0].room, "教学楼A-201", "改提醒不应清空教室");
+  assert.equal(rows[0].weeks, "1-16", "改提醒不应清空周次");
+});
