@@ -61,6 +61,22 @@
       padding: 6px 12px; border-radius: 8px; }
     .pano-bar button { background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.35);
       border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+    /* ---- 高德地图辅助入口（需联网；底图仍是离线可用的截图） ---- */
+    .map-tools { display: flex; gap: 8px; align-items: center; justify-content: flex-end;
+      flex-wrap: wrap; margin: 0 2px 8px; }
+    .map-tools .hint { font-size: 12px; color: var(--muted); margin-right: auto; }
+    .ghost { background: #fff; color: var(--pri); border: 1px solid var(--pri); border-radius: 8px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .ghost:hover { background: rgba(31,78,140,.06); }
+    #amapOverlay { position: fixed; inset: 0; background: rgba(12,18,28,.9); display: none; z-index: 55; }
+    #amapOverlay.on { display: block; }
+    .amap-shell { position: absolute; inset: 22px; background: #0f1720; border-radius: 12px; overflow: hidden; }
+    #amapFrame, #amapFrame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .amap-bar { position: relative; z-index: 2; display: flex; justify-content: space-between;
+      align-items: center; gap: 10px; padding: 8px 12px; background: #16202e; color: #fff; font-size: 13px; }
+    .amap-bar button { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35);
+      border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+    @media (max-width: 768px) { .amap-shell { inset: 8px; } }
     #demoBadge { position: fixed; right: 12px; top: 12px; background: var(--warn); color: #fff;
       font-size: 12px; padding: 4px 10px; border-radius: 999px; display: none; z-index: 60; }
     @media (max-width: 768px) {
@@ -91,6 +107,10 @@
 
   <div class="layout">
     <div class="map-card">
+      <div class="map-tools">
+        <span class="hint" id="amapHint"></span>
+        <button class="ghost" id="openAmap" type="button" hidden>在高德地图查看真实卫星图（需联网）</button>
+      </div>
       <div class="map-wrap" id="mapWrap">
         <img class="base" id="baseImg" src="/map/campus-map.svg" alt="校园示意图底图" />
         <!-- 标记由 JS 按 /map/map-bg.json 的百分比坐标渲染 -->
@@ -113,6 +133,17 @@
     <button id="panoClose" type="button">关闭</button>
   </div>
   <div id="pano"></div>
+</div>
+
+<div id="amapOverlay">
+  <div class="amap-shell">
+    <div class="amap-bar">
+      <span>高德地图 · 真实卫星图（iframe 嵌入，可拖动 / 缩放）—— 本视图需要联网</span>
+      <button id="amapClose" type="button">关闭</button>
+    </div>
+    <!-- iframe 在点击按钮时才创建：不点不请求，断网时本页照常可用 -->
+    <div id="amapFrame"></div>
+  </div>
 </div>
 
 <script src="/vendor/pannellum/pannellum.js"></script>
@@ -204,6 +235,11 @@ $("#panoClose").addEventListener("click", () => {
   $("#panoOverlay").classList.remove("on");
 });
 
+$("#amapClose").addEventListener("click", () => {
+  $("#amapFrame").innerHTML = "";                       // 释放 iframe，停止地图资源加载
+  $("#amapOverlay").classList.remove("on");
+});
+
 $("#chips").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
@@ -212,6 +248,29 @@ $("#chips").addEventListener("click", (e) => {
     c.setAttribute("aria-pressed", c === chip ? "true" : "false"));
   renderMarkers();
 });
+
+/* ---------- 高德地图「看真实卫星图」辅助入口 ----------
+   ⚠️ 它是黑盒 iframe：能拖动/缩放看卫星图，但**无法在其上叠加我们的点位标记**
+   （跨域，进不去内部 DOM）。所以定位是「辅助视图」，标点位仍用离线可跑的截图底图。
+   坐标为高德坐标系（GCJ-02）。配置在 /map/map-bg.json 的 amap 字段，⛔ 不硬编码。 */
+function setupAmap() {
+  const cfg = BG.amap;
+  if (!cfg || cfg.enabled === false || !cfg.center) return;
+  const btn = $("#openAmap");
+  btn.hidden = false;
+  $("#amapHint").textContent = "标点位用左侧截图底图（离线可用）；想看真实卫星图 →";
+  btn.addEventListener("click", () => {
+    const tpl = cfg.embed_url_template;
+    if (!tpl) return;                       // ⛔ 地址与坐标只从 /map/map-bg.json 读，不硬编码在页面里
+    const url = tpl
+      .replace("{lng}", cfg.center.lng).replace("{lat}", cfg.center.lat)
+      .replace("{zoom}", cfg.zoom || 17).replace("{maptype}", cfg.maptype || "satellite");
+    $("#amapFrame").innerHTML =
+      '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+    $("#amapOverlay").classList.add("on");
+  });
+}
 
 (async function init() {
   const [nodes, bg, manifest] = await Promise.all([
@@ -223,6 +282,7 @@ $("#chips").addEventListener("click", (e) => {
   BG = Object.assign(BG, bg || {});
   MANIFEST = Object.assign(MANIFEST, manifest || {});
   if (BG.image) $("#baseImg").src = BG.image;
+  setupAmap();
   $("#source").textContent = (BG.attribution || "底图为示意截图，非在线地图服务") +
     " · 共 " + NODES.length + " 个点位，其中 " +
     NODES.filter((n) => n.pano_url && MANIFEST.scenes[n.id]).length + " 个已拍摄 360° 实景";
