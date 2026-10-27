@@ -872,6 +872,97 @@ code.inline {
   }
 }
 
+/* ---------------------------------------------------------------- 13. 「即将上线」降级态
+   契约 §7 要求 6 页无 404。模块分支还没合进来时，入口**不隐藏、也不留成死链**：
+   弱化显示 + 「即将上线」小标签，点击给一句轻提示。模块合并后由 js/nav.js
+   的探测自动恢复成普通链接。 */
+.nav-link.is-soon,
+.btn.is-soon {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.nav-link.is-soon {
+  border-style: dashed;
+}
+
+.nav-link.is-soon:hover {
+  background: transparent;
+  text-decoration: none;
+}
+
+.btn.is-soon {
+  background: #fff;
+  color: var(--color-muted);
+  border-color: var(--color-line-strong);
+  box-shadow: none;
+}
+
+.soon-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  border: 1px dashed var(--color-line-strong);
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: 9.5px;
+  line-height: 1.6;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 轻提示（点击降级入口时出现） */
+.nav-tip {
+  position: fixed;
+  top: calc(var(--header-h) + 8px);
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  z-index: 95;
+  max-width: min(92vw, 460px);
+  padding: 9px 13px;
+  border-radius: 10px;
+  background: #0f172a;
+  color: #e2e8f0;
+  font-size: 13px;
+  box-shadow: var(--shadow-lift);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+}
+
+.nav-tip.on {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+@media (max-width: 768px) {
+  /* 底部 tab 里给「即将上线」留一行：仍不隐藏，只是更小 */
+  .soon-tag {
+    display: block;
+    margin: 2px 0 0;
+    padding: 0 3px;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 9px;
+    line-height: 1.4;
+    border: 0;
+    background: transparent;
+    color: var(--color-danger);
+  }
+
+  .nav-link.is-soon {
+    border-style: none;
+  }
+
+  .nav-tip {
+    top: auto;
+    bottom: calc(var(--tabbar-h) + 12px + env(safe-area-inset-bottom, 0px));
+    font-size: 12.5px;
+  }
+}
+
 /* 打印/投影场景：去掉阴影，保证投影仪上也清晰 */
 @media print {
   .site-header,
