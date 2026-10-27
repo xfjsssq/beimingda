@@ -1,14 +1,101 @@
 {
-  "_comment": "⭐ 占位示例，M1 分支必须补到 ≥6 名跑腿者。time_windows 可写 start_iso/end_iso 或 *_in_minutes（相对当前时间）。",
+  "_comment": "⭐ M1 跑腿者能力演示数据（全虚构，seed 一律写 demo=1）。reachable_buildings 必须与 config/map-nodes.json 的 label 字面一致；time_windows 用 *_in_minutes（相对执行 npm run seed 的时刻）。contact_code 只是演示占位串，⛔ 不是手机号，M1 全程不返回它。",
+  "_scenarios": {
+    "可匹配": "同学D / 同学E / 同学F / 同学G / 同学I / 同学J —— 覆盖「命中送达楼 40 分」「仅命中取件楼 20 分」两类",
+    "不可达": "同学H —— 只登记了「第二食堂」，任何宿舍楼任务都是 0 分，必须不出现在结果里",
+    "时间完全不重叠": "同学K —— 时段已经过去（-10 小时 ~ -100 分钟），必须出局",
+    "关掉接单开关": "同学L —— active=false，即使满分也不进候选池"
+  },
   "runners": [
     {
       "id": "demo-runner-1",
-      "user_handle": "同学B",
+      "user_handle": "同学D",
       "contact_code": "demo-contact-1",
-      "reachable_buildings": ["15号宿舍楼", "12号宿舍楼"],
+      "reachable_buildings": ["12号宿舍楼", "15号宿舍楼"],
       "reward_floor": 2,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 300 }],
+      "active": true,
+      "_scenario": "全能型：两栋楼都到，报酬下限低 → 多数任务是满分候选"
+    },
+    {
+      "id": "demo-runner-2",
+      "user_handle": "同学E",
+      "contact_code": "demo-contact-2",
+      "reachable_buildings": ["15号宿舍楼"],
+      "reward_floor": 5,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 120 }],
+      "active": true,
+      "_scenario": "只到 15 号楼 + 报酬下限 5 元：能做送 15 号楼的任务，做 15→12 的任务只能拿取件楼 20 分"
+    },
+    {
+      "id": "demo-runner-3",
+      "user_handle": "同学F",
+      "contact_code": "demo-contact-3",
+      "reachable_buildings": ["12号宿舍楼"],
+      "reward_floor": 1,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 60 }],
+      "active": true,
+      "_scenario": "只到 12 号楼 + 1 小时内有空：对 12→15 的任务只能拿 20 分（取件楼），靠时间/报酬补到 60 分边缘"
+    },
+    {
+      "id": "demo-runner-4",
+      "user_handle": "同学G",
+      "contact_code": "demo-contact-4",
+      "reachable_buildings": ["15号宿舍楼", "第二食堂"],
+      "reward_floor": 8,
       "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 240 }],
-      "active": true
+      "active": true,
+      "_scenario": "报酬下限 8 元偏高：低报酬任务拿 0 分，高报酬任务才够 60 分"
+    },
+    {
+      "id": "demo-runner-5",
+      "user_handle": "同学H",
+      "contact_code": "demo-contact-5",
+      "reachable_buildings": ["第二食堂"],
+      "reward_floor": 1,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 600 }],
+      "active": true,
+      "_scenario": "⭐ 不可达样本：时段再宽也不可能命中宿舍楼 → 任何结果里都不该出现"
+    },
+    {
+      "id": "demo-runner-6",
+      "user_handle": "同学I",
+      "contact_code": "demo-contact-6",
+      "reachable_buildings": ["12号宿舍楼", "15号宿舍楼"],
+      "reward_floor": 3,
+      "time_windows": [{ "start_in_minutes": 200, "end_in_minutes": 400 }],
+      "active": true,
+      "_scenario": "⭐ 时间不重叠样本：可达满分，但要 3 小时后才有空 → 短期限任务出局，长期限任务只拿部分时间分"
+    },
+    {
+      "id": "demo-runner-7",
+      "user_handle": "同学J",
+      "contact_code": "demo-contact-7",
+      "reachable_buildings": ["15号宿舍楼"],
+      "reward_floor": 0,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 45 }],
+      "active": true,
+      "_scenario": "只到 15 号楼 + 45 分钟内有空：短期限任务能拿满时间分，长期限任务只能拿 10 分"
+    },
+    {
+      "id": "demo-runner-8",
+      "user_handle": "同学K",
+      "contact_code": "demo-contact-8",
+      "reachable_buildings": ["12号宿舍楼", "15号宿舍楼"],
+      "reward_floor": 1,
+      "time_windows": [{ "start_in_minutes": -600, "end_in_minutes": -100 }],
+      "active": true,
+      "_scenario": "⭐ 时段已经过去：可达性满分但时间完全不重叠 → 必须出局"
+    },
+    {
+      "id": "demo-runner-9",
+      "user_handle": "同学L",
+      "contact_code": "demo-contact-9",
+      "reachable_buildings": ["15号宿舍楼"],
+      "reward_floor": 0,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 600 }],
+      "active": false,
+      "_scenario": "⭐ 关掉接单开关（active=false）：能力满分也不进候选池"
     }
   ]
 }
