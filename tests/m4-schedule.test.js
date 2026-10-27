@@ -310,6 +310,22 @@ test("HTTP：GET/POST /api/schedule 与 /api/scrub/audit", async () => {
     });
     assert.equal(noToken.status, 401, "POST /api/schedule 无 X-Demo-Token 必须 401");
 
+    // 单条详情（只读）：GET /api/schedule/:id
+    const detail = await fetch(`${base}/api/schedule/${encodeURIComponent(postBody.data.item_id)}`);
+    const detailBody = await detail.json();
+    assert.equal(detailBody.ok, true);
+    assert.equal(detailBody.data.id, postBody.data.item_id);
+    assert.equal(detailBody.data.title, "课程A");
+    // 只回白名单字段 + id，不回 user_id / created_at
+    assert.deepEqual(Object.keys(detailBody.data).sort(), [
+      "id", "period_end", "period_start", "remind_before", "room", "title", "weekday", "weeks",
+    ]);
+
+    const missing = await fetch(`${base}/api/schedule/no-such-id`);
+    const missingBody = await missing.json();
+    assert.equal(missingBody.ok, false);
+    assert.equal(missingBody.error.code, "NOT_FOUND");
+
     // ⛔ 不存在任何课表上传接口
     const up = await fetch(`${base}/api/schedule/upload`, { method: "POST" });
     const upBody = await up.json();
@@ -342,4 +358,38 @@ test("reminder.js --dry-run 能在测试数据上算出触发时刻", () => {
   assert.match(out, /\[dry-run\] now=/);
   assert.match(out, /第1节 提前15分钟/);
   assert.match(out, /课程A/);
+});
+
+test("upsert：改提醒不会清空 room/weeks（只更新请求里带了的字段）", async () => {
+  freshDb();
+  const db = getDb();
+  const first = addScheduleItem(db, {
+    user_handle: "同学A",
+    weekday: 2,
+    period_start: 3,
+    period_end: 4,
+    title: "课程A",
+    room: "教学楼A-201",
+    weeks: "1-16",
+  });
+  assert.ok(first.item_id);
+  assert.equal(first.updated, false, "首次提交应为新建");
+
+  // 页面「提醒设置」只提交 remind_before —— 不能把 room/weeks 清成 null
+  const second = addScheduleItem(db, {
+    user_handle: "同学A",
+    weekday: 2,
+    period_start: 3,
+    period_end: 4,
+    title: "课程A",
+    remind_before: 30,
+  });
+  assert.equal(second.item_id, first.item_id, "同一门课应更新而不是新增");
+  assert.equal(second.updated, true);
+
+  const rows = querySchedule(db, { user_handle: "同学A" });
+  assert.equal(rows.length, 1, "不应产生重复条目");
+  assert.equal(rows[0].remind_before, 30);
+  assert.equal(rows[0].room, "教学楼A-201", "改提醒不应清空教室");
+  assert.equal(rows[0].weeks, "1-16", "改提醒不应清空周次");
 });

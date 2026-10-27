@@ -123,16 +123,27 @@ export function addScheduleItem(db, input, now = nowSec()) {
     .get(userId, Number(it.weekday), Number(it.period_start), Number(it.period_end), sanitizeTitle(it.title));
 
   if (existing) {
-    db.prepare(
-      `UPDATE schedule_items SET room = ?, weeks = ?, remind_before = ? WHERE id = ?`,
-    ).run(
-      it.room == null ? null : String(it.room).slice(0, 50),
-      it.weeks == null ? null : String(it.weeks).slice(0, 50),
-      input?.remind_before == null ? null : Number(input.remind_before),
-      existing.id,
-    );
+    // ⚠️ 只更新"请求里真的带了的"字段：页面「提醒设置」只提交 remind_before，
+    // 若无条件 SET room/weeks 会把教室与周次清成 NULL（数据丢失）。
+    const sets = [];
+    const vals = [];
+    if (input?.room !== undefined) {
+      sets.push("room = ?");
+      vals.push(it.room == null ? null : String(it.room).slice(0, 50));
+    }
+    if (input?.weeks !== undefined) {
+      sets.push("weeks = ?");
+      vals.push(it.weeks == null ? null : String(it.weeks).slice(0, 50));
+    }
+    if (input?.remind_before !== undefined) {
+      sets.push("remind_before = ?");
+      vals.push(input.remind_before == null ? null : Number(input.remind_before));
+    }
+    if (sets.length) {
+      db.prepare(`UPDATE schedule_items SET ${sets.join(", ")} WHERE id = ?`).run(...vals, existing.id);
+    }
     writeAudit(db, "schedule", [...new Set([...dropped, ...extraDropped])], now);
-    return { item_id: existing.id, updated: true };
+    return { item_id: existing.id, updated: sets.length > 0 };
   }
 
   const id = randomUUID();
@@ -152,7 +163,7 @@ export function addScheduleItem(db, input, now = nowSec()) {
   );
   writeAudit(db, "schedule", [...new Set([...dropped, ...extraDropped])], now);
 
-  return { item_id: id };
+  return { item_id: id, updated: false };
 }
 
 /** 查询：按 weekday、period_start 升序；只回白名单字段 */
@@ -183,6 +194,32 @@ export function querySchedule(db, { user_handle, weekday } = {}) {
     weeks: r.weeks,
     remind_before: r.remind_before,
   }));
+}
+
+/**
+ * 单条详情（只读）。给评委点单条看详情用。
+ * 只回 id + 白名单字段，不返回 user_id / created_at 等内部信息。
+ */
+export function getScheduleItem(db, itemId) {
+  const id = String(itemId ?? "").trim();
+  if (!id) reject(CODES.SCHEMA_REJECTED, "item_id 不能为空");
+  const r = db
+    .prepare(
+      `SELECT id,weekday,period_start,period_end,title,room,weeks,remind_before
+       FROM schedule_items WHERE id = ?`,
+    )
+    .get(id);
+  if (!r) reject(CODES.NOT_FOUND, "日程不存在");
+  return {
+    id: r.id,
+    weekday: r.weekday,
+    period_start: r.period_start,
+    period_end: r.period_end,
+    title: r.title,
+    room: r.room,
+    weeks: r.weeks,
+    remind_before: r.remind_before,
+  };
 }
 
 /** 删除单条；不存在 → NOT_FOUND */
