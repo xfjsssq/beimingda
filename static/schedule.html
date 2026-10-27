@@ -119,6 +119,7 @@
   </div>
 </main>
 
+<script src="/config.js"></script>
 <script>
 (function () {
   var WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -133,7 +134,17 @@
   }
   function handle() { return (el("handle").value || "").trim(); }
 
+  // 写接口按 contracts/core.md §4 需要 X-Demo-Token；令牌由 /config.js 注入（⛔ 不硬编码）
+  function writeToken() {
+    return (window.__DEMO_TOKEN__ || "").trim();
+  }
   function api(url, opts) {
+    opts = opts || {};
+    var method = (opts.method || "GET").toUpperCase();
+    if (method !== "GET") {
+      opts.headers = Object.assign({}, opts.headers || {}, { "X-Demo-Token": writeToken() });
+      if (!opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
+    }
     return fetch(url, opts).then(function (r) { return r.json(); });
   }
 

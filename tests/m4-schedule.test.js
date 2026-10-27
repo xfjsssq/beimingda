@@ -257,9 +257,11 @@ test("HTTP：GET/POST /api/schedule 与 /api/scrub/audit", async () => {
   const base = `http://127.0.0.1:${server.address().port}`;
   try {
     // POST 写一条（带禁字段，应被 service 层拦下并记审计）
+    // 契约 core.md §4：写接口必须带 X-Demo-Token
+    const writeHeaders = { "content-type": "application/json", "x-demo-token": process.env.DEMO_TOKEN };
     const post = await fetch(`${base}/api/schedule`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: writeHeaders,
       body: JSON.stringify({
         user_handle: "同学A",
         weekday: 5,
@@ -293,12 +295,20 @@ test("HTTP：GET/POST /api/schedule 与 /api/scrub/audit", async () => {
     // 坏区间 → SCHEMA_REJECTED
     const bad = await fetch(`${base}/api/schedule`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: writeHeaders,
       body: JSON.stringify({ user_handle: "同学A", weekday: 1, period_start: 6, period_end: 2, title: "课程B" }),
     });
     const badBody = await bad.json();
     assert.equal(badBody.ok, false);
     assert.equal(badBody.error.code, "SCHEMA_REJECTED");
+
+    // 写接口无令牌 → 401（契约 core.md §4）
+    const noToken = await fetch(`${base}/api/schedule`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ user_handle: "同学A", weekday: 1, period_start: 1, period_end: 2, title: "课程C" }),
+    });
+    assert.equal(noToken.status, 401, "POST /api/schedule 无 X-Demo-Token 必须 401");
 
     // ⛔ 不存在任何课表上传接口
     const up = await fetch(`${base}/api/schedule/upload`, { method: "POST" });

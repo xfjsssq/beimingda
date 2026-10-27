@@ -171,9 +171,19 @@ test("HTTP：health 信封 + 404 信封 + MCP 鉴权", async () => {
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
     }).then((r) => r.json());
-    // T0 阶段 tools/list 为空数组；任何模块分支注册自己的工具后就不再为 0。
-    // 因此这里只断言形态（数组），具体工具的断言写在各模块自己的 tests/*.test.js 里。
-    assert.ok(Array.isArray(list.result.tools), "tools/list 必须返回数组");
+    // 工具数量随模块合入增长（M1 5 / M2 3 / M3 2 / M4 4 = 14），这里只校验结构：
+    assert.ok(Array.isArray(list.result.tools));
+    for (const t of list.result.tools) {
+      assert.equal(typeof t.name, "string");
+      assert.equal(
+        t.inputSchema?.additionalProperties,
+        false,
+        `${t.name} 的 inputSchema 必须 additionalProperties:false`,
+      );
+    }
+    // 工具名不许重复
+    const names = list.result.tools.map((t) => t.name);
+    assert.equal(new Set(names).size, names.length);
 
     const init = await fetch(`${base}/mcp`, {
       method: "POST",
