@@ -239,6 +239,15 @@
       return { value: null, from: spec.paths[0] };
     }
 
+    /** 失败原因翻译成人话：区分「还没上线」和「打太勤被限频」 */
+    function failHint(code) {
+      if (code === "NOT_FOUND") return null; // 交给调用方补 owner
+      if (code === "QUOTA") return "触发限频（单 IP 60 次/分钟）· 稍等一下再点「刷新统计」";
+      if (code === "TIMEOUT") return "请求超时 · 稍后重试";
+      if (code === "SCHEMA_REJECTED") return "接口拒绝（鉴权或参数）· 读接口不需要令牌，可能是写接口";
+      return code ? "读取失败（" + code + "）" : "读取失败";
+    }
+
     function paint(spec, res) {
       const box = document.getElementById("stat-" + spec.key);
       if (!box) return;
@@ -247,10 +256,11 @@
       if (res.value === null) {
         box.classList.add("stat--pending");
         valueEl.textContent = "—";
-        const err = lastError(spec.paths[0]);
-        srcEl.textContent = err
-          ? "接口未就绪（" + err.code + "）· 等待 " + spec.owner
-          : "接口未就绪 · 等待 " + spec.owner;
+        const err = lastError(spec.paths[0]) || lastError(spec.paths[spec.paths.length - 1]);
+        const hint = failHint(err && err.code);
+        srcEl.textContent = hint
+          ? hint
+          : "接口未就绪（" + ((err && err.code) || "…") + "）· 等待 " + spec.owner;
         return;
       }
       box.classList.remove("stat--pending");
