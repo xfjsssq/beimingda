@@ -40,6 +40,7 @@ try {
 }
 
 const { initDb, getDb } = await import("../src/db/index.js");
+const { normalizeBuildingName, canonicalLabels } = await import("../src/services/buildings.js");
 const {
   matchScore,
   parseReasonScores,
@@ -561,8 +562,15 @@ test("HTTP /api/tasks：4 条路由（读开放、写需令牌、详情、触发
     assert.ok(html.includes("匹配结果") && html.includes("score"), "页面必须展示 score");
     assert.ok(html.includes("reason:"), "页面必须展示 reason");
     const srcs = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(srcs, ["/config.js"], "页面只允许加载 /config.js（自包含，不引 /js 下的公共脚本）");
-    assert.ok(!/\/js\//.test(html), "⛔ 不许引用 /js/ 下的文件");
+    assert.deepEqual(srcs, ["/config.js"], "页面自带的外链脚本只允许 /config.js（自包含）");
+    // demo 模式接入：F0 的 /js/demo.js（动态 import → 未合并时静默跳过）
+    assert.ok(/import\("\/js\/demo\.js"\)/.test(html), "必须接入 /js/demo.js");
+    assert.ok(!/\/js\/(api|nav)\.js/.test(html), "⛔ 不直接引用 /js/api.js、/js/nav.js");
+    // ⛔ 静态文案里不许出现「演示模式」（否则不带 ?demo=1 也会被判定为已启用）
+    assert.ok(!html.includes("演示模式"), "静态文案里不许出现「演示模式」字样");
+    // 375px 不破版的关键 CSS：datetime-local 所在网格必须允许收缩
+    assert.ok(/minmax\(0,1fr\)/.test(html), ".wins .win 必须用 minmax(0,1fr)");
+    assert.ok(/@media \(max-width:640px\)[\s\S]*\.wins \.win/.test(html), "必须给 .wins .win 窄屏兜底");
   } finally {
     server.close();
   }
@@ -613,6 +621,132 @@ test("只读辅助口：GET /api/runners（脱敏、只回活跃）与 GET /api/
   } finally {
     server.close();
   }
+});
+
+test("楼栋规范名归一：口语写法自动收敛，归不出来才拒并列出可选规范名", async () => {
+  // 1) 纯归一表（由 config/map-nodes.json 的 label 派生，不写死楼栋）
+  const table = {
+    "12号楼": "12号宿舍楼",
+    "12栋": "12号宿舍楼",
+    "十二号宿舍楼": "12号宿舍楼",
+    "12号": "12号宿舍楼",
+    "15号楼": "15号宿舍楼",
+    "12号宿舍楼东": "12号宿舍楼",
+    "南大门": "南门",
+    "菜鸟驿站": "快递驿站",
+    "快递站": "快递驿站",
+    "二食堂": "第二食堂",
+    "2食堂": "第二食堂",
+    "火星楼": null,
+    "12号教学楼": null,
+  };
+  for (const [raw, want] of Object.entries(table)) {
+    assert.equal(normalizeBuildingName(raw), want, `${raw} 应归一为 ${want}`);
+  }
+
+  // 2) task_publish 传口语楼栋 → 成功，库里/出参都是规范名
+  const created = publishTask(baseTask({ from_building: "12号楼", to_building: "15栋" }));
+  const stored = getDb().prepare("SELECT from_building, to_building FROM tasks WHERE id = ?").get(created.task_id);
+  assert.equal(stored.from_building, "12号宿舍楼");
+  assert.equal(stored.to_building, "15号宿舍楼");
+  assert.equal(getTask(created.task_id).from_building, "12号宿舍楼");
+
+  // 3) 归一失败 → SCHEMA_REJECTED，且 message 里带可选规范名（Agent 可以自我纠正）
+  assert.throws(
+    () => publishTask(baseTask({ to_building: "火星楼" })),
+    (e) => {
+      assert.equal(e.code, "SCHEMA_REJECTED");
+      assert.match(e.message, /火星楼/);
+      assert.match(e.message, /可选/);
+      for (const label of canonicalLabels()) assert.ok(e.message.includes(label), `message 应列出 ${label}`);
+      return true;
+    },
+  );
+  assert.throws(
+    () => publishTask(baseTask({ from_building: "12号教学楼" })),
+    (e) => e.code === "SCHEMA_REJECTED",
+  );
+
+  // 4) 快递站名宽松：归一命中用规范名，归不出来保留原文（station 不参与打分）
+  const st1 = publishTask(baseTask({ station: "菜鸟驿站" }));
+  assert.equal(getTask(st1.task_id).station, "快递驿站");
+  const st2 = publishTask(baseTask({ station: "南门快递柜" }));
+  assert.equal(getTask(st2.task_id).station, "南门快递柜");
+
+  // 5) MCP 与 HTTP 共用同一套归一（MCP 路径也生效）
+  const viaMcp = await callTool("task_publish", {
+    from_building: "十二号楼",
+    to_building: "15号楼",
+    station: "菜鸟驿站",
+    deadline_iso: isoIn(240),
+    reward_min: 3,
+    reward_max: 5,
+    owner_handle: "归一同学",
+  });
+  assert.equal(viaMcp.ok, true, JSON.stringify(viaMcp));
+  assert.equal(getTask(viaMcp.data.task_id).from_building, "12号宿舍楼");
+  const badMcp = await callTool("task_publish", {
+    from_building: "火星楼",
+    to_building: "15号楼",
+    station: "快递驿站",
+    deadline_iso: isoIn(240),
+    reward_min: 3,
+    reward_max: 5,
+    owner_handle: "归一同学",
+  });
+  assert.equal(badMcp.error.code, "SCHEMA_REJECTED");
+  assert.match(badMcp.error.message, /可选/);
+
+  // 6) 过滤参数也归一：用「12号楼」筛得到 12号宿舍楼 的任务
+  const filtered = listOpenTasks({ building: "12号楼", limit: 50 });
+  assert.ok(filtered.length >= 1);
+  assert.ok(filtered.every((t) => t.from_building === "12号宿舍楼" || t.to_building === "12号宿舍楼"));
+});
+
+test("runner_register 也归一：登记「12号楼」的跑腿者能被「12号宿舍楼」的任务端到端命中", async () => {
+  parkAllRunners();
+  // 跑腿方用口语写法登记
+  const reg = registerRunner({
+    user_handle: "归一跑腿",
+    reachable_buildings: ["12号楼", "12号宿舍楼", "15栋"],
+    reward_floor: 1,
+    time_windows: [{ start_iso: isoIn(-30), end_iso: isoIn(300) }],
+  });
+  // 存库去重后是规范名
+  const row = getDb().prepare("SELECT reachable_buildings FROM runners WHERE id = ?").get(reg.runner_id);
+  assert.deepEqual(JSON.parse(row.reachable_buildings), ["12号宿舍楼", "15号宿舍楼"]);
+  assert.deepEqual(reg.reachable_buildings, ["12号宿舍楼", "15号宿舍楼"]);
+
+  // 任务端用规范名发布 → 端到端命中（可达性 40 + 时间 30 + 报酬 30 = 100）
+  const { task_id } = publishTask(baseTask({ from_building: "12号宿舍楼", to_building: "15号宿舍楼" }));
+  const result = matchForTask(task_id, { now: NOW, topK: 3 });
+  assert.equal(result.matches.length, 1);
+  assert.equal(result.matches[0].runner_handle, "归一跑腿");
+  assert.equal(result.matches[0].score, 100);
+  // reason 里楼栋名是规范名（⛔ 不许动分值：仍等于 score）
+  assert.match(result.matches[0].reason, /可达 15号宿舍楼/);
+  assert.equal(parseReasonScores(result.matches[0].reason).reduce((a, b) => a + b, 0), result.matches[0].score);
+
+  // 未知楼栋 → 拒 + 可选清单
+  assert.throws(
+    () =>
+      registerRunner({
+        user_handle: "归一跑腿",
+        reachable_buildings: ["火星楼"],
+        reward_floor: 1,
+        time_windows: [],
+      }),
+    (e) => e.code === "SCHEMA_REJECTED" && /可选/.test(e.message) && e.message.includes("12号宿舍楼"),
+  );
+  // MCP 路径同样归一
+  const viaMcp = await callTool("runner_register", {
+    user_handle: "归一跑腿MCP",
+    reachable_buildings: ["12号楼"],
+    reward_floor: 2,
+    time_windows: [{ start_iso: isoIn(-30), end_iso: isoIn(60) }],
+  });
+  assert.equal(viaMcp.ok, true);
+  assert.deepEqual(viaMcp.data.reachable_buildings, ["12号宿舍楼"]);
 });
 
 test("MCP 工具清单：m1 的 5 个工具都在，且 schema 全部 additionalProperties:false", () => {

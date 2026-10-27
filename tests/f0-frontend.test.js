@@ -310,10 +310,88 @@ test("nav.js：6 页导航 + 当前页判定（含 .html / 无扩展名 / 未知
   assert.equal(nav.currentPageId("/agent.html"), "agent");
   assert.equal(nav.currentPageId("/welcome/"), "welcome");
   assert.equal(nav.currentPageId("/nope"), "");
-  // 只产出 <a href>，不去 fetch 别的页面（其他模块页暂时 404 也不影响本页）
+  // 探测只发 HEAD、只看状态码，⛔ 不读响应体（不拉整页内容）
   const src = readText("static/js/nav.js");
-  assert.ok(!/fetch\(/.test(src), "nav.js 不该 fetch 其他页面");
+  assert.match(src, /method:\s*"HEAD"/, "nav.js 的页面存在性探测必须用 HEAD");
+  assert.ok(!/res\.(text|json)\(/.test(src), "nav.js 不该读取其他页面的响应体");
   assert.match(src, /aria-current="page"/);
+  // 导航入口带优雅降级（不隐藏、不是死链）
+  assert.match(src, /即将上线/);
+  assert.match(src, /data-soon-href/);
+});
+
+/* ------------------------------------------------------------------ 7b. 页面存在性探测与降级 */
+test("nav.js：classifyStatus 只对 404/410/501 判「即将上线」，探测失败绝不下结论", () => {
+  assert.equal(nav.classifyStatus(200), "ok");
+  assert.equal(nav.classifyStatus(204), "ok");
+  assert.equal(nav.classifyStatus(302), "ok");
+  assert.equal(nav.classifyStatus(404), "soon");
+  assert.equal(nav.classifyStatus(410), "soon");
+  assert.equal(nav.classifyStatus(501), "soon");
+  // 超时 / 网络失败 / 5xx / 401 → unknown（保持正常链接，不误伤）
+  assert.equal(nav.classifyStatus(null), "unknown");
+  assert.equal(nav.classifyStatus(undefined), "unknown");
+  assert.equal(nav.classifyStatus(0), "unknown");
+  assert.equal(nav.classifyStatus(500), "unknown");
+  assert.equal(nav.classifyStatus(401), "unknown");
+  assert.equal(nav.classifyStatus(429), "unknown");
+});
+
+test("nav.js：probePages 只发 HEAD、结果按会话缓存（同一会话只探一次）、unknown 不落缓存", async () => {
+  const store = new Map();
+  globalThis.sessionStorage = {
+    getItem: (k) => (store.has(k) ? store.get(k) : null),
+    setItem: (k, v) => store.set(k, String(v)),
+    removeItem: (k) => store.delete(k),
+  };
+  const calls = [];
+  const fetcher = async (href, init) => {
+    calls.push({ href, method: init && init.method, hasBody: Boolean(init && init.body) });
+    if (href === "/schedule") return { status: 404 };
+    if (href === "/takeout") return { status: 200 };
+    throw new Error("ECONNREFUSED"); // 模拟网络不通
+  };
+
+  const first = await nav.probePages(["/schedule", "/takeout", "/down", "/takeout"], { fetcher });
+  assert.deepEqual(first, { "/schedule": "soon", "/takeout": "ok", "/down": "unknown" });
+  assert.equal(calls.length, 3, "重复路径只探一次");
+  for (const c of calls) {
+    assert.equal(c.method, "HEAD", "必须是 HEAD 探测");
+    assert.equal(c.hasBody, false, "HEAD 探测不该带请求体");
+  }
+
+  // 第二次调用：命中会话缓存，一个请求都不发
+  const before = calls.length;
+  const second = await nav.probePages(["/schedule", "/takeout"], { fetcher });
+  assert.deepEqual(second, { "/schedule": "soon", "/takeout": "ok" });
+  assert.equal(calls.length, before, "同一会话内应命中缓存，不再发请求");
+  // unknown 不落缓存 → 下次仍会重探（网络恢复后能自愈）
+  const third = await nav.probePages(["/down"], { fetcher });
+  assert.equal(third["/down"], "unknown");
+  assert.ok(calls.length > before, "unknown 不该被缓存，应当重探");
+  // force 忽略缓存
+  const count = calls.length;
+  await nav.probePages(["/takeout"], { fetcher, force: true });
+  assert.equal(calls.length, count + 1, "force=true 应忽略缓存重探");
+
+  // isPageDown：缓存里判定为 soon 的才是降级入口
+  assert.equal(nav.isPageDown("/schedule"), true);
+  assert.equal(nav.isPageDown("/takeout"), false);
+  delete globalThis.sessionStorage;
+});
+
+test("首页与导航共用同一套降级判断：首页 4 个功能入口都带 data-page-check", () => {
+  const html = readStatic("index.html");
+  for (const href of ["/takeout", "/buddy", "/welcome", "/schedule"]) {
+    assert.ok(html.includes(`data-page-check="${href}"`), `首页 ${href} 入口缺少 data-page-check`);
+  }
+  // 降级态样式（不隐藏，只是弱化 + 「即将上线」小标签）
+  const css = readStatic("css/app.css");
+  assert.match(css, /\.nav-link\.is-soon/);
+  assert.match(css, /\.btn\.is-soon/);
+  assert.match(css, /\.soon-tag\s*\{/);
+  assert.match(css, /\.nav-tip\s*\{/);
+  assert.ok(!/\.is-soon[^{]*\{[^}]*display:\s*none/.test(css), "降级入口不许被 display:none 藏掉");
 });
 
 /* ------------------------------------------------------------------ 8. demo.js */

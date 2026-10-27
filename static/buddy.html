@@ -10,7 +10,8 @@
     契约：contracts/m2-buddy.md §6（4 个区块）
     ⚠️ 候选卡片上不得出现任何可反推身份的字段：本页只渲染接口白名单字段
         （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
-    照片：仅本地预览，既不参与评分也不会上传（契约 §7）
+    照片：本页**不含任何文件上传控件**（contracts/frontend.md §7：上传控件只出现在代取截图处）；
+          搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7）
   -->
   <style>
     :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; }
@@ -60,7 +61,6 @@
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
     th { color:#5b6470; font-weight:500; font-size:12px; }
-    #photoPrev { max-width:120px; border-radius:8px; margin-top:8px; display:none; }
     @media (max-width:768px) {
       main { padding:16px 12px 48px; }
       .row { flex-direction:column; }
@@ -102,15 +102,11 @@
           <option value="other">其他</option>
         </select>
       </div>
-      <div>
-        <label for="photo">照片（可选，仅本地预览）</label>
-        <input id="photo" type="file" accept="image/*" />
-      </div>
     </div>
     <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
     <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
-    <img id="photoPrev" alt="照片预览" />
-    <p class="hint">照片不参与评分、也不会上传（服务端根本没有照片字段）。</p>
+    <!-- ⛔ 本页刻意不放任何文件上传控件（contracts/frontend.md §7：文件上传控件只出现在代取截图上传处）；
+         搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7） -->
     <div class="row" style="margin-top:10px">
       <button id="btnPublish">发布</button>
       <button id="btnPreview" class="ghost">先看画像抽取结果</button>
@@ -170,17 +166,20 @@
   const params = new URLSearchParams(location.search);
 
   const getHandle = () => ($("handle").value || "").trim() || "同学A";
-  const getToken = () => ($("token").value || "").trim();
+  let fallbackToken = "";                                   // 服务端注入的令牌只放内存，⛔ 不回填到输入框
+  const getToken = () => ($("token").value || "").trim() || fallbackToken;
 
   // 初始化：令牌取值链 —— 1) ?token=  2) localStorage（必须非空）  3) /config.js 注入的 window.__DEMO_TOKEN__
   // 顺序有讲究：评委零操作时前两级都为空 -> 自动吃注入值；自己输过令牌的测试者不会被覆盖。
-  // ⛔ 注入值只在内存里用，绝不写回 localStorage（核心层轮换令牌后，下次打开自动吃到新值，不会被旧值挡掉）
-  // ⛔ 页面任何位置都不打印/回显令牌内容（输入框显示的是用户自己填或注入的那一份）
+  // ⛔ 注入值只在内存里用：不写回 localStorage，**也不回填到输入框**（否则直播/路演会把真实令牌明文显示在页面上）
+  // ⛔ 页面任何位置都不打印/回显令牌内容
   $("handle").value = params.get("handle") || localStorage.getItem(LS.handle) || "同学A";
   const urlToken = params.get("token") || "";
   const savedToken = (localStorage.getItem(LS.token) || "").trim();
   const injectedToken = typeof window.__DEMO_TOKEN__ === "string" ? window.__DEMO_TOKEN__ : "";
-  $("token").value = urlToken || savedToken || injectedToken || "";
+  fallbackToken = injectedToken;
+  $("token").value = urlToken || savedToken || "";
+  $("token").placeholder = getToken() ? "已由服务端配置（如需覆盖请重新输入）" : "<DEMO_TOKEN>";
   $("handle").addEventListener("change", () => localStorage.setItem(LS.handle, getHandle()));
   $("token").addEventListener("change", () => localStorage.setItem(LS.token, getToken()));
 
@@ -200,15 +199,6 @@
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  // ---------- 照片：本地预览，不参与评分、不上传 ----------
-  $("photo").addEventListener("change", () => {
-    const f = $("photo").files && $("photo").files[0];
-    const img = $("photoPrev");
-    if (!f) { img.style.display = "none"; img.removeAttribute("src"); return; }
-    img.src = URL.createObjectURL(f);
-    img.style.display = "block";
-  });
-
   // ---------- 区块一：发布 ----------
   async function publish() {
     const text = $("pubText").value.trim();
@@ -218,8 +208,8 @@
       const data = await api("/api/buddies", {
         method: "POST",
         headers: { "content-type": "application/json", "x-demo-token": getToken() },
-        // photo_path 传的是文件名占位 —— 服务端接收但不落库、不参与评分
-        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text, photo_path: "" }),
+        // 本页不带照片：搭子匹配不需要照片，照片也不参与评分（MCP buddy_publish 仍保留 photo_path 入参）
+        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text }),
       });
       say("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
       $("pubOut").style.display = "block";
@@ -311,6 +301,15 @@
   $("btnMine").addEventListener("click", loadMine);
   loadMine();
 })();
+</script>
+
+<!-- ?demo=1 演示模式（契约 frontend.md §5）：/js/demo.js 是 ES module，必须走 type="module" 才能真正执行 initDemo() -->
+<script type="module">
+  // 徽章（右上角「演示模式」）+ 学号/手机号形态兜底打码 + 幂等灌演示数据（接口未就绪则静默跳过）
+  // ⛔ 与上面的令牌输入框无关：demo.js 既不读也不写令牌，也不碰 input/textarea（MASK_SKIP_SELECTOR 排除）
+  // /js/demo.js 由 F0 分支提供；分支未合并时 import 失败不影响本页其余功能
+  import { initDemo } from "/js/demo.js";
+  initDemo();
 </script>
 </body>
 </html>

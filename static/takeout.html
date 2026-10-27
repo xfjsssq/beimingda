@@ -27,7 +27,7 @@
   .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px 14px; }
   label { display:block; font-size:12px; color:var(--mut); margin-bottom:4px; }
   input,select,textarea,button { font:inherit; }
-  input,select,textarea { width:100%; padding:8px 10px; border:1px solid var(--line);
+  input,select,textarea { width:100%; min-width:0; padding:8px 10px; border:1px solid var(--line);
     border-radius:8px; background:#fff; color:inherit; }
   textarea { min-height:64px; resize:vertical; }
   button { border:0; border-radius:8px; padding:9px 16px; background:var(--pri); color:#fff; cursor:pointer; }
@@ -58,10 +58,21 @@
   footer { max-width:980px; margin:0 auto; padding:0 16px 40px; font-size:12px; color:var(--mut); }
   .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
-  .wins .win { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; margin-bottom:8px; align-items:end; }
+  /* ⚠️ datetime-local 的固有最小宽约 182px：必须 minmax(0,1fr) 才允许收缩，否则 375px 视口被撑破 */
+  .wins .win { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
+    gap:8px; margin-bottom:8px; align-items:end; }
+  @media (max-width:640px) {
+    /* 窄屏：起始时间独占一行，结束时间 + 删除按钮一行，避免两个 datetime-local 并排溢出 */
+    .wins .win { grid-template-columns:minmax(0,1fr) auto; }
+    .wins .win .w-start { grid-column:1 / -1; }
+  }
   .chk { display:flex; flex-wrap:wrap; gap:10px 16px; }
   .chk label { display:flex; align-items:center; gap:6px; font-size:13px; color:#1c1c1e; margin:0; }
   .chk input { width:auto; }
+  /* demo 徽章（?demo=1，由 F0 的 /js/demo.js 注入）；本页不引 app.css，所以这里给个最小样式 */
+  .demo-badge--float { position:fixed; top:10px; right:10px; z-index:50;
+    background:var(--pri); color:#fff; font-size:12px; line-height:1.4; padding:4px 10px;
+    border-radius:999px; box-shadow:0 2px 8px rgba(16,24,40,.18); }
 </style>
 </head>
 <body>
@@ -465,6 +476,13 @@
   }
   boot();
 })();
+</script>
+<script type="module">
+  /* demo 模式（contracts/frontend.md §5）：?demo=1 时由 F0 的 /js/demo.js 注入演示徽章，
+     并对姓名/手机号形态做兜底处理；不带参数时不产生任何视觉变化。
+     demo.js 属 feat/frontend（集成阶段并入 main）——这里用动态 import + catch，
+     本分支（或未合并时）加载不到就静默跳过，⛔ 不让页面报错、也不与页面自带的令牌输入框打架。 */
+  import("/js/demo.js").then((m) => m.initDemo()).catch(() => {});
 </script>
 </body>
 </html>

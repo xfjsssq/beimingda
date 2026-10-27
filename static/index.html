@@ -37,25 +37,25 @@
           <span class="card__icon" aria-hidden="true">📦</span>
           <h3 class="card__title">代取撮合</h3>
           <p class="card__desc">发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。</p>
-          <a class="btn btn--ghost btn--sm card__action" href="/takeout">进入代取看板</a>
+          <a class="btn btn--ghost btn--sm card__action" href="/takeout" data-page-check="/takeout">进入代取看板</a>
         </article>
         <article class="card">
           <span class="card__icon" aria-hidden="true">🤝</span>
           <h3 class="card__title">搭子匹配</h3>
           <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）才互相可见联系方式，单方面看不到。</p>
-          <a class="btn btn--ghost btn--sm card__action" href="/buddy">进入搭子墙</a>
+          <a class="btn btn--ghost btn--sm card__action" href="/buddy" data-page-check="/buddy">进入搭子墙</a>
         </article>
         <article class="card">
           <span class="card__icon" aria-hidden="true">🗺️</span>
           <h3 class="card__title">迎新导览</h3>
           <p class="card__desc">校园地图 + 360° 实景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
-          <a class="btn btn--ghost btn--sm card__action" href="/welcome">进入迎新导览</a>
+          <a class="btn btn--ghost btn--sm card__action" href="/welcome" data-page-check="/welcome">进入迎新导览</a>
         </article>
         <article class="card">
           <span class="card__icon" aria-hidden="true">⏰</span>
           <h3 class="card__title">日程提醒</h3>
           <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。快到点了提前两小时喊你一声。</p>
-          <a class="btn btn--ghost btn--sm card__action" href="/schedule">进入日程表</a>
+          <a class="btn btn--ghost btn--sm card__action" href="/schedule" data-page-check="/schedule">进入日程表</a>
         </article>
       </div>
     </section>
@@ -184,8 +184,8 @@
       {
         key: "runners",
         label: "活跃跑腿者数",
-        unit: "人",
-        paths: ["/api/runners", "/api/stats"],
+        unit: "人",   // ⛔ 不探测不存在的 /api/stats：空实例上会打一条 404 噪音（验证员 B8）
+        paths: ["/api/runners"],
         owner: "feat/m1-takeout",
         pick(d) {
           const list = listOf(d);
@@ -197,7 +197,7 @@
         key: "buddies",
         label: "搭子帖数",
         unit: "条",
-        paths: ["/api/buddies", "/api/stats"],
+        paths: ["/api/buddies"],
         owner: "feat/m2-buddy",
         pick(d) {
           const list = listOf(d);
@@ -209,7 +209,7 @@
         key: "score",
         label: "平均匹配得分",
         unit: "分",
-        paths: ["/api/matches", "/api/stats"],
+        paths: ["/api/matches"],
         owner: "feat/m1-takeout",
         pick(d) {
           const list = listOf(d);

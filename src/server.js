@@ -52,6 +52,10 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: false, limit: "256kb" }));
 
+  // favicon：浏览器会固定请求 /favicon.ico，重定向到我们自己的 SVG 图标。
+  //   不加的话每页 console 都会有一条 404 噪音（独立验证员在真机走查里报过）。
+  app.get("/favicon.ico", (req, res) => res.redirect(301, "/favicon.svg"));
+
   // 前端配置注入：地图 key 等只在这里透出，⛔ 页面里不许硬编码
   //   ⚠️ __DEMO_TOKEN__ 是「演示令牌」，按 contracts/core.md §4 它本就是公开给评委的
   //      （只读 + 限频 + 短周期轮换，泄露无风险）。注入它只为让页面上的写接口

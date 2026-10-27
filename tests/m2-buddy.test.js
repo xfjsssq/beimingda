@@ -181,6 +181,100 @@ test("§8-3 must_have 与 deal_breaker 语义冲突的候选被排除（字符�
   );
 });
 
+test("§2 加强：完全同词（含去空白/大小写/同义归一）必须判冲突并一票否决", async () => {
+  // 验证员复现的原句：以前返回 []
+  assert.ok(engine.findConflicts(["抽烟"], ["抽烟"]).length >= 1, "完全同词必须判冲突");
+  assert.ok(engine.findConflicts(["  抽 烟 "], ["抽烟"]).length >= 1, "去空白后同词必须判冲突");
+  assert.ok(engine.findConflicts(["吸烟"], ["抽烟"]).length >= 1, "同义归一后同词必须判冲突");
+  assert.ok(engine.findConflicts(["不抽烟"], ["抽烟"]).length >= 1, "剥极性词后同词必须判冲突");
+
+  // 方向二：同主题但表述完全不同 —— 仍必须判冲突
+  assert.ok(engine.findConflicts(["室友必须安静，半夜别吵"], ["凌晨打游戏外放"]).length >= 1, "噪音主题");
+  assert.ok(engine.findConflicts(["不接受抽烟"], ["室友抽烟（阳台抽也不行）"]).length >= 1, "抽烟主题");
+  assert.ok(engine.findConflicts(["要求每周一起打扫卫生"], ["房间乱一点就焦虑，会一直念叨别人不收拾"]).length >= 1, "卫生主题");
+  assert.ok(engine.findConflicts(["希望一起自习"], ["讨厌自习"]).length >= 1, "学习习惯主题 + 否定语义");
+  assert.ok(engine.findConflicts(["希望周末有空"], ["周末很忙"]).length >= 1, "周末时间主题 + 反义立场");
+
+  // 反向：不该被误判成冲突的组合（否则会过度否决，把好候选排掉）
+  assert.deepEqual(engine.findConflicts(["希望作息一致"], ["凌晨打游戏外放"]), []);
+  assert.deepEqual(engine.findConflicts(["希望对方爱干净"], ["凌晨打游戏外放"]), []);
+  assert.deepEqual(engine.findConflicts(["不养宠物"], ["室友抽烟"]), []);
+  // ⛔ 纯"包含"关系不判冲突（verifier 终审 B1：`希望安静` ⊃ `安静` 语义其实一致，都爱安静）
+  //    包含只能作为"同主题 + 否定/反义"的补充证据，不能独立触发否决
+  assert.deepEqual(engine.findConflicts(["希望安静"], ["安静"]), [], "纯包含不得判冲突（会误杀好候选）");
+  assert.deepEqual(engine.findConflicts(["希望安静"], ["喜欢安静的环境"]), [], "同向立场不得判冲突");
+  assert.deepEqual(engine.findConflicts(["室友抽烟"], ["抽烟"]), [], "纯包含（无极性/否定）按裁决不判冲突");
+  // 但同主题一旦带否定或反义立场，仍必须冲突
+  assert.ok(engine.findConflicts(["希望安静"], ["讨厌安静"]).length >= 1, "同主题 + 否定词必须冲突");
+
+  // 评分层：同词场景必须 0 分出局；去掉同词句后同一画像本来能过阈值
+  const postProfile = { ...byId("demo-buddy-4").profile, deal_breaker: ["抽烟"] };
+  const seekerProfile = { ...byId("demo-buddy-4").profile, must_have: ["抽烟"] };
+  const scored = engine.buddyScore(postProfile, seekerProfile);
+  assert.equal(scored.vetoed, true, "同词必须一票否决");
+  assert.equal(scored.score, 0);
+  const cleared = engine.buddyScore(postProfile, { ...seekerProfile, must_have: [] });
+  assert.ok(cleared.score >= engine.THRESHOLD, `去掉同词句后应能过阈值，实得 ${cleared.score}`);
+
+  // 端到端 1：**完全同词** —— 帖子的雷点与寻找方的硬性要求归一后是同一句 -> 必须排除
+  const MATCH_TEXT =
+    "大四 经管 想找爱干净、作息规律的室友，实习期早出晚归，希望互相尊重安静时间；喜欢实习和读书；早睡早起；周五1-4节和周六1-4节有课";
+  const sameWordPost = svc.createPost({
+    author_handle: "同词作者",
+    kind: "roommate",
+    profile: { ...postProfile, deal_breaker: ["室友必须能一起抽烟"] },
+  });
+  const clean = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者A",
+    kind: "roommate",
+    text_profile: MATCH_TEXT,
+  });
+  assert.equal(clean.ok, true, JSON.stringify(clean.error));
+  assert.ok(
+    clean.data.candidates.some((c) => c.post_id === sameWordPost.post_id),
+    "不带同词句时应能命中该帖",
+  );
+  const dirty = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者B",
+    kind: "roommate",
+    text_profile: `${MATCH_TEXT}；室友必须能一起抽烟`,
+  });
+  assert.equal(dirty.ok, true, JSON.stringify(dirty.error));
+  assert.ok(
+    !dirty.data.candidates.some((c) => c.post_id === sameWordPost.post_id),
+    "完全同词的冲突候选必须被排除（以前会照常以 94 分通过）",
+  );
+
+  // 端到端 2：**同主题 + 否定词**（更贴近真实措辞）-> 也必须排除
+  //    ⚠️ 注意：单纯"包含"（`室友必须能一起抽烟` ⊃ `抽烟`）按语委口径**不算**冲突，
+  //    所以这里用「必须不抽烟」（带否定词）来触发，而不是靠包含
+  const themePost = svc.createPost({
+    author_handle: "同主题作者",
+    kind: "roommate",
+    profile: postProfile,
+  });
+  const negHit = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者C",
+    kind: "roommate",
+    text_profile: `${MATCH_TEXT}；室友必须不抽烟`,
+  });
+  assert.equal(negHit.ok, true, JSON.stringify(negHit.error));
+  assert.ok(
+    !negHit.data.candidates.some((c) => c.post_id === themePost.post_id),
+    "同主题 + 否定词必须排除",
+  );
+  const keep = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者D",
+    kind: "roommate",
+    text_profile: MATCH_TEXT,
+  });
+  assert.equal(keep.ok, true, JSON.stringify(keep.error));
+  assert.ok(
+    keep.data.candidates.some((c) => c.post_id === themePost.post_id),
+    "不带否定句时应命中该帖（否则就是误否决）",
+  );
+});
+
 test("§8-4 kind 不同的候选被排除", async () => {
   const study = byId("demo-buddy-1");
   const asSport = engine.buddyScore(study.profile, { ...study.profile, kind: "sport" });
@@ -486,6 +580,95 @@ test("双选状态机：三条路径 + revealed=0 时 toResponse 不含 contact_
 
   assert.throws(() => opt.applyConsent(s1, "nobody", true), /SCHEMA_REJECTED|author/);
   assert.throws(() => opt.applyConsent(s1, "seeker", "yes"), /SCHEMA_REJECTED|布尔/);
+});
+
+test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口以状态机推导为准）", async () => {
+  // ── 方向一：脏行不该揭示（存储列说 1，但两个 bit 没同时为真）──
+  for (const dirty of [
+    { author_ok: 0, seeker_ok: 0, revealed: 1 },
+    { author_ok: 0, seeker_ok: 1, revealed: 1 },
+    { author_ok: 1, seeker_ok: 0, revealed: 1 },
+  ]) {
+    const resp = opt.toResponse(dirty, "ct_dirty");
+    assert.equal(
+      Object.hasOwn(resp, "contact_code"),
+      false,
+      `脏行不得吐出 contact_code: ${JSON.stringify(dirty)}`,
+    );
+    assert.equal("contact_code" in resp, false);
+    assert.equal(resp.revealed, 0, "revealed 必须由 author_ok && seeker_ok 推导，不读存储列");
+    assert.equal(opt.normalizeConsent(dirty).revealed, 0);
+    assert.equal(opt.isMutual(dirty), false);
+    assert.equal(opt.revealStatus(dirty), "pending");
+  }
+
+  // ── 方向二（反证）：存储列是 0，但两个 bit 都为真 -> 按推导必须揭示 ──
+  const derived = opt.toResponse({ author_ok: 1, seeker_ok: 1, revealed: 0 }, "ct_ok");
+  assert.equal(derived.revealed, 1, "两个 bit 都为真时按推导应揭示");
+  assert.equal(Object.hasOwn(derived, "contact_code"), true);
+  assert.equal(derived.contact_code, "ct_ok");
+  assert.equal(opt.normalizeConsent({ author_ok: 1, seeker_ok: 1, revealed: 0 }).revealed, 1);
+
+  // ── 方向三（服务层）：手工 UPDATE revealed=1（author_ok 保持 0）后走对外接口 ──
+  const pub = await callTool("buddy_publish", {
+    author_handle: "脏数据作者",
+    kind: "study",
+    text_profile: STUDY_TEXT,
+  });
+  assert.equal(pub.ok, true, JSON.stringify(pub.error));
+  const postId = pub.data.post_id;
+
+  const voted = await callTool("buddy_consent", {
+    post_id: postId,
+    seeker_handle: "脏数据寻找者",
+    agree: true,
+  });
+  assert.equal(voted.ok, true, JSON.stringify(voted.error));
+  assert.equal(voted.data.revealed, 0);
+  assert.equal(Object.hasOwn(voted.data, "contact_code"), false);
+
+  // 把库里这一行手工改脏：revealed=1 而 author_ok 仍为 0
+  const seeker = svc.findUser("脏数据寻找者");
+  assert.ok(seeker);
+  getDb()
+    .prepare("UPDATE buddy_consents SET revealed = 1 WHERE post_id = ? AND seeker_id = ?")
+    .run(postId, seeker.id);
+  const dirtyRow = getDb()
+    .prepare("SELECT author_ok, seeker_ok, revealed FROM buddy_consents WHERE post_id = ? AND seeker_id = ?")
+    .get(postId, seeker.id);
+  assert.deepEqual(
+    { ...dirtyRow },
+    { author_ok: 0, seeker_ok: 1, revealed: 1 },
+    "前置条件：库里这行已经是脏数据",
+  );
+
+  // 对外接口一：MCP buddy_search 的候选
+  const search = await callTool("buddy_search", {
+    seeker_handle: "脏数据寻找者",
+    kind: "study",
+    text_profile: STUDY_TEXT,
+  });
+  assert.equal(search.ok, true, JSON.stringify(search.error));
+  const cand = search.data.candidates.find((c) => c.post_id === postId);
+  assert.ok(cand, "该帖应仍在候选列表里（脏数据只影响揭示，不该让帖子消失）");
+  assert.equal(cand.reveal_status, "pending", "脏数据不得让候选变成 mutual");
+  assert.equal(Object.hasOwn(cand, "contact_code"), false, "脏数据不得让候选吐出 contact_code");
+
+  // 对外接口二：我的申请（GET /api/buddies/mine 用的同一个 service）
+  const mine = svc.myApplications({ seeker_handle: "脏数据寻找者" }).find((m) => m.post_id === postId);
+  assert.ok(mine);
+  assert.equal(mine.revealed, 0, "我的申请也必须以推导为准");
+  assert.equal(mine.reveal_status, "pending");
+
+  // 收尾反证：作者真实同意后（两个 bit 都为真）才该揭示
+  const both = await callTool("buddy_consent", {
+    post_id: postId,
+    seeker_handle: "脏数据作者",
+    agree: true,
+  });
+  assert.equal(both.ok, true, JSON.stringify(both.error));
+  assert.equal(both.data.revealed, 1);
+  assert.equal(Object.hasOwn(both.data, "contact_code"), true);
 });
 
 // ──────────────────────────── 结果白名单（反推身份） ────────────────────────────

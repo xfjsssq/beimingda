@@ -268,11 +268,34 @@ export function semanticSimilarity(textA, textB) {
 
 /**
  * 冲突主题表（规则化兜底）—— 契约 §2 要求"语义判断，不是字符串相等"，配了 key 走模型，
- * 没配 key 就用这张表：**同一主题** + 下面任一条件才算冲突，避免"作息一致 vs 凌晨外放"这类假冲突。
- *   a) 任一侧含禁止/厌恶语义（不/别/受不了/讨厌/反感/雷/最怕/拒绝/勿/禁…）
- *   b) 两侧分别落在该主题的反义立场上（安静 ↔ 外放；早睡 ↔ 熬夜…）
+ * 没配 key 就用这张表。判冲突的条件（满足任一即冲突）：
+ *   a) 完全同词：去标点/空白/大小写 + 同义归一 + 剥极性词之后两边相同（`抽烟` ↔ `抽烟`、`吸烟` ↔ `抽烟`、`不抽烟` ↔ `抽烟`）
+ *   b) 同一主题 + 任一侧含禁止/厌恶语义（不/别/受不了/讨厌/反感/雷/最怕/拒绝/勿/禁…）
+ *   c) 同一主题 + 两侧落在该主题的反义立场上（安静 ↔ 外放；早睡 ↔ 熬夜；周末有空 ↔ 周末很忙）
+ * ⛔ 纯"包含"关系（`希望安静` ⊃ `安静`）**不判冲突** —— 那种组合语义往往一致，误否决会把好候选排掉。
+ * 这套口径下"该否的不漏"靠 a/b/c，"不该否的不碰"靠拒绝纯包含：宁可交给 LLM 判定，也不误杀。
  */
 const NEG_MARK = /不|别|勿|禁|没|无|避免|拒绝|受不了|讨厌|反感|雷|最怕|无法|免/;
+
+/** 归一化时剥掉的极性/诉求词（只用于"同词"判定，不参与主题匹配） */
+const POLARITY_STRIP = /不接受|不能接受|不许|不要|拒绝|受不了|讨厌|反感|避免|没有|别|勿|禁|不|无/g;
+
+/** 同义归一：把同义写法收敛成一个词，让「吸烟」与「抽烟」这类组合也能判为同词 */
+const PHRASE_SYNONYMS = [
+  [/吸烟|香烟|电子烟|二手烟|烟味|吞云吐雾/g, "抽烟"],
+  [/吵闹|嘈杂|喧哗|噪音|闹腾|闹/g, "吵"],
+  [/通宵|晚睡|凌晨|半夜|夜不归宿|晚归|开夜车/g, "熬夜"],
+];
+
+/**
+ * 冲突短语归一：去标点/空白/大小写 → 同义归一 → 剥极性词。
+ * 「  抽 烟 」「抽烟」「不抽烟」「吸烟」全部收敛成 `抽烟`。
+ */
+export function canonPhrase(text) {
+  let s = normalizeText(text).replace(/\s+/g, "");
+  for (const [re, to] of PHRASE_SYNONYMS) s = s.replace(re, to);
+  return s.replace(POLARITY_STRIP, "");
+}
 
 const CONFLICT_THEMES = [
   { name: "抽烟", re: /抽烟|吸烟|烟味|香烟|电子烟|二手烟|吞云吐雾/ },
@@ -299,6 +322,18 @@ const CONFLICT_THEMES = [
   { name: "气味与饮食", re: /香水|气味|味道|螺蛳粉|泡面|外卖|做饭|油烟|吃辣|饮食/ },
   { name: "游戏习惯", re: /游戏|开黑|联机|组队|打排位/ },
   { name: "费用与空调", re: /水电费|分摊|aa制|费用|空调|温度/ },
+  {
+    name: "学习习惯",
+    re: /自习|学习|刷题|图书馆|泡馆|背书|复习|备考|上课/,
+    pos: /一起自习|自习|学习|刷题|复习|背书|去图书馆|泡馆/,
+    opp: /讨厌自习|不想学习|不爱学习|拒绝自习|学不下去/,
+  },
+  {
+    name: "周末时间",
+    re: /周末|周六|周日|双休|节假日/,
+    pos: /周末有空|周末空|周末闲|周末自由|周末不忙|周末都空/,
+    opp: /周末很忙|周末忙|周末没空|周末满课|周末要打工|周末要兼职|周末不空|周末有事/,
+  },
 ];
 
 /** 找出必须项与雷点之间的冲突对（规则化兜底） */
@@ -308,15 +343,35 @@ export function findConflicts(mustHave, dealBreaker) {
   const out = [];
   for (const m of mh) {
     const mn = normalizeText(m);
+    const mc = canonPhrase(m);
     for (const d of db) {
       const dn = normalizeText(d);
+      const dc = canonPhrase(d);
+
+      // a) 完全同词（去标点/空白/大小写 + 同义归一 + 剥极性词后相同）—— 同一条要求不可能既是必须又是雷点
+      const sameWord = mc.length >= 2 && mc === dc;
       const theme = CONFLICT_THEMES.find((t) => t.re.test(mn) && t.re.test(dn));
-      if (!theme) continue;
-      const polarity =
-        NEG_MARK.test(mn) || NEG_MARK.test(dn) ||
-        (theme.pos && theme.opp &&
-          ((theme.pos.test(mn) && theme.opp.test(dn)) || (theme.opp.test(mn) && theme.pos.test(dn))));
-      if (polarity) out.push({ must: m, deal: d, theme: theme.name });
+
+      let hit = false;
+      let name = "";
+      if (sameWord) {
+        hit = true;
+        name = theme ? theme.name : "同词";
+      } else if (theme) {
+        // b) 任一侧有禁止/厌恶语义
+        const polarity = NEG_MARK.test(mn) || NEG_MARK.test(dn);
+        // c) 反义立场（安静 ↔ 外放；周末有空 ↔ 周末很忙；一起自习 ↔ 讨厌自习）
+        const opposite =
+          !!theme.pos && !!theme.opp &&
+          ((theme.pos.test(mn) && theme.opp.test(dn)) || (theme.opp.test(mn) && theme.pos.test(dn)));
+        // ⚠️ 纯"包含"关系**不再**单独判冲突：`希望安静` ⊃ `安静` 语义其实一致（都爱安静），
+        //    旧规则会误否决好候选（verifier 终审 B1）。包含只能作为 b/c 的补充证据，不能独立触发。
+        if (polarity || opposite) {
+          hit = true;
+          name = theme.name;
+        }
+      }
+      if (hit) out.push({ must: m, deal: d, theme: name });
     }
   }
   return out;
