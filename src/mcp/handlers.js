@@ -10,6 +10,7 @@
  */
 
 import { registerMapTools } from "./handlers/map.js";
+import { registerBuddyTools } from "./handlers/buddy.js";
 
 /**
  * 各模块在合并进 main 后，请把自己的注册调用补进下面这个函数。
@@ -22,7 +23,7 @@ import { registerMapTools } from "./handlers/map.js";
 const MODULE_REGISTRARS = [
   { module: "m3", register: registerMapTools },
   // { module: "m1", register: registerTakeoutTools },
-  // { module: "m2", register: registerBuddyTools },
+  { module: "m2", register: registerBuddyTools },
   // { module: "m4", register: registerScheduleTools },
 ];
 
