@@ -21,6 +21,7 @@
 import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
+import { createBuddiesRouter } from "./buddies.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -44,6 +45,9 @@ export function createApiRouter() {
   // 例：router.use("/tasks", createTaskRouter());
   //     router.use("/buddies", createBuddyRouter());
   // ⛔ 不要在这里写具体业务逻辑。
+
+  // ---------- M2 搭子匹配 ----------
+  router.use("/buddies", createBuddiesRouter());
 
   router.use((req, res) => {
     res.status(404).json({
