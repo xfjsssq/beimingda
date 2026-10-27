@@ -18,7 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { nowSec } from "../util/time.js";
+import { nowSec, toTs } from "../util/time.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RULES_PATH = path.resolve(__dirname, "../../config/match-rules.json");
@@ -120,8 +120,9 @@ export function matchScore(task, runner, now = nowSec()) {
   let timeScore = 0;
   let timeNote = "无可用时段";
   for (const w of asArray(runner.time_windows)) {
-    const ws = Number(w?.start);
-    const we = Number(w?.end);
+    // DB 行里是 {start,end}（Unix 秒）；也容忍 service 入参形态 {start_iso,end_iso}，避免调用方踩空
+    const ws = Number.isFinite(Number(w?.start)) ? Number(w.start) : toTs(w?.start_iso);
+    const we = Number.isFinite(Number(w?.end)) ? Number(w.end) : toTs(w?.end_iso);
     if (!Number.isFinite(ws) || !Number.isFinite(we)) continue;
     const overlap = Math.max(0, Math.min(we, deadline) - Math.max(ws, nowTs));
     if (overlap <= 0) continue;
