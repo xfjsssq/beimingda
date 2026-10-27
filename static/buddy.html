@@ -162,6 +162,7 @@
   </div>
 </main>
 
+<script src="/config.js"></script>
 <script>
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -171,9 +172,15 @@
   const getHandle = () => ($("handle").value || "").trim() || "同学A";
   const getToken = () => ($("token").value || "").trim();
 
-  // 初始化：地址栏 ?handle= / ?token= 优先，其次 localStorage
+  // 初始化：令牌取值链 —— 1) ?token=  2) localStorage（必须非空）  3) /config.js 注入的 window.__DEMO_TOKEN__
+  // 顺序有讲究：评委零操作时前两级都为空 -> 自动吃注入值；自己输过令牌的测试者不会被覆盖。
+  // ⛔ 注入值只在内存里用，绝不写回 localStorage（核心层轮换令牌后，下次打开自动吃到新值，不会被旧值挡掉）
+  // ⛔ 页面任何位置都不打印/回显令牌内容（输入框显示的是用户自己填或注入的那一份）
   $("handle").value = params.get("handle") || localStorage.getItem(LS.handle) || "同学A";
-  $("token").value = params.get("token") || localStorage.getItem(LS.token) || "";
+  const urlToken = params.get("token") || "";
+  const savedToken = (localStorage.getItem(LS.token) || "").trim();
+  const injectedToken = typeof window.__DEMO_TOKEN__ === "string" ? window.__DEMO_TOKEN__ : "";
+  $("token").value = urlToken || savedToken || injectedToken || "";
   $("handle").addEventListener("change", () => localStorage.setItem(LS.handle, getHandle()));
   $("token").addEventListener("change", () => localStorage.setItem(LS.token, getToken()));
 
