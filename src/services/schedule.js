@@ -196,6 +196,32 @@ export function querySchedule(db, { user_handle, weekday } = {}) {
   }));
 }
 
+/**
+ * 单条详情（只读）。给评委点单条看详情用。
+ * 只回 id + 白名单字段，不返回 user_id / created_at 等内部信息。
+ */
+export function getScheduleItem(db, itemId) {
+  const id = String(itemId ?? "").trim();
+  if (!id) reject(CODES.SCHEMA_REJECTED, "item_id 不能为空");
+  const r = db
+    .prepare(
+      `SELECT id,weekday,period_start,period_end,title,room,weeks,remind_before
+       FROM schedule_items WHERE id = ?`,
+    )
+    .get(id);
+  if (!r) reject(CODES.NOT_FOUND, "日程不存在");
+  return {
+    id: r.id,
+    weekday: r.weekday,
+    period_start: r.period_start,
+    period_end: r.period_end,
+    title: r.title,
+    room: r.room,
+    weeks: r.weeks,
+    remind_before: r.remind_before,
+  };
+}
+
 /** 删除单条；不存在 → NOT_FOUND */
 export function removeScheduleItem(db, itemId) {
   const id = String(itemId ?? "").trim();

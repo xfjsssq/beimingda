@@ -310,6 +310,22 @@ test("HTTP：GET/POST /api/schedule 与 /api/scrub/audit", async () => {
     });
     assert.equal(noToken.status, 401, "POST /api/schedule 无 X-Demo-Token 必须 401");
 
+    // 单条详情（只读）：GET /api/schedule/:id
+    const detail = await fetch(`${base}/api/schedule/${encodeURIComponent(postBody.data.item_id)}`);
+    const detailBody = await detail.json();
+    assert.equal(detailBody.ok, true);
+    assert.equal(detailBody.data.id, postBody.data.item_id);
+    assert.equal(detailBody.data.title, "课程A");
+    // 只回白名单字段 + id，不回 user_id / created_at
+    assert.deepEqual(Object.keys(detailBody.data).sort(), [
+      "id", "period_end", "period_start", "remind_before", "room", "title", "weekday", "weeks",
+    ]);
+
+    const missing = await fetch(`${base}/api/schedule/no-such-id`);
+    const missingBody = await missing.json();
+    assert.equal(missingBody.ok, false);
+    assert.equal(missingBody.error.code, "NOT_FOUND");
+
     // ⛔ 不存在任何课表上传接口
     const up = await fetch(`${base}/api/schedule/upload`, { method: "POST" });
     const upBody = await up.json();
