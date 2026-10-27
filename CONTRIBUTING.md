@@ -104,15 +104,49 @@ git checkout feat/<模块> && git merge origin/main
 
 ---
 
-## 7. 建仓配置（一次性，已由负责人完成，留档备查）
+## 7. 建仓配置（一次性，已完成，留档备查）
 
 - [x] 仓库建立（Public），`.gitignore` 在**第一次 commit 之前**就位
 - [x] `.env.example` 只有键名、无任何真实值
-- [x] 7 个分支已建，每个分支根部有 `BRANCH.md`
+- [x] 8 条分支已建（`main` + 7 条工作分支），每条工作分支根部有 `BRANCH.md`
 - [x] PR 模板、`CONTRIBUTING.md`、根 `README.md`
-- [ ] **`main` 分支保护**（仓库管理员在 GitHub 页面手动开）：
-      Settings → Branches → Add branch protection rule → Branch name pattern 填 `main`
-      → 勾 *Require a pull request before merging*（可选再勾 *Require approvals: 1*）
-      → 勾 *Do not allow bypassing the above settings* → Save
-- [ ] **添加协作者**：Settings → Collaborators → Add people → 填对方 GitHub 用户名（角色 Write）
-- [ ] 若误提交了密钥：立即**轮换密钥**，再用 `git filter-repo` 清历史（见 `tasks/G0-GitHub仓库初始化.md`）
+- [x] 仓库描述 + homepage（`https://demo.knowingly.dpdns.org`）+ topics 已设
+- [x] **`main` 分支保护已开启**（2026-10-27 通过 GitHub API 配置），当前生效项：
+  - **必须走 PR 才能进 main**（`Require a pull request before merging`）
+  - `enforce_admins = true` —— **管理员也不能直接 push / force push**，改动只能通过 PR
+  - `allow_force_pushes = false`、`allow_deletions = false`
+  - `required_approving_review_count = 0` ← **临时值，见下方待办**
+- [x] `delete_branch_on_merge = true` —— PR 合并后自动删掉来源分支（`feat/*` 这类长期分支要保留就先在 PR 页面取消勾选）
+- [x] 合并策略：允许 merge commit 与 squash，禁用 rebase merge
+- [x] 空仓库 `xfjsssq/-`（创建中文名时被 GitHub 规范化产生的）已删除
+
+### 👥 成员与权限（2026-10-27）
+
+| GitHub 账号 | 角色 | 负责 |
+|---|---|---|
+| `xfjsssq` | Owner（admin） | 骨架/核心、M1 代取撮合、M2 搭子匹配、M3 迎新导览、F0 前端门户、参赛材料 |
+| `CJY-sys` | Collaborator（**Write**） | **M4 日程与提醒**（分支 `feat/m4-schedule`） |
+
+- [x] 已邀请 `CJY-sys` 为协作者（Write 权限）
+      → **等对方在 <https://github.com/xfjsssq/beimingda/invitations> 点「Accept invitation」才生效**
+      （没接受之前：不能 push 自己的分支、也不能给别人点批准）
+- [x] PR 批准数已设为 **1**（`required_approving_review_count = 1`）：进 main 需要**另一个人的批准**
+
+### PR 批准与合并怎么操作（写给不熟 GitHub 的人）
+
+1. 打开 PR 页面 → 右上 **Review changes**（或在 *Files changed* 里点 *Review changes*）
+2. 写一句 review 意见（例：`M4 自测清单已逐条跑过，同意合并`）→ 选 **Approve** → **Submit review**
+3. 批准后 PR 页面下方的 **Merge pull request** 按钮变绿 → 由**开 PR 的人**点它合并（Squash 或 Merge commit 都行）
+4. 合并后来源分支自动删除（`delete_branch_on_merge = true`）；本地执行
+   `git checkout main && git pull`，再把自己的分支 `git merge origin/main` 跟上
+
+> ⚠️ **不能自己批准自己的 PR**。所以约定：谁开 PR，谁就等另一个人点 Approve 后再合并。
+
+> ⚠️ 因为 `enforce_admins = true`，**任何人对 `main` 的直接 push 都会被拒**（包括仓库管理员）。
+> 这是刻意设计：所有改动都必须经过 PR 留下记录。若确实需要临时绕过，先改分支保护规则，改完记得改回来。
+
+### 密钥事故处置（留档）
+
+若误提交了密钥：立即**轮换密钥**，再用 `git filter-repo` 清历史
+（`git filter-repo --path .env --invert-paths` → `git reflog expire --expire=now --all` → `git gc --prune=now --aggressive` → `git push --force --all`）。
+**删历史不等于密钥失效**，轮换才是关键动作。
