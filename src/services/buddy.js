@@ -407,16 +407,20 @@ export function myApplications({ seeker_handle, limit } = {}) {
        WHERE c.seeker_id = ? ORDER BY c.created_at DESC, c.rowid DESC LIMIT ?`,
     )
     .all(user.id, lim);
-  return rows.map((r) => ({
-    post_id: r.post_id,
-    anon_token: r.anon_token,
-    kind: r.kind,
-    score: r.score,
-    my_ok: r.seeker_ok,
-    revealed: r.revealed,
-    reveal_status: revealStatus(normalizeConsent(r)),
-    created_at: toIso(r.created_at),
-  }));
+  return rows.map((r) => {
+    // ⛔ 以状态机推导为准：不把存储列 revealed 原样透出去（脏数据防线）
+    const derived = normalizeConsent(r);
+    return {
+      post_id: r.post_id,
+      anon_token: r.anon_token,
+      kind: r.kind,
+      score: r.score,
+      my_ok: derived.seeker_ok,
+      revealed: derived.revealed,
+      reveal_status: revealStatus(derived),
+      created_at: toIso(r.created_at),
+    };
+  });
 }
 
 export default {
