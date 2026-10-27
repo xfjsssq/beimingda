@@ -10,7 +10,8 @@
     契约：contracts/m2-buddy.md §6（4 个区块）
     ⚠️ 候选卡片上不得出现任何可反推身份的字段：本页只渲染接口白名单字段
         （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
-    照片：仅本地预览，既不参与评分也不会上传（契约 §7）
+    照片：本页**不含任何文件上传控件**（contracts/frontend.md §7：上传控件只出现在代取截图处）；
+          搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7）
   -->
   <style>
     :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; }
@@ -60,7 +61,6 @@
     table { width:100%; border-collapse:collapse; font-size:13px; }
     th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
     th { color:#5b6470; font-weight:500; font-size:12px; }
-    #photoPrev { max-width:120px; border-radius:8px; margin-top:8px; display:none; }
     @media (max-width:768px) {
       main { padding:16px 12px 48px; }
       .row { flex-direction:column; }
@@ -102,15 +102,11 @@
           <option value="other">其他</option>
         </select>
       </div>
-      <div>
-        <label for="photo">照片（可选，仅本地预览）</label>
-        <input id="photo" type="file" accept="image/*" />
-      </div>
     </div>
     <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
     <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
-    <img id="photoPrev" alt="照片预览" />
-    <p class="hint">照片不参与评分、也不会上传（服务端根本没有照片字段）。</p>
+    <!-- ⛔ 本页刻意不放任何文件上传控件（contracts/frontend.md §7：文件上传控件只出现在代取截图上传处）；
+         搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7） -->
     <div class="row" style="margin-top:10px">
       <button id="btnPublish">发布</button>
       <button id="btnPreview" class="ghost">先看画像抽取结果</button>
@@ -200,15 +196,6 @@
 
   const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
-  // ---------- 照片：本地预览，不参与评分、不上传 ----------
-  $("photo").addEventListener("change", () => {
-    const f = $("photo").files && $("photo").files[0];
-    const img = $("photoPrev");
-    if (!f) { img.style.display = "none"; img.removeAttribute("src"); return; }
-    img.src = URL.createObjectURL(f);
-    img.style.display = "block";
-  });
-
   // ---------- 区块一：发布 ----------
   async function publish() {
     const text = $("pubText").value.trim();
@@ -218,8 +205,8 @@
       const data = await api("/api/buddies", {
         method: "POST",
         headers: { "content-type": "application/json", "x-demo-token": getToken() },
-        // photo_path 传的是文件名占位 —— 服务端接收但不落库、不参与评分
-        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text, photo_path: "" }),
+        // 本页不带照片：搭子匹配不需要照片，照片也不参与评分（MCP buddy_publish 仍保留 photo_path 入参）
+        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text }),
       });
       say("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
       $("pubOut").style.display = "block";
