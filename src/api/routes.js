@@ -21,6 +21,12 @@
 import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
+import { getDb } from "../db/index.js";
+import {
+  addScheduleItem,
+  listScrubAudit,
+  querySchedule,
+} from "../services/schedule.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -37,6 +43,37 @@ export function createApiRouter() {
         mcp: "/mcp",
       }),
     );
+  });
+
+  // ---------- M4 · 日程与脱敏审计 ----------
+  // 契约 §6：本模块刻意不提供任何课表文件上传接口。
+  router.get("/schedule", (req, res, next) => {
+    try {
+      const { handle, weekday } = req.query;
+      const items = querySchedule(getDb(), {
+        user_handle: handle,
+        weekday: weekday === undefined || weekday === "" ? undefined : Number(weekday),
+      });
+      res.json(ok(items));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.post("/schedule", (req, res, next) => {
+    try {
+      res.json(ok(addScheduleItem(getDb(), req.body ?? {})));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.get("/scrub/audit", (req, res, next) => {
+    try {
+      res.json(ok(listScrubAudit(getDb(), req.query.limit)));
+    } catch (e) {
+      next(e);
+    }
   });
 
   // ---------- 骨架占位：模块路由挂载点 ----------
