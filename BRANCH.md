@@ -34,7 +34,8 @@
 | `src/engine/match.js` | 新增。评分引擎，参数从 `config/match-rules.json` 读 |
 | `src/services/users.js` | 新增。昵称→用户（`ensureUser`）+ 入参归一化，**与 `scripts/seed.js` 的 `demo-user-<handle>` 约定一致**，避免 handle UNIQUE 与外键冲突 |
 | `src/services/task.js` | 新增。任务 CRUD / 发布校验 / 撮合落库 / 推送去重 / 截图字段理解 |
-| `src/services/runner.js` | 新增。能力登记（`runners.user_id` UPSERT） |
+| `src/services/runner.js` | 新增。能力登记（`runners.user_id` UPSERT）+ `reachable_buildings` 归一 |
+| `src/services/buildings.js` | 新增。楼栋/站点**规范名归一**（口语写法 → `config/map-nodes.json` 的 label），MCP 与 HTTP 共用 |
 | `src/mcp/handlers/takeout.js` | 新增。5 个工具 schema（照抄契约）+ handler（不写 SQL） |
 | `src/mcp/handlers.js` | **只加 2 行**：顶部 `import { registerTakeoutTools }`；`MODULE_REGISTRARS` 里 `{ module: "m1", register: registerTakeoutTools }`（m2/m3/m4 的注释行未动） |
 | `src/api/tasks.js` | 新增。4 条路由，写接口 `requireWriteToken` |
@@ -62,6 +63,23 @@
 - **note 脱敏**：手机号（11 位）与 ≥12 位长数字串入库前打码，并把**字段名**（`phone,tracking_no`）写进 `scrub_audit`（只记名字，绝不记值）。
 - **active 过滤**：`active = 0` 的能力登记不进候选池（service 层 `WHERE active=1`，引擎里也再判一次）。
 
+## 楼栋规范名归一（`src/services/buildings.js`）
+`config/map-nodes.json` 的 `label` 是撮合唯一口径（可达性 40 分靠**字面比对**），而调用方（尤其经 LLM / WorkBuddy）
+天然会写「12号楼」「12栋」「菜鸟驿站」——直接用会「发布成功但永远匹配不到」，看起来像引擎坏了。所以 **先归一、归一失败再拒**：
+
+| 输入 | 结果 |
+|---|---|
+| `12号楼` / `12栋` / `十二号宿舍楼` / `12号` / `12号宿舍楼东` | `12号宿舍楼` |
+| `菜鸟驿站` / `快递站` | `快递驿站` |
+| `南大门` | `南门` |
+| `二食堂` / `2食堂` / `第2食堂` | `第二食堂` |
+| `火星楼` / `12号教学楼` | `SCHEMA_REJECTED` + message 里列出可选规范名（让 Agent 自我纠正） |
+
+- 别名由 **config 的 label 自动派生**（编号 × 宿舍/食堂核心词 × 阿拉伯/中文数字，驿站类与门类同义词），**不写死楼栋**；config 加节点即自动生效。
+- 覆盖面：`task_publish` 的 `from_building`/`to_building`、`runner_register` 的 `reachable_buildings`、`task_list_open`/`GET /api/tasks` 的 `building` 过滤参数；MCP 与 HTTP 走同一套（⛔ 没有第二份实现）。
+- 快递站 `station` 是**宽松**策略：归一命中就用规范名，归不出来**保留原文**（station 不参与打分，过度拒绝只会让 Agent 反复试错）。
+- 已知限制：`一食堂` 会被折成 `第一食堂`，但本校园 config 里只有 `第二食堂` → 因此**会被拒并列出可选值**（宁可让 Agent 改正，也不匹配到错的楼）。B6（覆盖率显示 `0%` 应写成 `<1%`）本轮按 lead 决定跳过，记入已知限制。
+
 ## 集成注意（lead 用）
 1. `src/mcp/handlers.js` 与 `src/api/routes.js` 各只加了自己那两行，**与 m2/m3/m4 的改动不重叠**；若发生冲突，保留 m1 的那两行即可。
 2. 🖊 **前端令牌**：写接口要 `X-Demo-Token`、MCP 要 `Authorization: Bearer`。`static/takeout.html` 按 `?token=` → `window.__DEMO_TOKEN__` → `localStorage` 的优先级取令牌（**不硬编码**）。若希望评委零操作就能发布/撮合，可在 `/config.js` 里注入 `window.__DEMO_TOKEN__`（我按边界要求没有改 `src/server.js`，请 lead 决定）——注入后我的页面会自动用上，无需改页面。
@@ -72,7 +90,7 @@
 7. **门户两格数据**：`GET /api/runners` 已能点亮「活跃跑腿者数」（seed 后 = 8）。`GET /api/matches` 在 `seed` 之后是 **0 条**（库里的 `matches` 只有撮合过才有行）→ F0 的「平均匹配得分」会显示「—」，在 `/takeout` 点一次「查看匹配」（或调 `match_find_for_task`）后即变为真实平均分（实测 86.7）。若希望**首页开箱即有数**，需要在核心层加一步「对 open 任务跑一遍撮合」（`scripts/seed.js` 末尾或 `/api/demo/seed`）——这两个都是核心层文件/路由，我没动，请 lead 定。
 
 ## 验收证据（本分支提交时实测）
-- `npm test` → **27/27 通过**（T0 的 10 条 + M1 的 17 条）
+- `npm test` → **29/29 通过**（T0 的 10 条 + M1 的 19 条）
 - `npm run smoke` → **8/8 通过**
 - `node scripts/verify-integration.js`（lead 的跨模块验证器，临时拷入后已删）→ M1 相关 `tools/schema/call/guard/page( /takeout )/route( /api/tasks* )` 全 ✅；❌ 仅 buddy*/map*/schedule* 与 `/buddy /welcome /schedule /agent`（其他模块未合并）
 - `npm run seed -- --reset && npm run seed -- --check` → tasks 10 / runners 9 灌库成功
