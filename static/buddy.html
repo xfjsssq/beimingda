@@ -312,5 +312,14 @@
   loadMine();
 })();
 </script>
+
+<!-- ?demo=1 演示模式（契约 frontend.md §5）：/js/demo.js 是 ES module，必须走 type="module" 才能真正执行 initDemo() -->
+<script type="module">
+  // 徽章（右上角「演示模式」）+ 学号/手机号形态兜底打码 + 幂等灌演示数据（接口未就绪则静默跳过）
+  // ⛔ 与上面的令牌输入框无关：demo.js 既不读也不写令牌，也不碰 input/textarea（MASK_SKIP_SELECTOR 排除）
+  // /js/demo.js 由 F0 分支提供；分支未合并时 import 失败不影响本页其余功能
+  import { initDemo } from "/js/demo.js";
+  initDemo();
+</script>
 </body>
 </html>

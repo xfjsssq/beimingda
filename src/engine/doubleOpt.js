@@ -34,13 +34,20 @@ export function initialConsent() {
   return { author_ok: 0, seeker_ok: 0, revealed: 0 };
 }
 
-/** 把任意来源（DB 行 / 半成品对象 / undefined）收敛成 {author_ok,seeker_ok,revealed} 三个 bit */
+/**
+ * 把任意来源（DB 行 / 半成品对象 / undefined）收敛成 {author_ok,seeker_ok,revealed} 三个 bit。
+ *
+ * ⛔ `revealed` **不由存储列决定**：只有 author_ok 与 seeker_ok 同时为 1 才算揭示。
+ *    库里那一列即使是脏值（被手工改成 1、或历史遗留），也不会让出口吐出 contact_code。
+ */
 export function normalizeConsent(row) {
   const r = row ?? {};
+  const author_ok = bit(r.author_ok);
+  const seeker_ok = bit(r.seeker_ok);
   return {
-    author_ok: bit(r.author_ok),
-    seeker_ok: bit(r.seeker_ok),
-    revealed: bit(r.revealed),
+    author_ok,
+    seeker_ok,
+    revealed: author_ok === 1 && seeker_ok === 1 ? 1 : 0,
   };
 }
 
@@ -100,17 +107,22 @@ export function isSettled(row) {
  * ⛔ 关键：revealed=0 时 contact_code **这个键根本不出现在对象里**
  *    （不是置 null、不是空字符串 —— 是 Object.hasOwn() 为 false）
  *
+ * ⛔ 脏数据防线：是否揭示**以状态机推导为准**（author_ok && seeker_ok 同时为真），
+ *    ⛔ 绝不直接信任 row.revealed 这一存储列。
+ *
  * @param {object} row 迁移后的行
  * @param {string|null} contactCode 对方的中转码（仅在互相可见时才允许传入）
  */
 export function toResponse(row, contactCode = null) {
   const r = normalizeConsent(row);
+  // 再推导一次（不读 r.revealed / row.revealed），评审一眼能看出出口只信状态机
+  const revealed = r.author_ok === 1 && r.seeker_ok === 1 ? 1 : 0;
   const base = {
     author_ok: r.author_ok,
     seeker_ok: r.seeker_ok,
-    revealed: r.revealed,
+    revealed,
   };
-  if (r.revealed === 1) base.contact_code = contactCode ?? null;
+  if (revealed === 1) base.contact_code = contactCode ?? null;
   return base;
 }
 
