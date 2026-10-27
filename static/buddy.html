@@ -286,16 +286,21 @@
   });
 
   // ---------- 区块四：我的申请 ----------
+  // ⚠️ 口径说明（契约决定的固有差异）：这里的分数是**表决那一刻**算的（表决接口不收画像，
+  //    只能拿你最近一次搜索的画像；从未搜索过则按中性画像，会偏低），
+  //    与候选卡片上用「当次搜索画像」算出的分数可能不同。是否揭示只由双选状态机决定，与分数无关。
   async function loadMine() {
     try {
       const rows = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
       const box = $("mine");
       if (!rows.length) { box.innerHTML = '<p class="empty">还没有发出过意愿。</p>'; return; }
-      box.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分</th><th>状态</th><th>时间</th></tr></thead><tbody>" +
+      box.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分<br><small>（表决时估算）</small></th><th>状态</th><th>时间</th></tr></thead><tbody>" +
         rows.map((r) => "<tr><td>" + esc(r.anon_token) + "</td><td>" + r.score + "</td><td>" +
           (r.reveal_status === "mutual" ? '<span class="badge b-mutual">已互相可见</span>'
             : r.my_ok === 1 ? '<span class="badge b-pending">待对方同意</span>' : '<span class="badge b-pending">我已拒绝</span>') +
-          "</td><td>" + esc(r.created_at) + "</td></tr>").join("") + "</tbody></table>";
+          "</td><td>" + esc(r.created_at) + "</td></tr>").join("") + "</tbody></table>" +
+        '<p class="hint" style="margin:8px 0 0">分数在<b>表决那一刻</b>计算（表决接口不收画像，取你最近一次搜索的画像；' +
+        "从没搜过则按中性画像，会偏低），所以和候选卡片上的分数可能不同。**是否揭示只由双选状态机决定，与分数无关**。</p>";
     } catch (e) { say("searchMsg", e.message, "err"); }
   }
   $("btnMine").addEventListener("click", loadMine);

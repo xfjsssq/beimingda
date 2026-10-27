@@ -34,3 +34,8 @@ static/uploads/*
 _recon/
 .tmp/
 tmp/
+
+# ---- 验证/走查临时产物与交付包（脚本与截图、ZIP 一律不进库） ----
+verify-tmp/
+*.zip
+materials/*.zip
