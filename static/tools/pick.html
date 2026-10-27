@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>点位坐标取点工具 · 北名大小助手（开发用）</title>
+  <style>
+    :root { --pri:#1F4E8C; --ok:#2E8B76; --bg:#F5F7FA; --muted:#5B6470; --line:#E3E8EF; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:#1c1c1e;
+      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    header { background:#fff; border-bottom:1px solid var(--line); padding:12px 16px; }
+    header h1 { margin:0 0 4px; font-size:18px; color:var(--pri); }
+    header p { margin:0; font-size:13px; color:var(--muted); }
+    .wrap { display:grid; grid-template-columns: 300px minmax(0,1fr); gap:14px; padding:14px; }
+    .card { background:#fff; border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(16,24,40,.08); }
+    #map { height: 62vh; min-height:360px; border-radius:8px; overflow:hidden; background:#10161f; }
+    h2 { font-size:15px; margin:0 0 10px; }
+    .node { display:flex; gap:8px; align-items:center; padding:6px 8px; border-radius:8px; cursor:pointer;
+      font-size:13px; border:1px solid transparent; }
+    .node:hover { background:rgba(31,78,140,.06); }
+    .node.active { border-color:var(--pri); background:rgba(31,78,140,.08); }
+    .node .id { flex:1; }
+    .node .coord { color:var(--muted); font-family:Consolas,monospace; font-size:12px; }
+    .node.done .id::after { content:" ✓"; color:var(--ok); }
+    .hint { font-size:12px; color:var(--muted); line-height:1.6; }
+    pre { background:#0f172a; color:#e2e8f0; padding:12px; border-radius:8px; font-size:12px;
+      max-height:220px; overflow:auto; }
+    button { background:var(--pri); color:#fff; border:0; border-radius:8px; padding:8px 12px;
+      font-size:13px; cursor:pointer; }
+    button.ghost { background:#fff; color:var(--pri); border:1px solid var(--pri); }
+    .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+    .warn { background:#FFF8E6; border:1px solid #F0DFAC; color:#6B5A18; font-size:12px;
+      padding:8px 10px; border-radius:8px; margin-top:10px; }
+    @media (max-width: 768px) { .wrap { grid-template-columns: 1fr; } #map { height:48vh; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>点位坐标取点工具 <span style="font-size:12px;color:var(--muted)">（开发用，不属于交付的 6 个页面）</span></h1>
+  <p>左边点一个楼栋 → 在右边高德卫星图上点它的位置 → 坐标自动记下。12 个点取完，把下面的 JSON 写进 <code>config/map-nodes.json</code>。</p>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>点位清单（点一个开始取点）</h2>
+    <div id="nodes"></div>
+    <div class="row">
+      <button class="ghost" id="reset">清空已取</button>
+      <button class="ghost" id="center">回到校园中心</button>
+    </div>
+    <p class="hint" id="status"></p>
+  </div>
+
+  <div class="card">
+    <div id="map"></div>
+    <div id="warn" class="warn" hidden></div>
+    <h2 style="margin-top:14px">生成的坐标（粘进 config/map-nodes.json 对应节点的 lat/lng）</h2>
+    <pre id="out">{ }</pre>
+    <div class="row">
+      <button id="copy">复制 JSON</button>
+      <span class="hint" id="copied"></span>
+    </div>
+    <p class="hint">坐标系：高德 GCJ-02（与地图底图一致）。⛔ 不要用 GPS 的 WGS-84 直接填，会偏几十到几百米。</p>
+  </div>
+</div>
+
+<script src="/config.js"></script>
+<script>
+const $ = (s) => document.querySelector(s);
+const picked = {};          // id -> { lng, lat }
+let AMap = null, map = null, marker = null, activeId = null, NODES = [];
+
+function amapTip(t, isWarn) {
+  const el = $("#warn");
+  el.hidden = !t;
+  el.textContent = t || "";
+  el.style.background = isWarn ? "#FDECEA" : "";
+  el.style.borderColor = isWarn ? "#F5C2BC" : "";
+}
+
+async function getJson(u, fb) { try { const r = await fetch(u); return r.ok ? r.json() : fb; } catch { return fb; } }
+
+function renderList() {
+  $("#nodes").innerHTML = NODES.map((n) => {
+    const p = picked[n.id];
+    return '<div class="node' + (p ? " done" : "") + (activeId === n.id ? " active" : "") +
+      '" data-id="' + n.id + '"><span class="id">' + n.label + '</span><span class="coord">' +
+      (p ? p.lng.toFixed(5) + "," + p.lat.toFixed(5) : "未取") + "</span></div>";
+  }).join("");
+}
+
+function renderOut() {
+  const keys = Object.keys(picked);
+  const obj = {};
+  for (const id of keys) obj[id] = { lng: +picked[id].lng.toFixed(6), lat: +picked[id].lat.toFixed(6) };
+  $("#out").textContent = JSON.stringify(obj, null, 2);
+  $("#status").textContent = "已取 " + keys.length + " / " + NODES.length + " 个点位" +
+    (keys.length === NODES.length ? " —— 全部完成 ✓" : "");
+}
+
+function setActive(id) {
+  activeId = id;
+  renderList();
+  const n = NODES.find((x) => x.id === id);
+  $("#status").textContent = "正在为「" + (n ? n.label : id) + "」取点：在右边地图上点它的位置";
+}
+
+function dropMarker(lng, lat) {
+  if (!AMap || !map) return;
+  if (marker) map.remove(marker);
+  marker = new AMap.Marker({ position: [lng, lat], offset: new AMap.Pixel(-11, -11),
+    content: '<div style="width:22px;height:22px;border-radius:50%;background:#1F4E8C;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>' });
+  map.add(marker);
+  map.setCenter([lng, lat]);
+}
+
+async function main() {
+  const [nodes, bg] = await Promise.all([getJson("/api/map/nodes", []), getJson("/map/map-bg.json", {})]);
+  NODES = Array.isArray(nodes) ? nodes : [];
+  // 已有的真实坐标（非 0）当作初始值
+  for (const n of NODES) if (Number(n.lat) && Number(n.lng)) picked[n.id] = { lng: Number(n.lng), lat: Number(n.lat) };
+  renderList(); renderOut();
+
+  const cfg = (bg && bg.jsapi) || {};
+  const key = window.__AMAP_KEY__ || "";
+  const sec = window.__AMAP_SECURITY_CODE__ || "";
+  if (!key) {
+    amapTip("未配置高德 key（环境变量 AMAP_JS_KEY）—— 取点工具需要它。把 key 填进 .env 后重启即可；" +
+      "服务器上由部署方配置。", true);
+    return;
+  }
+  if (sec) window._AMapSecurityConfig = { securityJsCode: sec };
+  const tpl = cfg.sdk_url_template;
+  if (!tpl) { amapTip("缺少 SDK 地址配置（/map/map-bg.json 的 jsapi.sdk_url_template）", true); return; }  // ⛔ 不硬编码
+  const s = document.createElement("script");
+  s.src = tpl.replace("{key}", key);
+  s.async = true;
+  s.onload = () => {
+    if (!window.AMap) { amapTip("高德 SDK 加载异常（无 AMap 全局对象）", true); return; }
+    AMap = window.AMap;
+    map = new AMap.Map("map", {
+      zoom: (cfg.zoom || 16) + 1,
+      center: [cfg.center ? cfg.center.lng : 116.397, cfg.center ? cfg.center.lat : 39.909],
+      viewMode: "2D",
+    });
+    map.add(new AMap.TileLayer.Satellite());
+    map.add(new AMap.TileLayer.RoadNet());
+    map.on("click", (e) => {
+      if (!activeId) { $("#status").textContent = "先在左边点一个楼栋，再点地图"; return; }
+      picked[activeId] = { lng: e.lnglat.getLng(), lat: e.lnglat.getLat() };
+      dropMarker(picked[activeId].lng, picked[activeId].lat);
+      const next = NODES.find((n) => !picked[n.id]);
+      activeId = null;
+      renderList(); renderOut();
+      if (next) setActive(next.id); else $("#status").textContent = "12 个点位已全部取完 ✓ 点「复制 JSON」";
+    });
+    amapTip("地图就绪。先在左边点一个楼栋，再在地图上点位置。");
+  };
+  s.onerror = () => amapTip("高德 SDK 加载失败：检查域名白名单是否包含当前域名（应含 knowingly.dpdns.org 或本机别名）。", true);
+  document.head.appendChild(s);
+}
+
+$("#nodes").addEventListener("click", (e) => {
+  const el = e.target.closest(".node");
+  if (!el) return;
+  setActive(el.dataset.id);
+});
+$("#reset").addEventListener("click", () => {
+  for (const k of Object.keys(picked)) delete picked[k];
+  if (marker && map) { map.remove(marker); marker = null; }
+  activeId = null; renderList(); renderOut();
+});
+$("#center").addEventListener("click", async () => {
+  const bg = await getJson("/map/map-bg.json", {});
+  const c = (bg.jsapi && bg.jsapi.center) || { lng: 116.397, lat: 39.909 };
+  if (map) map.setCenter([c.lng, c.lat]);
+});
+$("#copy").addEventListener("click", async () => {
+  await navigator.clipboard.writeText($("#out").textContent);
+  $("#copied").textContent = "已复制 ✓";
+  setTimeout(() => ($("#copied").textContent = ""), 2000);
+});
+
+main();
+</script>
+</body>
+</html>
