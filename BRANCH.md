@@ -1,31 +1,27 @@
-# 分支：main
+# 分支：feat/frontend
 
 ## 本分支做什么
-主分支。**只接受 PR**，不直接推。当前已包含 T0 骨架与核心层（由 `feat/core` 合入）。
+**F0 前端与门户**：共用样式 `static/css/app.css`、共用导航 `static/js/nav.js`、统一 API 封装 `static/js/api.js`、演示模式 `static/js/demo.js`、**门户首页 `static/index.html`**（4 区块，统计走真实 API）、**⭐ 评委核心页 `static/agent.html`**（6 区块，含一键复制 MCP 配置）。
 
 ## 依赖什么
-- 无（这是基准分支）
+- `contracts/core.md`、`contracts/frontend.md`、`tasks/F0-前端总览.md`
+- 各模块 API 至少 `GET /api/health` 可用（T0 已提供）
+- 其余 4 个页面（takeout / buddy / welcome / schedule）由各自分支负责，**本分支只提供共用文件**
 
 ## 完成标准
-- 所有模块分支的验收清单合并后，`npm start` + `npm run seed` + `npm test` + `npm run smoke` 全绿
-- 部署站点 `https://demo.knowingly.dpdns.org` 可用
+`contracts/frontend.md` §7 自测清单全部勾上（含 `/agent` 页复制出来是合法 JSON、令牌为占位符、断网可跑、375px 不破）。
 
 ## 不能碰什么
-- ⛔ 不许直接 push（必须走 PR）
-- ⛔ 不许把 `.env` / `*.db` / `node_modules` 提交进来
+- 其他模块的 html（只引用共用文件；要改共用文件先沟通）
+- ⛔ 依赖外部 CDN（第三方库必须本地化到 `static/vendor/` 且带 LICENSE）
+- ⛔ 首页统计数字写死 · 课表上传控件 · 页面出现真实姓名/学号/手机号
+- ⛔ 在没有实景的点位上假装有实景
 
 ## 当前进度
-- [x] T0 骨架与核心（`feat/core`）：目录结构、`package.json`、`schema.sql`、DB 初始化、
-      auth/ratelimit 中间件、`GET /api/health`、`POST /mcp`（initialize / tools/list / tools/call）、
-      `npm run seed`、`npm run smoke`、`npm test`
-- [x] G0 协作文件：`.gitignore`、`.env.example`、PR 模板、`CONTRIBUTING.md`、7 个分支与各自 `BRANCH.md`
-- [ ] M1 代取撮合（`feat/m1-takeout`）
-- [ ] M2 搭子匹配（`feat/m2-buddy`）
-- [ ] M3 迎新导览（`feat/m3-welcome`）
-- [ ] M4 日程与提醒（`feat/m4-schedule`）
-- [ ] F0 门户与 `/agent` 页（`feat/frontend`）
-- [ ] 参赛材料（`docs/materials`）
-
-## 合并完成后要做的两件事（仓库管理员）
-1. `main` 开分支保护（Settings → Branches），禁止直接 push
-2. 给对方 GitHub 账号加 Write 权限（Settings → Collaborators）
+- [ ] `static/css/app.css` 按视觉规范（主色 #1F4E8C 等）
+- [ ] `static/js/nav.js` 6 页导航 + 移动端底部 tab
+- [ ] `static/js/api.js` 统一 fetch 封装解信封
+- [ ] `static/js/demo.js` `?demo=1` 徽章与假名替换
+- [ ] `static/index.html` 门户 4 区块
+- [ ] `static/agent.html` ⭐ 6 区块 + 复制按钮
+- [ ] `static/vendor/vue/`（若使用 Vue 3）
