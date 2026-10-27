@@ -17,11 +17,13 @@
  *   import { registerTakeoutTools } from "./handlers/takeout.js";
  *   { module: "m1", register: registerTakeoutTools }
  */
+import { registerScheduleTools } from "./handlers/schedule.js";
+
 const MODULE_REGISTRARS = [
   // { module: "m1", register: registerTakeoutTools },
   // { module: "m2", register: registerBuddyTools },
   // { module: "m3", register: registerMapTools },
-  // { module: "m4", register: registerScheduleTools },
+  { module: "m4", register: registerScheduleTools },
 ];
 
 let loaded = false;
