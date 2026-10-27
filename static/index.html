@@ -184,8 +184,8 @@
       {
         key: "runners",
         label: "活跃跑腿者数",
-        unit: "人",
-        paths: ["/api/runners", "/api/stats"],
+        unit: "人",   // ⛔ 不探测不存在的 /api/stats：空实例上会打一条 404 噪音（验证员 B8）
+        paths: ["/api/runners"],
         owner: "feat/m1-takeout",
         pick(d) {
           const list = listOf(d);
@@ -197,7 +197,7 @@
         key: "buddies",
         label: "搭子帖数",
         unit: "条",
-        paths: ["/api/buddies", "/api/stats"],
+        paths: ["/api/buddies"],
         owner: "feat/m2-buddy",
         pick(d) {
           const list = listOf(d);
@@ -209,7 +209,7 @@
         key: "score",
         label: "平均匹配得分",
         unit: "分",
-        paths: ["/api/matches", "/api/stats"],
+        paths: ["/api/matches"],
         owner: "feat/m1-takeout",
         pick(d) {
           const list = listOf(d);
