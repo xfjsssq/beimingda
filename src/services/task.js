@@ -13,6 +13,9 @@
  * ⛔ 不回传 contact_code（联系方式只在 M2 的双选揭示后出现）
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getDb } from "../db/index.js";
 import { CODES, assertNoExtraKeys, reject } from "../util/envelope.js";
 import { nowSec, toIso, toTs } from "../util/time.js";
@@ -24,6 +27,8 @@ import {
 } from "../engine/match.js";
 import { ensureUser, normalizeHandle, toFiniteNumber, toInt } from "./users.js";
 import { listActiveRunners } from "./runner.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 /** task_publish / POST /api/tasks 允许的字段（白名单，多一个即 SCHEMA_REJECTED） */
 export const TASK_FIELDS = [
@@ -345,12 +350,223 @@ export function listMatches(taskId, limit = MAX_LIMIT) {
     }));
 }
 
+// ---------------------------------------------------------------- 截图理解（task_parse_screenshot）
+//
+// 契约 §3.1：
+//   - 图片直接进模型上下文理解（不做独立 OCR 再转换）
+//   - ⛔ 收件人姓名 / 手机号 / 运单号一律不抽取、不复述、不写入
+//   - confidence < 0.4 或关键字段全空 → 返回 null 字段而非猜测值
+//   - 图片不落服务器磁盘
+//
+// ⭐ 本仓库的降级实现（.env 里 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL 三件套为空时）：
+//   不落盘、不 OCR、不调外部接口；只用「规则化兜底」在 hint 文本里做**确定性**匹配
+//   （楼栋规范名来自 config/map-nodes.json，报酬区间来自「3-5元 / 3块到5块」这类写法）。
+//   识别不出来的字段一律返回 null、confidence 记 0；始终不产出姓名/手机号/运单号字段。
+
+const PARSE_FIELDS = [
+  "from_building",
+  "to_building",
+  "station",
+  "deadline_iso",
+  "reward_min",
+  "reward_max",
+  "note",
+];
+
+/** 图片 base64 上限（express.json 本体上限 2mb，这里只做防御性判断） */
+const MAX_IMAGE_B64 = 4_000_000;
+const LLM_TIMEOUT_MS = 25_000; // 契约：单次响应必须 < 90 秒
+
+let nodeCache = null;
+
+function loadMapNodes() {
+  if (nodeCache) return nodeCache;
+  try {
+    const file = path.resolve(__dirname, "../../config/map-nodes.json");
+    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+    nodeCache = Array.isArray(raw?.nodes) ? raw.nodes : [];
+  } catch {
+    nodeCache = [];
+  }
+  return nodeCache;
+}
+
+/** LLM 三件套是否配齐（配齐才走真模型调用） */
+export function isVisionConfigured() {
+  return Boolean(process.env.LLM_BASE_URL && process.env.LLM_API_KEY && process.env.LLM_MODEL);
+}
+
+function emptyFields(confidence = 0) {
+  const out = { confidence };
+  for (const f of PARSE_FIELDS) out[f] = null;
+  return out;
+}
+
+/** 只保留契约字段 + 强制不出现身份字段（模型即使返回也一律丢弃） */
+function finalizeParsed(raw, confidence) {
+  const conf = Math.min(1, Math.max(0, Number(confidence) || 0));
+  const out = { confidence: conf };
+  const usable = conf >= 0.4 && raw && typeof raw === "object";
+  for (const f of PARSE_FIELDS) {
+    const v = usable ? raw[f] : null;
+    out[f] = v === undefined || v === "" ? null : v;
+  }
+  // ⛔ 关键字段全空时，confidence 归 0（不猜测）
+  if (PARSE_FIELDS.every((f) => out[f] == null)) out.confidence = 0;
+  return out;
+}
+
+/** 规则化兜底：在 hint 里做确定性匹配（完全不看图片内容） */
+function parseByRules(hint) {
+  const text = typeof hint === "string" ? hint : "";
+  if (!text.trim()) return emptyFields(0);
+
+  const nodes = loadMapNodes();
+  const labels = nodes
+    .map((n) => ({ label: String(n.label ?? ""), category: String(n.category ?? "") }))
+    .filter((n) => n.label);
+
+  // 1) 楼栋（按出现顺序取前两个：取件楼 → 送达楼）
+  const hits = labels
+    .map((n) => ({ ...n, at: text.indexOf(n.label) }))
+    .filter((n) => n.at >= 0)
+    .sort((a, b) => a.at - b.at);
+  const dorms = hits.filter((n) => n.category === "dorm").map((n) => n.label);
+
+  // 2) 快递站（category = service / gate 的规范名）
+  const stationHit = hits.find((n) => n.category === "service" || n.category === "gate");
+
+  // 3) 报酬区间：3-5元 / 3块到5块 / 报酬 5 元
+  let rewardMin = null;
+  let rewardMax = null;
+  const range = /(\d+(?:\.\d+)?)\s*(?:元|块)?\s*(?:[-~到至]|——)\s*(\d+(?:\.\d+)?)\s*(?:元|块)?/.exec(text);
+  if (range) {
+    rewardMin = Number(range[1]);
+    rewardMax = Number(range[2]);
+    if (rewardMin > rewardMax) [rewardMin, rewardMax] = [rewardMax, rewardMin];
+  } else {
+    const single = /(\d+(?:\.\d+)?)\s*(?:元|块)/.exec(text);
+    if (single) {
+      rewardMin = Number(single[1]);
+      rewardMax = rewardMin;
+    }
+  }
+
+  const raw = {
+    from_building: dorms[0] ?? null,
+    to_building: dorms[1] ?? null,
+    station: stationHit?.label ?? null,
+    deadline_iso: null, // 时间表述（今晚8点前…）歧义大，规则兜底一律不猜
+    reward_min: rewardMin,
+    reward_max: rewardMax,
+    note: null, // ⛔ 不把自由文本抄进 note，避免把姓名/电话/单号带进库
+  };
+
+  const recognized = PARSE_FIELDS.filter((f) => raw[f] != null).length;
+  const confidence = recognized === 0 ? 0 : Math.min(0.6, 0.3 + recognized * 0.1);
+  return { ...finalizeParsed(raw, confidence), source: "rule_fallback" };
+}
+
+/** 真模型调用（只有 LLM 三件套配齐时才走这里；图片只在请求体内，不落盘、不打日志） */
+async function parseByLlm(imageBase64, hint) {
+  const base = String(process.env.LLM_BASE_URL).replace(/\/+$/, "");
+  const model = process.env.LLM_MODEL;
+  const dataUrl = /^data:image\//i.test(imageBase64)
+    ? imageBase64
+    : `data:image/jpeg;base64,${imageBase64}`;
+
+  const system =
+    "你是校园代取任务的字段抽取器。只输出一个 JSON 对象，键固定为 " +
+    "from_building,to_building,station,deadline_iso,reward_min,reward_max,note,confidence。" +
+    "识别不出来的字段填 null，不要猜测。deadline_iso 用 ISO 8601 带时区。" +
+    "严格禁止输出、复述、改写收件人姓名、手机号、运单号、取件码等任何个人或物流标识信息，" +
+    "note 也不要包含这些内容（note 以楼栋/件型/重量等无关信息为限）。";
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), LLM_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${process.env.LLM_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0,
+        messages: [
+          { role: "system", content: system },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: `补充说明：${hint || "（无）"}` },
+              { type: "image_url", image_url: { url: dataUrl } },
+            ],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`LLM HTTP ${res.status}`);
+    const body = await res.json();
+    const text = body?.choices?.[0]?.message?.content ?? "";
+    const json = JSON.parse(String(text).replace(/^```(?:json)?|```$/gm, "").trim());
+    return { ...finalizeParsed(json, json?.confidence ?? 0.8), source: "llm" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 截图 → 结构化任务字段
+ * @param {{image_base64:string, hint?:string}} input
+ * @returns {Promise<object>} 契约字段 + confidence（⛔ 不含姓名/手机号/运单号）
+ */
+export async function parseTaskFromImage(input = {}) {
+  const image = typeof input.image_base64 === "string" ? input.image_base64.trim() : "";
+  if (!image) reject(CODES.SCHEMA_REJECTED, "image_base64 不能为空");
+  if (image.length > MAX_IMAGE_B64) {
+    reject(CODES.SCHEMA_REJECTED, "image_base64 过大（超过 4MB 文本上限）");
+  }
+  const payload = image.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "");
+  if (!/^[A-Za-z0-9+/\r\n=\s]+$/.test(payload)) {
+    reject(CODES.SCHEMA_REJECTED, "image_base64 不是合法的 base64 文本");
+  }
+  const hint = typeof input.hint === "string" ? input.hint.slice(0, 200) : "";
+
+  const common = { image_stored: false, pii_extracted: [] };
+
+  if (isVisionConfigured()) {
+    try {
+      const parsed = await parseByLlm(image, hint);
+      return { ...parsed, ...common, degraded: false };
+    } catch (e) {
+      // 模型不可用 → 如实降级，不猜测、不报错
+      return {
+        ...parseByRules(hint),
+        ...common,
+        degraded: true,
+        degrade_reason: `LLM 调用失败，已降级为规则兜底：${String(e?.message || e).slice(0, 120)}`,
+      };
+    }
+  }
+
+  return {
+    ...parseByRules(hint),
+    ...common,
+    degraded: true,
+    degrade_reason: "未配置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL，走规则化兜底（不 OCR、不落盘）",
+  };
+}
+
 export default {
   publishTask,
   getTask,
   listOpenTasks,
   matchForTask,
   listMatches,
+  parseTaskFromImage,
+  isVisionConfigured,
   toTaskView,
   TASK_FIELDS,
 };
