@@ -350,6 +350,32 @@ export function listMatches(taskId, limit = MAX_LIMIT) {
     }));
 }
 
+/**
+ * 最近的撮合记录（跨任务，按时间倒序）—— 门户「平均匹配得分」用
+ * ⛔ 只读，不写库；只出昵称，不出 user_id / 联系方式
+ */
+export function listRecentMatches(limit = DEFAULT_LIMIT) {
+  return getDb()
+    .prepare(
+      `SELECT m.id, m.task_id, m.score, m.state, m.created_at, u.handle AS runner_handle
+         FROM matches m
+         JOIN runners r ON r.id = m.runner_id
+         JOIN users   u ON u.id = r.user_id
+        ORDER BY m.created_at DESC, m.score DESC
+        LIMIT ?`,
+    )
+    .all(clampLimit(limit, DEFAULT_LIMIT, MAX_LIMIT))
+    .map((m) => ({
+      match_id: m.id,
+      task_id: m.task_id,
+      runner_handle: m.runner_handle,
+      score: m.score,
+      state: m.state,
+      created_at: m.created_at,
+      created_at_iso: toIso(m.created_at),
+    }));
+}
+
 // ---------------------------------------------------------------- 截图理解（task_parse_screenshot）
 //
 // 契约 §3.1：
@@ -565,6 +591,7 @@ export default {
   listOpenTasks,
   matchForTask,
   listMatches,
+  listRecentMatches,
   parseTaskFromImage,
   isVisionConfigured,
   toTaskView,

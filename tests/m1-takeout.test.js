@@ -568,6 +568,53 @@ test("HTTP /api/tasks：4 条路由（读开放、写需令牌、详情、触发
   }
 });
 
+test("只读辅助口：GET /api/runners（脱敏、只回活跃）与 GET /api/matches（最近撮合 + score）", async () => {
+  const { createApp } = await import("../src/server.js");
+  const app = createApp();
+  const server = app.listen(0);
+  await new Promise((r) => server.once("listening", r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+
+  try {
+    parkAllRunners();
+    registerRunner(baseRunner({ user_handle: "门户统计跑腿", reward_floor: 1 }));
+    const { task_id } = publishTask(baseTask({ deadline_iso: isoIn(180) }));
+    const matched = matchForTask(task_id, { now: NOW, topK: 3 });
+    assert.ok(matched.pushed_count >= 1);
+
+    // 读接口不加令牌
+    const runners = await fetch(`${base}/api/runners`).then((r) => r.json());
+    assert.equal(runners.ok, true);
+    assert.ok(Array.isArray(runners.data), "门户 listOf() 需要 data 直接是数组");
+    assert.equal(runners.data.length, 1);
+    assert.equal(runners.data[0].user_handle, "门户统计跑腿");
+    assert.equal(Number(runners.data[0].active), 1, "门户按 Number(r.active) === 1 计数");
+    assert.ok(!("user_id" in runners.data[0]), "⛔ 不得返回内部 user_id");
+    assert.ok(!("contact_code" in runners.data[0]), "⛔ 不得返回联系方式");
+    assert.ok(Array.isArray(runners.data[0].reachable_buildings));
+
+    const matches = await fetch(`${base}/api/matches?limit=5`).then((r) => r.json());
+    assert.equal(matches.ok, true);
+    assert.ok(Array.isArray(matches.data));
+    assert.ok(matches.data.length >= 1 && matches.data.length <= 5, "limit 必须生效");
+    for (const m of matches.data) {
+      assert.ok(Number.isFinite(Number(m.score)), "score 必须是数字（门户要算平均分）");
+      assert.ok(m.score >= 60);
+      assert.ok(typeof m.task_id === "string");
+      assert.match(m.created_at_iso, /^\d{4}-\d{2}-\d{2}T/);
+      assert.ok(!("user_id" in m) && !("runner_id" in m), "⛔ 只出昵称，不出内部 id");
+    }
+    const avg = matches.data.reduce((a, b) => a + Number(b.score), 0) / matches.data.length;
+    assert.ok(avg > 0 && avg <= 100, `平均撮合得分=${avg}`);
+
+    // limit 越界收敛到 1..50，不报错
+    const clamped = await fetch(`${base}/api/matches?limit=999`).then((r) => r.json());
+    assert.equal(clamped.ok, true);
+  } finally {
+    server.close();
+  }
+});
+
 test("MCP 工具清单：m1 的 5 个工具都在，且 schema 全部 additionalProperties:false", () => {
   const tools = listToolSchemas();
   const m1 = ["task_parse_screenshot", "task_publish", "runner_register", "match_find_for_task", "task_list_open"];

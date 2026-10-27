@@ -182,4 +182,28 @@ export function toRunnerView(row) {
   };
 }
 
-export default { registerRunner, listActiveRunners, getRunner, getRunnerByHandle, toRunnerView };
+/**
+ * 对外（页面/门户）用的脱敏视图：
+ *   ⛔ 不含 user_id（内部主键）、不含 contact_code（那是 M2 双选揭示后才有资格出现的东西）
+ *   active 用 1/0 表达（门户统计直接 `Number(r.active) === 1` 计数）
+ */
+export function toPublicRunnerView(row) {
+  const view = toRunnerView(row);
+  if (!view) return null;
+  return { ...view, active: view.active ? 1 : 0 };
+}
+
+/** 活跃跑腿者列表（脱敏视图，供门户「活跃跑腿者数」统计） */
+export function listActiveRunnerViews() {
+  return listActiveRunners().map(toPublicRunnerView);
+}
+
+export default {
+  registerRunner,
+  listActiveRunners,
+  listActiveRunnerViews,
+  getRunner,
+  getRunnerByHandle,
+  toRunnerView,
+  toPublicRunnerView,
+};
