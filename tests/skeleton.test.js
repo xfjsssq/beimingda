@@ -171,7 +171,9 @@ test("HTTP：health 信封 + 404 信封 + MCP 鉴权", async () => {
       },
       body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" }),
     }).then((r) => r.json());
-    assert.deepEqual(list.result.tools, []);
+    // T0 阶段 tools/list 为空数组；任何模块分支注册自己的工具后就不再为 0。
+    // 因此这里只断言形态（数组），具体工具的断言写在各模块自己的 tests/*.test.js 里。
+    assert.ok(Array.isArray(list.result.tools), "tools/list 必须返回数组");
 
     const init = await fetch(`${base}/mcp`, {
       method: "POST",
