@@ -561,8 +561,15 @@ test("HTTP /api/tasks：4 条路由（读开放、写需令牌、详情、触发
     assert.ok(html.includes("匹配结果") && html.includes("score"), "页面必须展示 score");
     assert.ok(html.includes("reason:"), "页面必须展示 reason");
     const srcs = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(srcs, ["/config.js"], "页面只允许加载 /config.js（自包含，不引 /js 下的公共脚本）");
-    assert.ok(!/\/js\//.test(html), "⛔ 不许引用 /js/ 下的文件");
+    assert.deepEqual(srcs, ["/config.js"], "页面自带的外链脚本只允许 /config.js（自包含）");
+    // demo 模式接入：F0 的 /js/demo.js（动态 import → 未合并时静默跳过）
+    assert.ok(/import\("\/js\/demo\.js"\)/.test(html), "必须接入 /js/demo.js");
+    assert.ok(!/\/js\/(api|nav)\.js/.test(html), "⛔ 不直接引用 /js/api.js、/js/nav.js");
+    // ⛔ 静态文案里不许出现「演示模式」（否则不带 ?demo=1 也会被判定为已启用）
+    assert.ok(!html.includes("演示模式"), "静态文案里不许出现「演示模式」字样");
+    // 375px 不破版的关键 CSS：datetime-local 所在网格必须允许收缩
+    assert.ok(/minmax\(0,1fr\)/.test(html), ".wins .win 必须用 minmax(0,1fr)");
+    assert.ok(/@media \(max-width:640px\)[\s\S]*\.wins \.win/.test(html), "必须给 .wins .win 窄屏兜底");
   } finally {
     server.close();
   }
