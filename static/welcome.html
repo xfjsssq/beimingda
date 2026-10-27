@@ -191,6 +191,19 @@ async function getJson(url, fallback) {
   } catch { return fallback; }
 }
 
+/**
+ * 取 /api/* 的数据并**解掉统一信封** `{ok,data,error}`（contracts/core.md）。
+ * ⚠️ 曾经这里直接 `Array.isArray(nodes) ? nodes : []`，而接口返回的是信封对象 →
+ *    NODES 恒为空数组 → 地图上一个点位都不画、右侧还谎报"节点未就绪"。
+ * 现在：数组直接用；信封且 ok:true 用 .data；其余一律回退，绝不猜。
+ */
+async function getApiData(url, fallback) {
+  const body = await getJson(url, null);
+  if (Array.isArray(body)) return body;                       // 兼容裸数组
+  if (body && body.ok === true && body.data != null) return body.data;
+  return fallback;
+}
+
 function catLabel(c) { return CAT_LABEL[c] || c; }
 
 function renderMarkers() {
@@ -407,7 +420,7 @@ function setupAmap() {
 
 (async function init() {
   const [nodes, bg, manifest] = await Promise.all([
-    getJson("/api/map/nodes", []),
+    getApiData("/api/map/nodes", []),          // ⚠️ 走信封解包，不能再直接当数组
     getJson("/map/map-bg.json", BG),
     getJson("/pano/manifest.json", MANIFEST)
   ]);

@@ -49,6 +49,9 @@
       th, td { padding:5px 4px; }
       .grid td { height:34px; }
       .slot { font-size:11px; padding:2px 4px; }
+      /* 7 列课表在窄屏不再硬压（会把课程名压成逐字竖排）：
+         给表格一个合理最小宽，让 #gridWrap 真横向滚动，字还是正常横排可读 */
+      #gridWrap table.grid { min-width:520px; }
       input[type="text"] { min-width:0; width:100%; }
       input[type="number"] { width:88px; }
     }
