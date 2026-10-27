@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>代取撮合 · 北名大小助手</title>
+<!--
+  M1 · 代取撮合页（四个区块：发布任务 / 跑腿登记 / 任务看板 / 匹配结果）
+  - 页面自包含：内联样式 + 内联脚本，⛔ 不引用 /js/api.js、/js/nav.js（本分支没有这两个文件，由集成阶段统一接入）
+  - 只加载 /config.js（骨架自带，用于读取服务端注入的运行时配置，不含任何硬编码密钥）
+  - 平台不参与交易、不代收款：报酬由双方线下协商
+-->
+<style>
+  :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; --mut:#5b6470; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:#1c1c1e;
+    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.6; }
+  header { background:var(--pri); color:#fff; padding:18px 20px 16px; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; font-size:13px; opacity:.85; }
+  main { max-width:980px; margin:0 auto; padding:18px 16px 64px; }
+  .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
+    box-shadow:0 1px 3px rgba(16,24,40,.08); }
+  .card h2 { font-size:16px; margin:0 0 12px; color:var(--pri); display:flex; align-items:center; gap:8px; }
+  .card h2 .n { display:inline-flex; width:22px; height:22px; border-radius:50%; background:var(--pri);
+    color:#fff; font-size:12px; align-items:center; justify-content:center; }
+  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px 14px; }
+  label { display:block; font-size:12px; color:var(--mut); margin-bottom:4px; }
+  input,select,textarea,button { font:inherit; }
+  input,select,textarea { width:100%; padding:8px 10px; border:1px solid var(--line);
+    border-radius:8px; background:#fff; color:inherit; }
+  textarea { min-height:64px; resize:vertical; }
+  button { border:0; border-radius:8px; padding:9px 16px; background:var(--pri); color:#fff; cursor:pointer; }
+  button.ghost { background:#eef2f8; color:var(--pri); }
+  button.ok { background:var(--ok); }
+  button:disabled { opacity:.55; cursor:not-allowed; }
+  .actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .hint { font-size:12px; color:var(--mut); }
+  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2f8; color:var(--pri); }
+  .pill.ok { background:rgba(46,139,118,.12); color:var(--ok); }
+  .pill.warn { background:rgba(192,57,43,.1); color:var(--warn); }
+  .task { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
+  .task .path { font-weight:600; }
+  .task .meta { font-size:13px; color:var(--mut); margin-top:4px; }
+  .match { border:1px solid var(--line); border-left:4px solid var(--ok); border-radius:10px;
+    padding:12px 14px; margin-bottom:10px; }
+  .match .top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .match .who { font-weight:600; }
+  .score { font-size:20px; font-weight:700; color:var(--ok); }
+  .score.low { color:var(--mut); }
+  .bar { height:6px; border-radius:3px; background:#eef2f8; overflow:hidden; margin:8px 0 6px; }
+  .bar i { display:block; height:100%; background:var(--ok); }
+  .reason { font-family:Consolas,"Courier New",monospace; font-size:12.5px; background:#f7f9fc;
+    border:1px dashed var(--line); border-radius:8px; padding:8px 10px; word-break:break-all; }
+  pre { background:#0f172a; color:#e2e8f0; padding:10px 12px; border-radius:8px; overflow:auto;
+    font-size:12px; margin:8px 0 0; }
+  .shot { max-width:180px; border-radius:8px; border:1px solid var(--line); margin-top:8px; }
+  footer { max-width:980px; margin:0 auto; padding:0 16px 40px; font-size:12px; color:var(--mut); }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
+  .wins .win { display:grid; grid-template-columns:1fr 1fr auto; gap:8px; margin-bottom:8px; align-items:end; }
+  .chk { display:flex; flex-wrap:wrap; gap:10px 16px; }
+  .chk label { display:flex; align-items:center; gap:6px; font-size:13px; color:#1c1c1e; margin:0; }
+  .chk input { width:auto; }
+</style>
+</head>
+<body>
+<header>
+  <h1>代取撮合 · 北名大小助手</h1>
+  <p>发布取件需求 → 跑腿者登记能力 → 撮合引擎按「可达性 40 / 时间 30 / 报酬 30」打分，只推 ≥60 分的候选人。</p>
+</header>
+
+<main>
+  <!-- ───────────── 区块一 · 发布任务 ───────────── -->
+  <section class="card" id="sec-publish">
+    <h2><span class="n">1</span>发布任务</h2>
+    <div class="row">
+      <div>
+        <label for="p-owner">你的昵称（本站只收昵称，不收姓名/学号/手机号）</label>
+        <input id="p-owner" value="同学A" maxlength="32" />
+      </div>
+      <div>
+        <label for="p-from">取件楼栋</label>
+        <select id="p-from"></select>
+      </div>
+      <div>
+        <label for="p-to">送达楼栋</label>
+        <select id="p-to"></select>
+      </div>
+      <div>
+        <label for="p-station">快递站</label>
+        <input id="p-station" list="station-list" value="快递驿站" />
+        <datalist id="station-list"></datalist>
+      </div>
+      <div>
+        <label for="p-deadline">截止时间</label>
+        <input id="p-deadline" type="datetime-local" />
+      </div>
+      <div class="grid2">
+        <div><label for="p-rmin">报酬下限（元）</label><input id="p-rmin" type="number" min="0" step="0.5" value="3" /></div>
+        <div><label for="p-rmax">报酬上限（元）</label><input id="p-rmax" type="number" min="0" step="0.5" value="5" /></div>
+      </div>
+    </div>
+    <div class="actions">
+      <button id="btn-publish">发布任务</button>
+      <span class="hint">报酬由双方线下协商，平台不参与交易、不代收款。</span>
+    </div>
+
+    <div style="margin-top:14px">
+      <label for="p-note">备注（入库前自动打码手机号 / 超长单号）</label>
+      <textarea id="p-note" placeholder="例：小件，两个包裹；12号宿舍楼取快递送到15号宿舍楼，报酬3-5元"></textarea>
+    </div>
+    <div class="actions">
+      <label class="hint" style="margin:0">截图（可选）</label>
+      <input id="p-shot" type="file" accept="image/*" style="max-width:260px" />
+      <button class="ghost" id="btn-parse">识别截图字段</button>
+      <span class="hint">原图不落盘；只做字段理解，<b>不抽取收件人姓名 / 手机号 / 运单号</b>。</span>
+    </div>
+    <div id="parse-out"></div>
+    <div id="publish-out"></div>
+  </section>
+
+  <!-- ───────────── 区块二 · 跑腿登记 ───────────── -->
+  <section class="card" id="sec-register">
+    <h2><span class="n">2</span>跑腿登记</h2>
+    <div class="row">
+      <div>
+        <label for="r-owner">你的昵称</label>
+        <input id="r-owner" value="同学B" maxlength="32" />
+      </div>
+      <div>
+        <label for="r-floor">可接受报酬下限（元）</label>
+        <input id="r-floor" type="number" min="0" step="0.5" value="2" />
+      </div>
+    </div>
+    <div style="margin-top:10px">
+      <label>可达楼栋（多选）</label>
+      <div class="chk" id="r-buildings"></div>
+    </div>
+    <div style="margin-top:12px">
+      <label>可跑时段（可多段；只填你真正有空的时间）</label>
+      <div class="wins" id="r-windows"></div>
+      <div class="actions" style="margin-top:6px">
+        <button class="ghost" id="btn-add-window">+ 加一段时段</button>
+        <button class="ok" id="btn-register">登记 / 覆盖登记</button>
+        <span class="hint">同一昵称重复登记 = 覆盖更新（<code>runners.user_id</code> 唯一）。</span>
+      </div>
+    </div>
+    <div id="register-out"></div>
+  </section>
+
+  <!-- ───────────── 区块三 · 任务看板 ───────────── -->
+  <section class="card" id="sec-board">
+    <h2><span class="n">3</span>任务看板</h2>
+    <div class="actions" style="margin-top:0">
+      <select id="b-filter" style="max-width:220px"><option value="">全部楼栋</option></select>
+      <button class="ghost" id="btn-reload">刷新</button>
+      <span class="hint" id="board-count"></span>
+    </div>
+    <div id="board" style="margin-top:12px"></div>
+  </section>
+
+  <!-- ───────────── 区块四 · 匹配结果 ───────────── -->
+  <section class="card" id="sec-match">
+    <h2><span class="n">4</span>匹配结果</h2>
+    <p class="hint" style="margin:0 0 10px">
+      点看板里某个任务的「查看匹配」，这里会显示<b>候选跑腿者 + score + reason</b>（reason 里的分值相加正好等于 score）；
+      阈值 60，低于 60 分的一律不出现。同一任务对同一人 5 分钟内不重复推送。
+    </p>
+    <div id="match-out"><p class="hint">还没有触发撮合。</p></div>
+  </section>
+
+  <section class="card">
+    <h2>演示令牌（写接口需要）</h2>
+    <p class="hint" style="margin:0 0 8px">
+      发布/触发撮合/登记是写接口，需要 <code>X-Demo-Token</code>（MCP 端点是 <code>Authorization: Bearer</code>）。
+      本站令牌只读、限频、短期轮换，不进任何参赛材料。
+    </p>
+    <div class="row">
+      <div>
+        <label for="tk">令牌（只存本地浏览器，不写进代码）</label>
+        <input id="tk" type="password" placeholder="<DEMO_TOKEN>" />
+      </div>
+      <div style="align-self:end">
+        <button class="ghost" id="btn-tk">保存令牌</button>
+        <span class="pill" id="tk-state">未配置</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
+  <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+</footer>
+
+<script src="/config.js"></script>
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+
+  // ---------- 令牌（只从运行时拿，⛔ 不硬编码） ----------
+  const TK_KEY = "bm_demo_token";
+  function readToken() {
+    const q = new URLSearchParams(location.search).get("token");
+    if (q) { try { localStorage.setItem(TK_KEY, q); } catch {} return q; }
+    return (window.__DEMO_TOKEN__ || "") || (() => { try { return localStorage.getItem(TK_KEY) || ""; } catch { return ""; } })();
+  }
+  let TOKEN = readToken();
+  function paintToken() {
+    const s = $("#tk-state");
+    s.textContent = TOKEN ? "已配置" : "未配置（写接口会 401）";
+    s.className = "pill " + (TOKEN ? "ok" : "warn");
+    $("#tk").value = ""; $("#tk").placeholder = TOKEN ? "已保存（重新输入可覆盖）" : "<DEMO_TOKEN>";
+  }
+  $("#btn-tk").addEventListener("click", () => {
+    const v = $("#tk").value.trim();
+    if (v) { TOKEN = v; try { localStorage.setItem(TK_KEY, v); } catch {} }
+    paintToken();
+  });
+
+  // ---------- 统一信封解包 ----------
+  async function apiGet(path) {
+    const r = await fetch(path, { headers: { accept: "application/json" } });
+    const j = await r.json().catch(() => ({ ok:false, error:{ message:"响应不是 JSON" } }));
+    return { status: r.status, ...j };
+  }
+  async function apiPost(path, body) {
+    const r = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-demo-token": TOKEN },
+      body: JSON.stringify(body || {}),
+    });
+    const j = await r.json().catch(() => ({ ok:false, error:{ message:"响应不是 JSON" } }));
+    return { status: r.status, ...j };
+  }
+  async function mcpCall(name, args) {
+    const r = await fetch("/mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer " + TOKEN },
+      body: JSON.stringify({ jsonrpc: "2.0", id: Date.now() % 100000, method: "tools/call", params: { name, arguments: args } }),
+    });
+    if (r.status === 401) return { ok:false, error:{ code:"SCHEMA_REJECTED", message:"MCP 端点需要有效令牌（见下方「演示令牌」）" } };
+    const j = await r.json().catch(() => null);
+    const sc = j && j.result && j.result.structuredContent;
+    return sc || { ok:false, error:{ code:"INTERNAL", message:(j && j.error && j.error.message) || "MCP 调用失败" } };
+  }
+  function show(target, node) { const box = $(target); box.innerHTML = ""; if (node) box.appendChild(node); }
+  function errNode(j) {
+    const p = el("p", "hint"); p.style.color = "var(--warn)";
+    p.textContent = "❌ " + (j && j.error ? j.error.code + "：" + j.error.message : "未知错误");
+    return p;
+  }
+  function jsonNode(obj) { const pre = el("pre"); pre.textContent = JSON.stringify(obj, null, 2); return pre; }
+
+  // ---------- 楼栋 / 快递站：优先 M3 的 /api/map/nodes，没有就用规范名兜底 ----------
+  // 兜底清单与 config/map-nodes.json 的 label 字面一致（集成后自动切到接口数据）
+  const FALLBACK_NODES = [
+    { label:"12号宿舍楼", category:"dorm" }, { label:"15号宿舍楼", category:"dorm" },
+    { label:"第二食堂", category:"canteen" }, { label:"南门", category:"gate" },
+    { label:"快递驿站", category:"service" },
+  ];
+  let NODES = FALLBACK_NODES;
+  async function loadNodes() {
+    const j = await apiGet("/api/map/nodes").catch(() => null);
+    if (j && j.ok && Array.isArray(j.data) && j.data.length) NODES = j.data;
+    const dorms = NODES.filter((n) => n.category === "dorm").map((n) => n.label);
+    const opts = dorms.length ? dorms : NODES.map((n) => n.label);
+    for (const id of ["#p-from", "#p-to", "#b-filter"]) {
+      const sel = $(id); const keep = sel.value; sel.innerHTML = "";
+      if (id === "#b-filter") sel.appendChild(new Option("全部楼栋", ""));
+      opts.forEach((label, i) => sel.appendChild(new Option(label, label)));
+      if (id === "#p-to" && opts.length > 1) sel.value = opts[1];
+      else sel.value = keep || opts[0] || "";
+    }
+    const dl = $("#station-list"); dl.innerHTML = "";
+    NODES.forEach((n) => dl.appendChild(new Option(n.label, n.label)));
+    const box = $("#r-buildings"); box.innerHTML = "";
+    opts.forEach((label) => {
+      const l = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = label;
+      l.appendChild(cb); l.appendChild(document.createTextNode(label)); box.appendChild(l);
+    });
+  }
+
+  // ---------- 时间工具 ----------
+  function isoPlusMinutes(min) { return new Date(Date.now() + min * 60000).toISOString(); }
+  function localInput(ts) {
+    const d = new Date(ts - new Date().getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 16);
+  }
+  function countdown(iso) {
+    const ms = new Date(iso).getTime() - Date.now();
+    if (!Number.isFinite(ms)) return "—";
+    if (ms <= 0) return "已过期";
+    const m = Math.floor(ms / 60000);
+    if (m < 60) return m + " 分钟后截止";
+    const h = Math.floor(m / 60), mm = m % 60;
+    if (h < 24) return h + " 小时" + (mm ? mm + " 分" : "") + "后截止";
+    return Math.floor(h / 24) + " 天" + (h % 24) + " 小时后截止";
+  }
+
+  // ---------- 时段行 ----------
+  function addWindow(startMin, endMin) {
+    const wrap = el("div", "win");
+    const s = el("input"); s.type = "datetime-local"; s.className = "w-start";
+    const e = el("input"); e.type = "datetime-local"; e.className = "w-end";
+    s.value = localInput(Date.now() + startMin * 60000);
+    e.value = localInput(Date.now() + endMin * 60000);
+    const del = el("button", "ghost", "删除"); del.type = "button";
+    del.addEventListener("click", () => wrap.remove());
+    wrap.append(s, e, del);
+    $("#r-windows").appendChild(wrap);
+  }
+
+  // ---------- 区块一：识别截图 ----------
+  $("#btn-parse").addEventListener("click", async () => {
+    const f = $("#p-shot").files && $("#p-shot").files[0];
+    if (!f) { show("#parse-out", errNode({ error:{ code:"SCHEMA_REJECTED", message:"先选一张截图" } })); return; }
+    if (f.size > 1.4 * 1024 * 1024) { show("#parse-out", errNode({ error:{ code:"SCHEMA_REJECTED", message:"图片过大（≤1.4MB，请求体上限 2mb）" } })); return; }
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("读取失败"));
+      fr.readAsDataURL(f);
+    }).catch(() => "");
+    if (!dataUrl) { show("#parse-out", errNode({ error:{ code:"INTERNAL", message:"读取图片失败" } })); return; }
+    const box = $("#parse-out"); box.innerHTML = "<p class='hint'>识别中…（图片只在本次请求内使用，不落盘）</p>";
+    const j = await mcpCall("task_parse_screenshot", { image_base64: dataUrl, hint: $("#p-note").value.trim() });
+    box.innerHTML = "";
+    if (!j.ok) { box.appendChild(errNode(j)); return; }
+    const d = j.data || {};
+    const p = el("p", "hint");
+    p.textContent = (d.degraded ? "⚠️ 降级模式（未配置视觉模型）：" : "✅ 模型识别：") +
+      "confidence=" + d.confidence + "　（识别不出的字段为 null，绝不猜）" + (d.degrade_reason ? "｜" + d.degrade_reason : "");
+    box.appendChild(p);
+    if (d.from_building) $("#p-from").value = d.from_building;
+    if (d.to_building) $("#p-to").value = d.to_building;
+    if (d.station) $("#p-station").value = d.station;
+    if (d.deadline_iso) { const t = new Date(d.deadline_iso); if (!Number.isNaN(t.getTime())) $("#p-deadline").value = localInput(t.getTime()); }
+    if (typeof d.reward_min === "number") $("#p-rmin").value = d.reward_min;
+    if (typeof d.reward_max === "number") $("#p-rmax").value = d.reward_max;
+    box.appendChild(jsonNode(d));
+  });
+
+  // ---------- 区块一：发布 ----------
+  $("#btn-publish").addEventListener("click", async () => {
+    const dl = $("#p-deadline").value;
+    const body = {
+      from_building: $("#p-from").value,
+      to_building: $("#p-to").value,
+      station: $("#p-station").value.trim(),
+      deadline_iso: dl ? new Date(dl).toISOString() : "",
+      reward_min: Number($("#p-rmin").value),
+      reward_max: Number($("#p-rmax").value),
+      note: $("#p-note").value.trim() || null,
+      screenshot_path: null, // ⛔ 截图原图不落服务器磁盘，所以发布时不带路径
+      owner_handle: $("#p-owner").value.trim(),
+    };
+    const j = await apiPost("/api/tasks", body);
+    show("#publish-out", j.ok ? jsonNode({ ok:true, task_id:j.data.task_id, status:j.data.status }) : errNode(j));
+    if (j.ok) { $("#p-note").value = ""; loadBoard(); }
+  });
+
+  // ---------- 区块二：登记 ----------
+  $("#btn-add-window").addEventListener("click", () => addWindow(30, 240));
+  $("#btn-register").addEventListener("click", async () => {
+    const buildings = [...document.querySelectorAll("#r-buildings input:checked")].map((c) => c.value);
+    const wins = [...document.querySelectorAll("#r-windows .win")].map((w) => ({
+      start_iso: w.querySelector(".w-start").value ? new Date(w.querySelector(".w-start").value).toISOString() : "",
+      end_iso: w.querySelector(".w-end").value ? new Date(w.querySelector(".w-end").value).toISOString() : "",
+    }));
+    const j = await mcpCall("runner_register", {
+      user_handle: $("#r-owner").value.trim(),
+      reachable_buildings: buildings,
+      reward_floor: Number($("#r-floor").value),
+      time_windows: wins,
+    });
+    show("#register-out", j.ok ? jsonNode(j.data) : errNode(j));
+  });
+
+  // ---------- 区块三：看板 ----------
+  async function loadBoard() {
+    const b = $("#b-filter").value;
+    const j = await apiGet("/api/tasks?limit=20" + (b ? "&building=" + encodeURIComponent(b) : ""));
+    const box = $("#board"); box.innerHTML = "";
+    if (!j.ok) { box.appendChild(errNode(j)); $("#board-count").textContent = ""; return; }
+    const list = j.data || [];
+    $("#board-count").textContent = "开放任务 " + list.length + " 条（只含 open 且未过期）";
+    if (!list.length) { box.appendChild(el("p", "hint", "暂时没有开放任务，先在上面的区块一发布一条。")); return; }
+    for (const t of list) {
+      const c = el("div", "task");
+      c.appendChild(el("div", "path", t.from_building + " → " + t.to_building));
+      c.appendChild(el("div", "meta",
+        "取件点：" + t.station + "｜报酬：" + t.reward_min + "–" + t.reward_max + " 元（双方线下协商）"));
+      const meta2 = el("div", "meta");
+      meta2.appendChild(document.createTextNode("截止：" + new Date(t.deadline_iso).toLocaleString("zh-CN") + "（"));
+      meta2.appendChild(el("b", null, countdown(t.deadline_iso)));
+      meta2.appendChild(document.createTextNode("）"));
+      c.appendChild(meta2);
+      if (t.note) c.appendChild(el("div", "meta", "备注：" + t.note));
+      const act = el("div", "actions");
+      const btn = el("button", "ghost", "查看匹配");
+      btn.addEventListener("click", () => runMatch(t));
+      act.appendChild(btn);
+      const link = el("span", "hint", "task_id " + t.task_id);
+      act.appendChild(link);
+      c.appendChild(act);
+      box.appendChild(c);
+    }
+  }
+  $("#btn-reload").addEventListener("click", loadBoard);
+  $("#b-filter").addEventListener("change", loadBoard);
+
+  // ---------- 区块四：撮合 ----------
+  async function runMatch(task) {
+    const box = $("#match-out");
+    box.innerHTML = "";
+    box.appendChild(el("p", "hint", "正在撮合：" + task.from_building + " → " + task.to_building + " …"));
+    if (!TOKEN) {
+      box.innerHTML = "";
+      box.appendChild(el("p", "hint", "⚠️ 写接口需要演示令牌：请在下方「演示令牌」里粘贴，或访问 /takeout?token=<DEMO_TOKEN>。"));
+      return;
+    }
+    const j = await apiPost("/api/tasks/" + encodeURIComponent(task.task_id) + "/match", {});
+    box.innerHTML = "";
+    if (!j.ok) { box.appendChild(errNode(j)); return; }
+
+    const head = el("div", "meta");
+    head.textContent = "任务 " + task.from_building + " → " + task.to_building +
+      "｜候选（score ≥ 60）：" + (j.data || []).length + " 人｜按 score 降序";
+    box.appendChild(head);
+
+    if (!(j.data || []).length) {
+      box.appendChild(el("p", "hint", "暂无 ≥60 分的候选（引擎已把不可达 / 时间不重叠 / 总分不足的跑腿者筛掉了）。"));
+      return;
+    }
+    for (const m of j.data) {
+      const c = el("div", "match");
+      const top = el("div", "top");
+      top.appendChild(el("span", "who", m.runner_handle || m.runner_id));
+      const sc = el("span", "score" + (m.score < 60 ? " low" : ""), String(m.score));
+      top.appendChild(sc);
+      top.appendChild(el("span", "hint", "score / 100"));
+      top.appendChild(el("span", "pill " + (m.pushed ? "ok" : "warn"),
+        m.pushed ? "已推送（写 matches）" : (m.skip_reason || "未推送")));
+      c.appendChild(top);
+      const bar = el("div", "bar"); const i = el("i"); i.style.width = Math.max(0, Math.min(100, m.score)) + "%";
+      bar.appendChild(i); c.appendChild(bar);
+      c.appendChild(el("div", "reason", "reason: " + m.reason));
+      box.appendChild(c);
+    }
+    const foot = el("p", "hint",
+      "reason 里的分值相加正好等于 score（引擎按整数「分」相加，不会出现 +30 却 59.7 的矛盾）。报酬由双方线下协商，平台不参与交易。");
+    box.appendChild(foot);
+  }
+
+  // ---------- 启动 ----------
+  async function boot() {
+    paintToken();
+    $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
+    addWindow(-30, 300);
+    await loadNodes();
+    await loadBoard();
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
