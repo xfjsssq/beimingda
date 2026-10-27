@@ -40,7 +40,7 @@
 | `src/api/tasks.js` | 新增。4 条路由，写接口 `requireWriteToken` |
 | `src/api/runners.js` | 新增。`GET /api/runners` 只读、脱敏（不出 `user_id` / 联系方式），门户「活跃跑腿者数」用 |
 | `src/api/matches.js` | 新增。`GET /api/matches?limit=` 只读，最近撮合记录（含 `score`），门户「平均匹配得分」用 |
-| `src/api/routes.js` | **只加 5 行**：3 个 import + `router.use("/tasks"/"/runners"/"/matches", …)`（挂在 404 兜底之前），其他模块的行未动 |
+| `src/api/routes.js` | **只加 6 行**：3 个 import + `router.use("/tasks"…, "/runners"…, "/matches"…)`，全部挂在 404 兜底之前；其他模块的行未动 |
 | `static/takeout.html` | 新增。自包含（内联样式+脚本），只外链 `/config.js` |
 | `fixtures/tasks.json` `fixtures/runners.json` | 覆盖写（原来各 1 条占位） |
 | `tests/m1-takeout.test.js` | 新增 |
