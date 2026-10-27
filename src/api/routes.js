@@ -23,6 +23,7 @@ import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
 import { createMapRouter } from "./map.js";
 import { createBuddiesRouter } from "./buddies.js";
+import { createTaskRouter } from "./tasks.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -55,6 +56,13 @@ export function createApiRouter() {
 
   // ---------- M2 搭子匹配 ----------
   router.use("/buddies", createBuddiesRouter());
+
+  // ---------- M1 代取撮合 ----------
+  router.use("/tasks", createTaskRouter());
+
+  // ---------- M4 日程提醒（待合） ----------
+  // router.use("/schedule", createScheduleRouter());
+  // router.use("/scrub",    createScrubRouter());
 
   router.use((req, res) => {
     res.status(404).json({
