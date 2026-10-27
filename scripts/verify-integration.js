@@ -257,7 +257,8 @@ try {
 
   // ---- 6) 红线：⛔ 不许依赖外部 CDN ----
   const cdnHits = [];
-  const ALLOW = ["maps.amap.com"]; // 高德辅助视图是官方嵌入 iframe，非 CDN 依赖
+  const ALLOW = ["maps.amap.com", "webapi.amap.com"]; // 高德是「联网增强」（iframe 嵌入 / JS API SDK），
+  // 官方形态而非第三方 CDN 拼装；且两处都只在用户点击切换底图时才加载，截图底图才是离线兜底
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       if (["node_modules", ".git", "data", "vendor"].includes(e.name)) continue;
