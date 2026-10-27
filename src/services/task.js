@@ -13,9 +13,6 @@
  * ⛔ 不回传 contact_code（联系方式只在 M2 的双选揭示后出现）
  */
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { getDb } from "../db/index.js";
 import { CODES, assertNoExtraKeys, reject } from "../util/envelope.js";
 import { nowSec, toIso, toTs } from "../util/time.js";
@@ -27,8 +24,12 @@ import {
 } from "../engine/match.js";
 import { ensureUser, normalizeHandle, toFiniteNumber, toInt } from "./users.js";
 import { listActiveRunners } from "./runner.js";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+import {
+  canonicalBuildingOrThrow,
+  canonicalStation,
+  loadMapNodes,
+  normalizeBuildingName,
+} from "./buildings.js";
 
 /** task_publish / POST /api/tasks 允许的字段（白名单，多一个即 SCHEMA_REJECTED） */
 export const TASK_FIELDS = [
@@ -152,9 +153,18 @@ export function publishTask(input = {}, opts = {}) {
   assertNoExtraKeys(input, TASK_FIELDS, "task_publish");
   const now = Number.isFinite(opts.now) ? Number(opts.now) : nowSec();
 
-  const fromBuilding = requiredText(input.from_building, "from_building");
-  const toBuilding = requiredText(input.to_building, "to_building");
-  const station = requiredText(input.station, "station");
+  // ⭐ 楼栋名先归一、归一失败再拒（config/map-nodes.json 的 label 是撮合唯一口径；
+  //    MCP 与 HTTP 共用这一套，⛔ 不许各写一份）。`12号楼` → `12号宿舍楼`。
+  const fromBuilding = canonicalBuildingOrThrow(
+    requiredText(input.from_building, "from_building"),
+    "取件楼栋（from_building）",
+  );
+  const toBuilding = canonicalBuildingOrThrow(
+    requiredText(input.to_building, "to_building"),
+    "送达楼栋（to_building）",
+  );
+  // 快递站名不参与可达性打分 → 归不到规范名时保留原文，避免 Agent 反复试错
+  const station = canonicalStation(requiredText(input.station, "station"));
   const ownerHandle = normalizeHandle(input.owner_handle, "owner_handle");
 
   const deadlineTs = toTs(input.deadline_iso);
@@ -226,7 +236,9 @@ export function getTask(id) {
 export function listOpenTasks(params = {}, opts = {}) {
   const now = Number.isFinite(opts.now) ? Number(opts.now) : nowSec();
   const limit = clampLimit(params.limit);
-  const building = typeof params.building === "string" ? params.building.trim() : "";
+  const rawBuilding = typeof params.building === "string" ? params.building.trim() : "";
+  // 过滤参数同样归一（`12号楼` 也能筛得到）；归不出来就按原文过滤 → 查不到结果，不报错
+  const building = rawBuilding ? normalizeBuildingName(rawBuilding) ?? rawBuilding : "";
 
   let sql = `${TASK_SELECT} WHERE t.raw_status = 'open' AND t.deadline_ts > @now`;
   const args = { now, limit };
@@ -402,20 +414,6 @@ const PARSE_FIELDS = [
 /** 图片 base64 上限（express.json 本体上限 2mb，这里只做防御性判断） */
 const MAX_IMAGE_B64 = 4_000_000;
 const LLM_TIMEOUT_MS = 25_000; // 契约：单次响应必须 < 90 秒
-
-let nodeCache = null;
-
-function loadMapNodes() {
-  if (nodeCache) return nodeCache;
-  try {
-    const file = path.resolve(__dirname, "../../config/map-nodes.json");
-    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
-    nodeCache = Array.isArray(raw?.nodes) ? raw.nodes : [];
-  } catch {
-    nodeCache = [];
-  }
-  return nodeCache;
-}
 
 /** LLM 三件套是否配齐（配齐才走真模型调用） */
 export function isVisionConfigured() {

@@ -15,27 +15,22 @@ import { getDb } from "../db/index.js";
 import { CODES, assertNoExtraKeys, reject } from "../util/envelope.js";
 import { nowSec, toIso, toTs } from "../util/time.js";
 import { ensureUser, normalizeHandle, toFiniteNumber } from "./users.js";
+import { canonicalBuildingsOrThrow } from "./buildings.js";
 
 const RUNNER_FIELDS = ["user_handle", "reachable_buildings", "reward_floor", "time_windows"];
 const WINDOW_FIELDS = ["start_iso", "end_iso"];
 const MAX_BUILDINGS = 20;
 const MAX_WINDOWS = 20;
 
-/** 解析并校验 reachable_buildings */
+/**
+ * 解析并校验 reachable_buildings：**先归一成平台规范名**（`12号楼` → `12号宿舍楼`），归一失败才拒。
+ * 否则跑腿方登记了「12号楼」而任务写「12号宿舍楼」，可达性永远 0 分 → 现场看起来像引擎坏了。
+ */
 function normalizeBuildings(value) {
-  if (!Array.isArray(value)) {
-    reject(CODES.SCHEMA_REJECTED, "reachable_buildings 必须是字符串数组");
-  }
-  if (value.length > MAX_BUILDINGS) {
+  if (Array.isArray(value) && value.length > MAX_BUILDINGS) {
     reject(CODES.SCHEMA_REJECTED, `reachable_buildings 最多 ${MAX_BUILDINGS} 个楼栋`);
   }
-  const out = [];
-  for (const item of value) {
-    const name = typeof item === "string" ? item.trim() : "";
-    if (!name) reject(CODES.SCHEMA_REJECTED, "reachable_buildings 含空楼栋名");
-    if (!out.includes(name)) out.push(name);
-  }
-  return out;
+  return canonicalBuildingsOrThrow(value);
 }
 
 /** 解析并校验 time_windows（入参 ISO → 出参/存库 Unix 秒） */
