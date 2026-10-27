@@ -22,6 +22,7 @@ import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
 import { createMapRouter } from "./map.js";
+import { createDemoRouter } from "./demo.js";
 
 const VERSION = process.env.npm_package_version || "0.1.0";
 
@@ -43,6 +44,9 @@ export function createApiRouter() {
   // ---------- 模块路由挂载点 ----------
   // 各模块在自己的分支里 import 自己的 router，并 router.use(...) 到对应前缀上。
   // ⛔ 只加自己模块的那一行，不要动别人的；⛔ 不要在这里写具体业务逻辑。
+
+  // ---------- 核心：演示数据（契约 core.md §3：GET /api/demo/seed） ----------
+  router.use("/demo", createDemoRouter());
 
   // M3 迎新导览（GET /api/map/nodes、/api/map/summary）
   router.use("/map", createMapRouter());
