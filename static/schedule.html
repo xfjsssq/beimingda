@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>日程与提醒 · 北名大小助手</title>
+  <style>
+    :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#B45309; --bg:#F5F7FA; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:#1c1c1e;
+      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:1080px; margin:0 auto; padding:28px 20px 64px; }
+    h1 { color:var(--pri); font-size:23px; margin:0 0 6px; }
+    .sub { color:#5b6470; margin:0 0 20px; }
+    .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(16,24,40,.08); }
+    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); }
+    .card h2 small { font-weight:400; color:#6b7280; font-size:12px; margin-left:6px; }
+    code { font-family:Consolas,"Courier New",monospace; font-size:13px; }
+    table { border-collapse:collapse; width:100%; font-size:13px; }
+    th, td { border:1px solid #e5e7eb; padding:6px 8px; text-align:left; vertical-align:top; }
+    th { background:#f3f4f6; font-weight:600; }
+    .grid td { height:38px; }
+    .slot { background:rgba(31,78,140,.08); border-left:3px solid var(--pri); padding:2px 6px; border-radius:4px; font-size:12px; }
+    .slot.cont { opacity:.55; border-left-color:#9ca3af; }
+    .notice { background:#FFFBEB; border:1px solid #FCD34D; border-radius:10px; padding:12px 14px; }
+    .notice strong { color:var(--warn); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    label { font-size:12px; color:#4b5563; display:block; margin-bottom:4px; }
+    input, select { padding:7px 9px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; background:#fff; }
+    input[type="text"] { min-width:130px; }
+    button { background:var(--pri); color:#fff; border:0; border-radius:8px; padding:8px 14px;
+      font-size:13px; cursor:pointer; }
+    button.ghost { background:#fff; color:var(--pri); border:1px solid var(--pri); }
+    button:disabled { opacity:.55; cursor:default; }
+    .muted { color:#6b7280; font-size:12px; }
+    .ok { color:var(--ok); } .bad { color:#B91C1C; }
+    .pill { display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px;
+      background:rgba(31,78,140,.1); color:var(--pri); margin-left:6px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>日程与主动提醒</h1>
+  <p class="sub">只保存「周几 / 起止节次 / 课程名 / 教室 / 周次」。提醒由平台定时任务触发，不占用任何长连接。</p>
+
+  <!-- 身份：仅昵称，无任何身份字段 -->
+  <div class="card">
+    <div class="row">
+      <div>
+        <label for="handle">你的昵称（仅用于区分日程，不涉及身份信息）</label>
+        <input id="handle" type="text" value="同学A" />
+      </div>
+      <button id="loadBtn" class="ghost">载入我的日程</button>
+      <span class="muted" id="whoami"></span>
+    </div>
+  </div>
+
+  <!-- 区块一 · 周视图 -->
+  <div class="card">
+    <h2>① 一周课表 <small>7 列 × 节次网格</small></h2>
+    <div id="gridWrap" class="muted">还没有日程。可以先在下方手动添加，或在对话里让 Agent 导入。</div>
+  </div>
+
+  <!-- 区块二 · 导入指引（合规说明区，必须显眼） -->
+  <div class="card">
+    <h2>② 怎么导入课表 <small>⚠️ 请先读这一段</small></h2>
+    <div class="notice">
+      <p style="margin:0 0 8px"><strong>课表文件不要上传到这里。</strong>本页面没有、也不会有任何上传入口。</p>
+      <p style="margin:0">
+        请在学校官方渠道导出课表后，在<strong>你自己的本机</strong> WorkBuddy 对话里交给 Agent 处理 ——
+        Agent 只会把「周几 / 起止节次 / 课程名 / 教室 / 周次」写入平台，
+        <strong>姓名与学号不会离开你的设备</strong>。每次导入后 Agent 会告诉你写入了多少条、
+        丢弃了哪些类别的字段（这些类别会记进下方第 ⑤ 区块的脱敏审计）。
+      </p>
+    </div>
+    <p class="muted" style="margin:10px 0 0">
+      对话里可以这么说：<code>把我的课表导入：周一 1-2 节 课程A，周三 3-4 节 课程B……</code>
+    </p>
+  </div>
+
+  <!-- 区块三 · 手动添加（只有 6 个字段） -->
+  <div class="card">
+    <h2>③ 手动添加一门课 <small>不想用对话时的兜底</small></h2>
+    <form id="addForm">
+      <div class="row">
+        <div><label for="weekday">周几</label>
+          <select id="weekday">
+            <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
+            <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+            <option value="7">周日</option>
+          </select></div>
+        <div><label for="ps">起节</label><input id="ps" type="number" min="1" max="14" value="1" style="width:80px" /></div>
+        <div><label for="pe">止节</label><input id="pe" type="number" min="1" max="14" value="2" style="width:80px" /></div>
+        <div><label for="title">课程名</label><input id="title" type="text" placeholder="课程A" /></div>
+        <div><label for="room">教室（可选）</label><input id="room" type="text" placeholder="教学楼A-101" /></div>
+        <div><label for="weeks">周次（可选）</label><input id="weeks" type="text" placeholder="1-16" style="width:110px" /></div>
+        <div><label for="rb">提前提醒（分钟）</label><input id="rb" type="number" min="0" max="1440" placeholder="不提醒" style="width:120px" /></div>
+        <button type="submit">添加 / 更新</button>
+      </div>
+    </form>
+    <p class="muted" style="margin:8px 0 0">同一门课（周几+起止节次+课程名）再次提交是<strong>更新</strong>，不会产生重复条目。</p>
+  </div>
+
+  <!-- 区块四 · 提醒设置 -->
+  <div class="card">
+    <h2>④ 提醒设置 <small>每门课单独设置，单位分钟；留空 = 不提醒</small></h2>
+    <div id="remindWrap" class="muted">载入日程后可在这里逐门课设置。</div>
+    <p class="muted" style="margin:8px 0 0">
+      提醒由服务端定时任务每 5 分钟检查一次（按 Asia/Shanghai 计算），不使用 SSE 长连接。
+    </p>
+  </div>
+
+  <!-- 区块五 · 脱敏审计 -->
+  <div class="card">
+    <h2>⑤ 脱敏审计 <small>最近一次导入丢弃了哪些类别的字段</small></h2>
+    <div id="auditWrap" class="muted">正在读取…</div>
+    <p class="muted" style="margin:8px 0 0">审计只记录<strong>字段名</strong>，绝不记录任何字段值。</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  var WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+  var MAX_PERIOD = 10;
+  var state = { items: [] };
+
+  function el(id) { return document.getElementById(id); }
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function handle() { return (el("handle").value || "").trim(); }
+
+  function api(url, opts) {
+    return fetch(url, opts).then(function (r) { return r.json(); });
+  }
+
+  function renderGrid() {
+    if (!state.items.length) {
+      el("gridWrap").className = "muted";
+      el("gridWrap").textContent = "还没有日程。可以先在下方手动添加，或在对话里让 Agent 导入。";
+      return;
+    }
+    var cells = {};
+    state.items.forEach(function (it) {
+      for (var p = it.period_start; p <= it.period_end; p++) {
+        cells[it.weekday + "-" + p] = cells[it.weekday + "-" + p] || [];
+        cells[it.weekday + "-" + p].push(it);
+      }
+    });
+    var html = '<table class="grid"><thead><tr><th style="width:64px">节次</th>';
+    WEEK_LABELS.forEach(function (w) { html += "<th>" + w + "</th>"; });
+    html += "</tr></thead><tbody>";
+    for (var p = 1; p <= MAX_PERIOD; p++) {
+      html += '<tr><th>' + p + "</th>";
+      for (var d = 1; d <= 7; d++) {
+        var list = cells[d + "-" + p] || [];
+        html += "<td>";
+        list.forEach(function (it) {
+          var isStart = it.period_start === p;
+          html += '<div class="slot' + (isStart ? "" : " cont") + '" title="' +
+            esc(it.weeks ? "周次 " + it.weeks : "") + '">' +
+            (isStart ? esc(it.title) + (it.room ? '<br><span style="font-size:11px">' + esc(it.room) + "</span>" : "")
+                     : "…") +
+            "</div>";
+        });
+        html += "</td>";
+      }
+      html += "</tr>";
+    }
+    html += "</tbody></table>";
+    el("gridWrap").className = "";
+    el("gridWrap").innerHTML = html;
+  }
+
+  function renderRemind() {
+    if (!state.items.length) {
+      el("remindWrap").className = "muted";
+      el("remindWrap").textContent = "载入日程后可在这里逐门课设置。";
+      return;
+    }
+    var html = '<table><thead><tr><th>课程</th><th>时间</th><th>提前提醒（分钟）</th><th></th></tr></thead><tbody>';
+    state.items.forEach(function (it, i) {
+      html += "<tr><td>" + esc(it.title) + (it.room ? '<span class="pill">' + esc(it.room) + "</span>" : "") + "</td>" +
+        "<td>" + WEEK_LABELS[it.weekday - 1] + " 第" + it.period_start + (it.period_end > it.period_start ? "-" + it.period_end : "") + "节</td>" +
+        '<td><input type="number" min="0" max="1440" style="width:110px" id="rb' + i + '" value="' +
+        (it.remind_before == null ? "" : it.remind_before) + '" placeholder="不提醒" /></td>' +
+        '<td><button class="ghost" data-i="' + i + '">保存</button></td></tr>';
+    });
+    html += "</tbody></table>";
+    el("remindWrap").className = "";
+    el("remindWrap").innerHTML = html;
+    Array.prototype.forEach.call(el("remindWrap").querySelectorAll("button[data-i]"), function (btn) {
+      btn.addEventListener("click", function () {
+        var i = Number(btn.getAttribute("data-i"));
+        var it = state.items[i];
+        var raw = el("rb" + i).value;
+        var rb = raw === "" ? null : Number(raw);
+        btn.disabled = true;
+        api("/api/schedule", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            user_handle: handle(), weekday: it.weekday, period_start: it.period_start,
+            period_end: it.period_end, title: it.title, room: it.room, weeks: it.weeks,
+            remind_before: rb,
+          }),
+        }).then(function (j) {
+          btn.disabled = false;
+          if (j.ok) { load(); } else { alert("保存失败：" + (j.error && j.error.message)); }
+        }).catch(function (e) { btn.disabled = false; alert("保存失败：" + e.message); });
+      });
+    });
+  }
+
+  function renderAudit() {
+    api("/api/scrub/audit?limit=20").then(function (j) {
+      if (!j.ok || !j.data || !j.data.length) {
+        el("auditWrap").className = "muted";
+        el("auditWrap").textContent = "暂时没有审计记录（说明还没有字段被丢弃）。";
+        return;
+      }
+      var html = '<table><thead><tr><th>时间</th><th>类型</th><th>被丢弃的字段名</th></tr></thead><tbody>';
+      j.data.forEach(function (row) {
+        html += "<tr><td>" + esc(row.created_at) + "</td><td>" + esc(row.item_type) + "</td><td><code>" +
+          esc((row.dropped_fields || []).join(", ")) + "</code></td></tr>";
+      });
+      html += "</tbody></table>";
+      el("auditWrap").className = "";
+      el("auditWrap").innerHTML = html;
+    }).catch(function (e) {
+      el("auditWrap").className = "bad";
+      el("auditWrap").textContent = "读取失败：" + e.message;
+    });
+  }
+
+  function load() {
+    var h = handle();
+    if (!h) { alert("请先填昵称"); return; }
+    try { localStorage.setItem("bm_handle", h); } catch (e) {}
+    el("whoami").textContent = "当前：" + h;
+    api("/api/schedule?handle=" + encodeURIComponent(h)).then(function (j) {
+      state.items = j.ok && Array.isArray(j.data) ? j.data : [];
+      renderGrid();
+      renderRemind();
+    }).catch(function (e) {
+      el("gridWrap").className = "bad";
+      el("gridWrap").textContent = "载入失败：" + e.message;
+    });
+    renderAudit();
+  }
+
+  el("loadBtn").addEventListener("click", load);
+
+  el("addForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var rbRaw = el("rb").value;
+    var body = {
+      user_handle: handle(),
+      weekday: Number(el("weekday").value),
+      period_start: Number(el("ps").value),
+      period_end: Number(el("pe").value),
+      title: (el("title").value || "").trim(),
+    };
+    if (el("room").value.trim()) body.room = el("room").value.trim();
+    if (el("weeks").value.trim()) body.weeks = el("weeks").value.trim();
+    if (rbRaw !== "") body.remind_before = Number(rbRaw);
+
+    api("/api/schedule", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(body),
+    }).then(function (j) {
+      if (j.ok) { el("title").value = ""; load(); }
+      else { alert("添加失败：" + (j.error && j.error.message)); }
+    }).catch(function (e) { alert("添加失败：" + e.message); });
+  });
+
+  try {
+    var saved = localStorage.getItem("bm_handle");
+    if (saved) el("handle").value = saved;
+  } catch (e) {}
+
+  load();
+})();
+</script>
+</body>
+</html>
