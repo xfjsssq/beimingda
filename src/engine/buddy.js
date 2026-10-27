@@ -523,7 +523,7 @@ function detectWanted(raw) {
   return asStr(text, 200);
 }
 
-const MUST_MARK = /必须|要求|希望对方|最好|一定要|请|需要对方|不接受|不能接受/;
+const MUST_MARK = /必须|要求|希望对方|一定要|需要对方|不接受|不能接受/;
 const BREAK_MARK = /受不了|讨厌|反感|最怕|雷|不要|不许|拒绝|不能|无法忍受/;
 
 function detectHardRules(raw) {
