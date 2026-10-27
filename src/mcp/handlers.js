@@ -9,18 +9,20 @@
  *   - 抛 AppError / 返回信封都可以，callTool 会统一归一化
  */
 
+import { registerMapTools } from "./handlers/map.js";
+
 /**
  * 各模块在合并进 main 后，请把自己的注册调用补进下面这个函数。
- * 目前为空数组 = 骨架阶段 0 个工具（tools/list 应返回空数组，这是 T0 的验收项）。
+ * 目前只有 M3（迎新导览）已接入 = 2 个工具。
  *
  * 示例（M1 合进来之后的样子）：
  *   import { registerTakeoutTools } from "./handlers/takeout.js";
  *   { module: "m1", register: registerTakeoutTools }
  */
 const MODULE_REGISTRARS = [
+  { module: "m3", register: registerMapTools },
   // { module: "m1", register: registerTakeoutTools },
   // { module: "m2", register: registerBuddyTools },
-  // { module: "m3", register: registerMapTools },
   // { module: "m4", register: registerScheduleTools },
 ];
 

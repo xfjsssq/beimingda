@@ -71,10 +71,11 @@ try {
 
   // 3. tools/list
   const list = await callMcp({ jsonrpc: "2.0", id: 2, method: "tools/list" }).then((r) => r.json());
+  const toolNames = (list?.result?.tools ?? []).map((t) => t.name);
   check(
-    "POST /mcp tools/list 返回数组（骨架阶段 0 个工具）",
+    "POST /mcp tools/list 返回工具数组（数量随模块合入增长，M1 5 / M2 3 / M3 2 / M4 4 = 14）",
     Array.isArray(list?.result?.tools),
-    `${list?.result?.tools?.length ?? "?"} 个工具`,
+    `${toolNames.length} 个工具：${toolNames.join(",") || "（暂无）"}`,
   );
 
   // 4. 错 token
