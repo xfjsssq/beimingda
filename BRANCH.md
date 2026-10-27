@@ -1,31 +1,27 @@
-# 分支：main
+# 分支：feat/m1-takeout
 
 ## 本分支做什么
-主分支。**只接受 PR**，不直接推。当前已包含 T0 骨架与核心层（由 `feat/core` 合入）。
+**M1 代取撮合**：撮合评分引擎 + 任务/跑腿 service + MCP 5 个工具 + `GET/POST /api/tasks` 路由 + `static/takeout.html`。
 
 ## 依赖什么
-- 无（这是基准分支）
+- `contracts/core.md`（表结构、信封、鉴权）
+- `contracts/m1-takeout.md`（算法与工具契约，**权重 40/30/30 与阈值 60 不得改**）
+- `tasks/M1-代取撮合.md`（任务卡）
+- T0 骨架已合入 `main`（`src/server.js` `src/db/` `src/mcp/` `src/util/` 可用）
 
 ## 完成标准
-- 所有模块分支的验收清单合并后，`npm start` + `npm run seed` + `npm test` + `npm run smoke` 全绿
-- 部署站点 `https://demo.knowingly.dpdns.org` 可用
+`contracts/m1-takeout.md` §7 自测清单全部勾上，外加 `npm test` 有撮合断言测试。
 
 ## 不能碰什么
-- ⛔ 不许直接 push（必须走 PR）
-- ⛔ 不许把 `.env` / `*.db` / `node_modules` 提交进来
+- `src/db/schema.sql`（要改先提 PR 到 main）
+- `src/mcp/tools.js` / `src/mcp/handlers.js` 里**其他模块**的工具定义（只加 m1 区块）
+- `contracts/` 下任何文件
+- 截图原图落盘、从截图抽取姓名/手机号/运单号
 
 ## 当前进度
-- [x] T0 骨架与核心（`feat/core`）：目录结构、`package.json`、`schema.sql`、DB 初始化、
-      auth/ratelimit 中间件、`GET /api/health`、`POST /mcp`（initialize / tools/list / tools/call）、
-      `npm run seed`、`npm run smoke`、`npm test`
-- [x] G0 协作文件：`.gitignore`、`.env.example`、PR 模板、`CONTRIBUTING.md`、7 个分支与各自 `BRANCH.md`
-- [ ] M1 代取撮合（`feat/m1-takeout`）
-- [ ] M2 搭子匹配（`feat/m2-buddy`）
-- [ ] M3 迎新导览（`feat/m3-welcome`）
-- [ ] M4 日程与提醒（`feat/m4-schedule`）
-- [ ] F0 门户与 `/agent` 页（`feat/frontend`）
-- [ ] 参赛材料（`docs/materials`）
-
-## 合并完成后要做的两件事（仓库管理员）
-1. `main` 开分支保护（Settings → Branches），禁止直接 push
-2. 给对方 GitHub 账号加 Write 权限（Settings → Collaborators）
+- [ ] `src/engine/match.js` 撮合评分引擎（含可解释 reason）
+- [ ] `src/services/task.js` `src/services/runner.js`
+- [ ] MCP 5 工具注册与 handler
+- [ ] `src/api/routes.js` 4 条路由
+- [ ] `static/takeout.html` 4 区块
+- [ ] `fixtures/tasks.json` ≥8 条 / `fixtures/runners.json` ≥6 名（含匹配与不匹配样本）
