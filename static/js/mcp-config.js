@@ -25,7 +25,7 @@ export const TOKEN_PLACEHOLDER = "<DEMO_TOKEN>";
 
 /** 令牌能力说明（放在 JSON 旁边） */
 export const TOKEN_NOTES = [
-  "令牌是<b>只读 + 限频</b>的演示令牌：HTTP 接口 60 次/分钟、MCP 工具 30 次/分钟，且短周期轮换，泄露无风险。",
+  "令牌是<b>限频 + 短周期轮换</b>的演示令牌：HTTP 接口 60 次/分钟、MCP 工具 30 次/分钟；它只能操作演示数据，泄露无风险。",
   "页面上永远只出现占位符 <code class=\"inline\">&lt;DEMO_TOKEN&gt;</code>；真实值只存在于服务端环境变量，由站长单独发给评委。",
   "拿到真令牌后，把配置里的 <code class=\"inline\">&lt;DEMO_TOKEN&gt;</code> 整段替换掉即可。",
 ];
@@ -108,7 +108,7 @@ export const TOOLS_BY_MODULE = [
 /** 一句话合规声明（contracts/frontend.md §3 区块六） */
 export const COMPLIANCE_LINE =
   "不收集身份信息（姓名 / 学号 / 手机号 / 身份证 / 学生证照片 / 校园网账号口令都不收）；" +
-  "不接入、不登录、不抓取学校任何内部系统；演示令牌只读 + 限频。";
+  "不接入、不登录、不抓取学校任何内部系统；演示令牌限频 + 短周期轮换、只能操作演示数据。";
 
 /** 工具总数（应为 14） */
 export function toolCount() {
