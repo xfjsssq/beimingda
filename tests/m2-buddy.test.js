@@ -187,17 +187,25 @@ test("§2 加强：完全同词（含去空白/大小写/同义归一）必须�
   assert.ok(engine.findConflicts(["  抽 烟 "], ["抽烟"]).length >= 1, "去空白后同词必须判冲突");
   assert.ok(engine.findConflicts(["吸烟"], ["抽烟"]).length >= 1, "同义归一后同词必须判冲突");
   assert.ok(engine.findConflicts(["不抽烟"], ["抽烟"]).length >= 1, "剥极性词后同词必须判冲突");
-  assert.ok(engine.findConflicts(["室友抽烟"], ["抽烟"]).length >= 1, "同主题下包含关系必须判冲突");
 
   // 方向二：同主题但表述完全不同 —— 仍必须判冲突
   assert.ok(engine.findConflicts(["室友必须安静，半夜别吵"], ["凌晨打游戏外放"]).length >= 1, "噪音主题");
   assert.ok(engine.findConflicts(["不接受抽烟"], ["室友抽烟（阳台抽也不行）"]).length >= 1, "抽烟主题");
   assert.ok(engine.findConflicts(["要求每周一起打扫卫生"], ["房间乱一点就焦虑，会一直念叨别人不收拾"]).length >= 1, "卫生主题");
+  assert.ok(engine.findConflicts(["希望一起自习"], ["讨厌自习"]).length >= 1, "学习习惯主题 + 否定语义");
+  assert.ok(engine.findConflicts(["希望周末有空"], ["周末很忙"]).length >= 1, "周末时间主题 + 反义立场");
 
-  // 反向：不该被误判成冲突的组合（否则会过度否决）
+  // 反向：不该被误判成冲突的组合（否则会过度否决，把好候选排掉）
   assert.deepEqual(engine.findConflicts(["希望作息一致"], ["凌晨打游戏外放"]), []);
   assert.deepEqual(engine.findConflicts(["希望对方爱干净"], ["凌晨打游戏外放"]), []);
   assert.deepEqual(engine.findConflicts(["不养宠物"], ["室友抽烟"]), []);
+  // ⛔ 纯"包含"关系不判冲突（verifier 终审 B1：`希望安静` ⊃ `安静` 语义其实一致，都爱安静）
+  //    包含只能作为"同主题 + 否定/反义"的补充证据，不能独立触发否决
+  assert.deepEqual(engine.findConflicts(["希望安静"], ["安静"]), [], "纯包含不得判冲突（会误杀好候选）");
+  assert.deepEqual(engine.findConflicts(["希望安静"], ["喜欢安静的环境"]), [], "同向立场不得判冲突");
+  assert.deepEqual(engine.findConflicts(["室友抽烟"], ["抽烟"]), [], "纯包含（无极性/否定）按裁决不判冲突");
+  // 但同主题一旦带否定或反义立场，仍必须冲突
+  assert.ok(engine.findConflicts(["希望安静"], ["讨厌安静"]).length >= 1, "同主题 + 否定词必须冲突");
 
   // 评分层：同词场景必须 0 分出局；去掉同词句后同一画像本来能过阈值
   const postProfile = { ...byId("demo-buddy-4").profile, deal_breaker: ["抽烟"] };
@@ -208,14 +216,14 @@ test("§2 加强：完全同词（含去空白/大小写/同义归一）必须�
   const cleared = engine.buddyScore(postProfile, { ...seekerProfile, must_have: [] });
   assert.ok(cleared.score >= engine.THRESHOLD, `去掉同词句后应能过阈值，实得 ${cleared.score}`);
 
-  // 端到端：同词冲突句必须把该候选从检索结果里排除
+  // 端到端 1：**完全同词** —— 帖子的雷点与寻找方的硬性要求归一后是同一句 -> 必须排除
+  const MATCH_TEXT =
+    "大四 经管 想找爱干净、作息规律的室友，实习期早出晚归，希望互相尊重安静时间；喜欢实习和读书；早睡早起；周五1-4节和周六1-4节有课";
   const sameWordPost = svc.createPost({
     author_handle: "同词作者",
     kind: "roommate",
-    profile: postProfile,
+    profile: { ...postProfile, deal_breaker: ["室友必须能一起抽烟"] },
   });
-  const MATCH_TEXT =
-    "大四 经管 想找爱干净、作息规律的室友，实习期早出晚归，希望互相尊重安静时间；喜欢实习和读书；早睡早起；周五1-4节和周六1-4节有课";
   const clean = await callTool("buddy_search", {
     seeker_handle: "同词寻找者A",
     kind: "roommate",
@@ -234,7 +242,36 @@ test("§2 加强：完全同词（含去空白/大小写/同义归一）必须�
   assert.equal(dirty.ok, true, JSON.stringify(dirty.error));
   assert.ok(
     !dirty.data.candidates.some((c) => c.post_id === sameWordPost.post_id),
-    "同词冲突候选必须被排除（以前会照常以 94 分通过）",
+    "完全同词的冲突候选必须被排除（以前会照常以 94 分通过）",
+  );
+
+  // 端到端 2：**同主题 + 否定词**（更贴近真实措辞）-> 也必须排除
+  //    ⚠️ 注意：单纯"包含"（`室友必须能一起抽烟` ⊃ `抽烟`）按语委口径**不算**冲突，
+  //    所以这里用「必须不抽烟」（带否定词）来触发，而不是靠包含
+  const themePost = svc.createPost({
+    author_handle: "同主题作者",
+    kind: "roommate",
+    profile: postProfile,
+  });
+  const negHit = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者C",
+    kind: "roommate",
+    text_profile: `${MATCH_TEXT}；室友必须不抽烟`,
+  });
+  assert.equal(negHit.ok, true, JSON.stringify(negHit.error));
+  assert.ok(
+    !negHit.data.candidates.some((c) => c.post_id === themePost.post_id),
+    "同主题 + 否定词必须排除",
+  );
+  const keep = await callTool("buddy_search", {
+    seeker_handle: "同词寻找者D",
+    kind: "roommate",
+    text_profile: MATCH_TEXT,
+  });
+  assert.equal(keep.ok, true, JSON.stringify(keep.error));
+  assert.ok(
+    keep.data.candidates.some((c) => c.post_id === themePost.post_id),
+    "不带否定句时应命中该帖（否则就是误否决）",
   );
 });
 
