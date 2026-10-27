@@ -1,31 +1,29 @@
-# 分支：main
+# 分支：feat/m4-schedule
 
 ## 本分支做什么
-主分支。**只接受 PR**，不直接推。当前已包含 T0 骨架与核心层（由 `feat/core` 合入）。
+**M4 日程与主动提醒**（全站合规最敏感）：字段白名单 + 禁字段黑名单**双层防御**、脱敏审计、MCP 4 个工具、`GET/POST /api/schedule` + `GET /api/scrub/audit`、`scripts/reminder.js`、`static/schedule.html`。
 
 ## 依赖什么
-- 无（这是基准分支）
+- `contracts/core.md`、`contracts/m4-schedule.md`、`tasks/M4-日程提醒.md`
+- T0 骨架已合入 `main`；`config/periods.json`（节次→时刻）已就位
 
 ## 完成标准
-- 所有模块分支的验收清单合并后，`npm start` + `npm run seed` + `npm test` + `npm run smoke` 全绿
-- 部署站点 `https://demo.knowingly.dpdns.org` 可用
+`contracts/m4-schedule.md` §9 自测清单全部勾上，特别是：
+- 绕过 schema 直调 service 仍被 `scrub.js` 拦下
+- `scrub_audit.dropped_fields` **只有字段名、无任何值**
+- 全仓 `grep -ri upload` 找不到课表上传接口
 
 ## 不能碰什么
-- ⛔ 不许直接 push（必须走 PR）
-- ⛔ 不许把 `.env` / `*.db` / `node_modules` 提交进来
+- `src/db/schema.sql`、`contracts/` 下任何文件
+- ⛔ **任何形式的课表文件上传接口或按钮** · 代用户登录学校系统拉课表
+- ⛔ `schedule_items` 出现白名单外字段 · `scrub_audit` 记录任何字段值
+- ⛔ 用 SSE 长连接做提醒 · 只靠 schema 防御而 service 层不二次扫描
 
 ## 当前进度
-- [x] T0 骨架与核心（`feat/core`）：目录结构、`package.json`、`schema.sql`、DB 初始化、
-      auth/ratelimit 中间件、`GET /api/health`、`POST /mcp`（initialize / tools/list / tools/call）、
-      `npm run seed`、`npm run smoke`、`npm test`
-- [x] G0 协作文件：`.gitignore`、`.env.example`、PR 模板、`CONTRIBUTING.md`、7 个分支与各自 `BRANCH.md`
-- [ ] M1 代取撮合（`feat/m1-takeout`）
-- [ ] M2 搭子匹配（`feat/m2-buddy`）
-- [ ] M3 迎新导览（`feat/m3-welcome`）
-- [ ] M4 日程与提醒（`feat/m4-schedule`）
-- [ ] F0 门户与 `/agent` 页（`feat/frontend`）
-- [ ] 参赛材料（`docs/materials`）
-
-## 合并完成后要做的两件事（仓库管理员）
-1. `main` 开分支保护（Settings → Branches），禁止直接 push
-2. 给对方 GitHub 账号加 Write 权限（Settings → Collaborators）
+- [ ] `src/services/scrub.js` ⭐（黑名单 + 二次扫描 + 审计写入）
+- [ ] `src/services/schedule.js`（导入前先清旧数据）
+- [ ] MCP 4 工具注册与 handler
+- [ ] `src/api/routes.js` 3 条路由（含 `/api/scrub/audit`）
+- [ ] `scripts/reminder.js` 定时提醒计算
+- [ ] `static/schedule.html` 5 区块（导入指引必须显眼）
+- [ ] `fixtures/schedule.json` ≥20 条 + 恶意请求测试用例
