@@ -78,6 +78,23 @@ tar -tf .\源码.zip | Select-String -Pattern '\.env$|\.db$|node_modules|\.git/'
 | ZIP 内含 `materials/` 且根前缀 `beimingda/` | ⏳ 待填（期望：**有**） |
 | 投递方式 | 以组委会通知为准（移动云盘 / 指定表单），**不留 GitHub 链接当提交** |
 
+### 4.1 预演导出记录（2026-10-27 21:57，**非最终包**）
+
+为提前验证导出链路，做了一次"预合并树"导出（`main` + PR #15「收尾修复」 + PR #16「本材料」在本地临时分支合并后导出；**这两个 PR 尚未合并进 main**，故不是最终交付包）：
+
+| 项 | 结果 |
+|---|---|
+| 导出命令 | `git archive --format=zip --prefix=beimingda/ -o beimingda-源码-20261027-2157.zip HEAD` |
+| ZIP 大小 / 条目 | **0.35 MB / 135 条目** |
+| `.env` / `*.db` / `node_modules/` / `.git/` | ✅ **无** |
+| 根前缀 `beimingda/` | ✅ 135 条全部符合 |
+| 含 `materials/` | ✅ 7 条（4 份材料 + README + 截图清单 + 目录） |
+| 中文文件名 | ✅ 正常（`01-作品说明书.md`、`pano/HOWTO-补全景.md` 等均完好） |
+| 真实令牌 / 红线词 / 乱码扫描 | ✅ 无真实令牌；`ATrust`/`校园网账号` 命中项**全部是"不收集…"的禁止性声明**；手机号形态命中项为 `tests/` 里的假号码（用于验证打码）与 `pannellum.js` 的 PI 常量 |
+
+> ⚠️ **最终包**必须在 PR #15 / #16 合并进 `main` 后、用上面 §4 的命令从 `main` 重新导出一次，再回来把本表上半部分的 ⏳ 填掉。
+
+
 > ZIP 与截图**都不进仓库**；`.gitignore` 已覆盖 `.env`、`*.db`、`node_modules/`，并建议补 `materials/*.zip`。
 
 ---
