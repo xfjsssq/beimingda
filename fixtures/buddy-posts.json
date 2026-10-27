@@ -1,0 +1,26 @@
+{
+  "_comment": "⭐ 占位示例，M2 分支必须补到 ≥10 条、覆盖 5 种 kind，并故意构造 must_have vs deal_breaker 语义冲突的组合。profile 结构照抄 contracts/m2-buddy.md §1 的 11 字段。",
+  "posts": [
+    {
+      "id": "demo-post-1",
+      "author_handle": "同学A",
+      "kind": "study",
+      "profile": {
+        "kind": "study",
+        "grade": "大二",
+        "major_group": "工科",
+        "schedule": {
+          "early_bird": 0.3,
+          "weekend_free": 0.8,
+          "busy_slots": [{ "weekday": 3, "period_start": 1, "period_end": 2 }]
+        },
+        "interests": ["算法", "摄影"],
+        "traits": { "chatty": 0.4, "planner": 0.7, "tidy": 0.6 },
+        "wanted": "想找一起刷算法题的同学，晚上七点后有空",
+        "must_have": ["安静，不半夜吵闹"],
+        "deal_breaker": ["凌晨打游戏外放"]
+      },
+      "raw_status": "open"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+{
+  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 场景由 feat/m3-welcome 分支补齐，图片放 pano/ 并压到单张 ≤2MB。",
+  "default": { "firstScene": "dorm-12", "sceneFadeDuration": 800 },
+  "scenes": {}
+}

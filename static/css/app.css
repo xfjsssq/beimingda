@@ -1,0 +1,15 @@
+/* 占位样式（骨架阶段）—— 正式视觉规范由 feat/frontend 分支在 static/css/app.css 实现
+   视觉规范（contracts/frontend.md §4）：
+     主色 #1F4E8C ｜ 辅助 #2E8B76 ｜ 警示 #C0392B
+     背景 #F5F7FA ｜ 卡片白底 + 12px 圆角 + 轻投影
+     @media (max-width: 768px) 卡片单列、导航收成底部 tab
+   ⛔ 不许依赖任何外部 CDN。 */
+:root {
+  --color-primary: #1F4E8C;
+  --color-success: #2E8B76;
+  --color-danger: #C0392B;
+  --color-bg: #F5F7FA;
+  --radius-card: 12px;
+  --font-cn: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: Consolas, "Courier New", monospace;
+}

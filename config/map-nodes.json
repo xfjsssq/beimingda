@@ -1,0 +1,60 @@
+{
+  "_comment": "校园地图节点（冻版结构）。⚠️ 经纬度为占位示例，M3 分支必须实地测量后替换为真实值；楼栋 label 必须与 M1 的 from_building/to_building 规范名一致。pano_url 为 null 表示该点暂无实景，前端必须如实提示。",
+  "nodes": [
+    {
+      "id": "dorm-12",
+      "label": "12号宿舍楼",
+      "category": "dorm",
+      "lat": 0.0,
+      "lng": 0.0,
+      "pano_url": null,
+      "pano_yaw": 180,
+      "desc": "占位节点：位于校园东侧，紧邻第二食堂，楼下有快递驿站。",
+      "sort": 10
+    },
+    {
+      "id": "dorm-15",
+      "label": "15号宿舍楼",
+      "category": "dorm",
+      "lat": 0.0,
+      "lng": 0.0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "占位节点：与 12 号楼同片区。",
+      "sort": 20
+    },
+    {
+      "id": "canteen-2",
+      "label": "第二食堂",
+      "category": "canteen",
+      "lat": 0.0,
+      "lng": 0.0,
+      "pano_url": null,
+      "pano_yaw": 90,
+      "desc": "占位节点：两层，午高峰 12:00-12:40。",
+      "sort": 30
+    },
+    {
+      "id": "gate-south",
+      "label": "南门",
+      "category": "gate",
+      "lat": 0.0,
+      "lng": 0.0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "占位节点：外卖与快递集散点。",
+      "sort": 40
+    },
+    {
+      "id": "service-express",
+      "label": "快递驿站",
+      "category": "service",
+      "lat": 0.0,
+      "lng": 0.0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "占位节点：代取任务的主要取件点。",
+      "sort": 50
+    }
+  ]
+}

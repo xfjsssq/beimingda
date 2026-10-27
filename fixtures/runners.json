@@ -1,0 +1,14 @@
+{
+  "_comment": "⭐ 占位示例，M1 分支必须补到 ≥6 名跑腿者。time_windows 可写 start_iso/end_iso 或 *_in_minutes（相对当前时间）。",
+  "runners": [
+    {
+      "id": "demo-runner-1",
+      "user_handle": "同学B",
+      "contact_code": "demo-contact-1",
+      "reachable_buildings": ["15号宿舍楼", "12号宿舍楼"],
+      "reward_floor": 2,
+      "time_windows": [{ "start_in_minutes": -30, "end_in_minutes": 240 }],
+      "active": true
+    }
+  ]
+}

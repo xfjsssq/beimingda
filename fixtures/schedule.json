@@ -1,0 +1,16 @@
+{
+  "_comment": "⭐ 占位示例，M4 分支必须补到 ≥20 条虚构课表。⛔ 只允许出现白名单 6 字段（weekday/period_start/period_end/title/room/weeks）+ remind_before，绝不出现姓名/学号/教师名。",
+  "items": [
+    {
+      "id": "demo-sched-1",
+      "user_handle": "同学A",
+      "weekday": 3,
+      "period_start": 3,
+      "period_end": 4,
+      "title": "数据结构",
+      "room": "教学楼A-201",
+      "weeks": "1-16",
+      "remind_before": 120
+    }
+  ]
+}

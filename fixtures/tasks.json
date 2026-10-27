@@ -1,0 +1,18 @@
+{
+  "_comment": "⭐ 占位示例，M1 分支必须补到：≥8 条任务 + 故意构造'匹配/不匹配'两类样本。owner_handle 一律用'同学A/同学B'这类假名。deadline 可写 deadline_iso / deadline_in_minutes（相对当前时间）。",
+  "tasks": [
+    {
+      "id": "demo-task-1",
+      "owner_handle": "同学A",
+      "from_building": "12号宿舍楼",
+      "to_building": "15号宿舍楼",
+      "station": "快递驿站",
+      "deadline_in_minutes": 360,
+      "reward_min": 3,
+      "reward_max": 5,
+      "note": "小件，两个包裹",
+      "screenshot_path": null,
+      "raw_status": "open"
+    }
+  ]
+}

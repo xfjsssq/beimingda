@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>北名大小助手 · 骨架就绪</title>
+  <style>
+    :root { --pri:#1F4E8C; --ok:#2E8B76; --bg:#F5F7FA; }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:#1c1c1e;
+      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+    main { max-width:860px; margin:0 auto; padding:32px 20px 64px; }
+    h1 { color:var(--pri); font-size:24px; margin:0 0 8px; }
+    .sub { color:#5b6470; margin:0 0 24px; }
+    .card { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px;
+      box-shadow:0 1px 3px rgba(16,24,40,.08); }
+    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); }
+    code, pre { font-family:Consolas,"Courier New",monospace; font-size:13px; }
+    pre { background:#0f172a; color:#e2e8f0; padding:12px 14px; border-radius:8px; overflow:auto; }
+    .tag { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px;
+      background:rgba(46,139,118,.12); color:var(--ok); margin-left:6px; }
+    ul { margin:8px 0 0; padding-left:20px; }
+    a { color:var(--pri); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>北名大小助手 <span class="tag">骨架已就绪</span></h1>
+  <p class="sub">把散落的校园服务，收进一个对话。</p>
+
+  <div class="card">
+    <h2>这一页是占位页，不是最终首页</h2>
+    <p>最终门户首页由 <code>feat/frontend</code> 分支交付（<code>contracts/frontend.md</code> 规定 4 个区块）。
+       本文件只保证骨架阶段 <code>GET /</code> 不 404。</p>
+  </div>
+
+  <div class="card">
+    <h2>骨架自检</h2>
+    <pre>curl -s http://127.0.0.1:3000/api/health
+curl -s -X POST http://127.0.0.1:3000/mcp \
+  -H "Authorization: Bearer $DEMO_TOKEN" -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'</pre>
+    <p id="health">正在探测 /api/health …</p>
+  </div>
+
+  <div class="card">
+    <h2>六个页面的路由（最终形态）</h2>
+    <ul>
+      <li><code>/</code> 门户首页 · <code>feat/frontend</code></li>
+      <li><code>/takeout</code> 代取看板 · <code>feat/m1-takeout</code></li>
+      <li><code>/buddy</code> 搭子墙 · <code>feat/m2-buddy</code></li>
+      <li><code>/welcome</code> 迎新地图 · <code>feat/m3-welcome</code></li>
+      <li><code>/schedule</code> 日程表 · <code>feat/m4-schedule</code></li>
+      <li><code>/agent</code> ⭐ 评委核心页 · <code>feat/frontend</code></li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>协作</h2>
+    <p>分支与 PR 规范见仓库根 <code>CONTRIBUTING.md</code> 与 <code>BRANCH.md</code>；
+       需求契约见 <code>contracts/</code>；任务卡见 <code>tasks/</code>。</p>
+  </div>
+</main>
+<script src="/config.js"></script>
+<script>
+  fetch("/api/health").then(r => r.json()).then(j => {
+    document.getElementById("health").textContent =
+      j.ok ? "✅ /api/health 正常：" + JSON.stringify(j.data) : "❌ 异常：" + JSON.stringify(j);
+  }).catch(e => { document.getElementById("health").textContent = "❌ " + e.message; });
+</script>
+</body>
+</html>

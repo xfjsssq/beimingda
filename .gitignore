@@ -1,0 +1,36 @@
+# ---- 密钥 / 环境（⛔ 第一次 commit 之前就必须存在本文件） ----
+.env
+*.env
+!.env.example
+
+# ---- 依赖与产物 ----
+node_modules/
+dist/
+build/
+
+# ---- 数据库（演示数据可重建，不进版本库） ----
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+data/
+
+# ---- 平台垃圾文件 ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- 日志 ----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- 上传目录（代取截图打码后落盘处） ----
+static/uploads/
+static/uploads/*
+
+# ---- 侦察 / 临时目录（历史命名，保留） ----
+_recon/
+.tmp/
+tmp/
