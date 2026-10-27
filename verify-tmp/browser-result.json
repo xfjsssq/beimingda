@@ -1,0 +1,323 @@
+{
+  "pass": 12,
+  "fail": 2,
+  "results": [
+    {
+      "id": "BR-index",
+      "title": "/ 在 375px 下不破版（布局宽度=375、无溢出元素）、无外部资源、无 4xx 页面资源",
+      "ok": false,
+      "evidence": "innerWidth=375 scrollWidth=375 bodyScrollWidth=375（>375 即为被撑破/缩放）溢出元素=[] 外部资源=[] 4xx=[\"404 http://127.0.0.1:3185/schedule\",\"404 http://127.0.0.1:3185/favicon.ico\"] console错误=[\"Failed to load resource: the server responded with a status of 404 (Not Found)\",\"Failed to load resource: the server responded with a status of 404 (Not Found)\"]"
+    },
+    {
+      "id": "BR-takeout",
+      "title": "/takeout 在 375px 下不破版（布局宽度=375、无溢出元素）、无外部资源、无 4xx 页面资源",
+      "ok": true,
+      "evidence": "innerWidth=375 scrollWidth=375 bodyScrollWidth=375（>375 即为被撑破/缩放）溢出元素=[] 外部资源=[] 4xx=[] console错误=[]"
+    },
+    {
+      "id": "BR-buddy",
+      "title": "/buddy 在 375px 下不破版（布局宽度=375、无溢出元素）、无外部资源、无 4xx 页面资源",
+      "ok": true,
+      "evidence": "innerWidth=375 scrollWidth=375 bodyScrollWidth=375（>375 即为被撑破/缩放）溢出元素=[] 外部资源=[] 4xx=[] console错误=[]"
+    },
+    {
+      "id": "BR-welcome",
+      "title": "/welcome 在 375px 下不破版（布局宽度=375、无溢出元素）、无外部资源、无 4xx 页面资源",
+      "ok": true,
+      "evidence": "innerWidth=375 scrollWidth=375 bodyScrollWidth=375（>375 即为被撑破/缩放）溢出元素=[] 外部资源=[] 4xx=[] console错误=[]"
+    },
+    {
+      "id": "BR-agent",
+      "title": "/agent 在 375px 下不破版（布局宽度=375、无溢出元素）、无外部资源、无 4xx 页面资源",
+      "ok": false,
+      "evidence": "innerWidth=375 scrollWidth=375 bodyScrollWidth=375（>375 即为被撑破/缩放）溢出元素=[] 外部资源=[] 4xx=[\"404 http://127.0.0.1:3185/schedule\"] console错误=[\"Failed to load resource: the server responded with a status of 404 (Not Found)\"]"
+    },
+    {
+      "id": "BR-demo-index",
+      "title": "/?demo=1 → 演示模式徽章（应有）：count=5 visible=4",
+      "ok": true,
+      "evidence": "徽章元素数=5 可见=4 样例={\"tag\":\"HTML\",\"cls\":\"\",\"text\":\"北名大小助手 · 把散落的校园服务，收进一个对话\\n  \\n\\n北\",\"rect\":{\"x\":0,\"y\":0,\"width\":375,\"height\":2626.65625,\"top\":0,\"right\":375,\"bottom\":2626.65625,\"left\":0}}"
+    },
+    {
+      "id": "BR-demo-takeout",
+      "title": "/takeout?demo=1 → 演示模式徽章（本页未接 demo.js，记录现状）：count=2 visible=2",
+      "ok": true,
+      "evidence": "徽章元素数=2 可见=2 样例={\"tag\":\"HTML\",\"cls\":\"\",\"text\":\"代取撮合 · 北名大小助手\\n\\n\\n  :root { --pr\",\"rect\":{\"x\":0,\"y\":0,\"width\":375,\"height\":4816.453125,\"top\":0,\"right\":375,\"bottom\":4816.453125,\"left\":0}}"
+    },
+    {
+      "id": "BR-demo-buddy",
+      "title": "/buddy?demo=1 → 演示模式徽章（本页未接 demo.js，记录现状）：count=3 visible=2",
+      "ok": true,
+      "evidence": "徽章元素数=3 可见=2 样例={\"tag\":\"HTML\",\"cls\":\"\",\"text\":\"搭子墙 · 北名大小助手\\n  \\n  \\n    :root {\",\"rect\":{\"x\":0,\"y\":0,\"width\":375,\"height\":2761.3125,\"top\":0,\"right\":375,\"bottom\":2761.3125,\"left\":0}}"
+    },
+    {
+      "id": "BR-demo-welcome",
+      "title": "/welcome?demo=1 → 演示模式徽章（应有）：count=2 visible=2",
+      "ok": true,
+      "evidence": "徽章元素数=2 可见=2 样例={\"tag\":\"HTML\",\"cls\":\"\",\"text\":\"迎新导览 · 北名大小助手\\n  \\n  \\n    :root \",\"rect\":{\"x\":0,\"y\":0,\"width\":375,\"height\":806.15625,\"top\":0,\"right\":375,\"bottom\":806.15625,\"left\":0}}"
+    },
+    {
+      "id": "BR-demo-agent",
+      "title": "/agent?demo=1 → 演示模式徽章（应有）：count=4 visible=3",
+      "ok": true,
+      "evidence": "徽章元素数=4 可见=3 样例={\"tag\":\"HTML\",\"cls\":\"\",\"text\":\"接入 Agent · 把整个平台交给一句话 · 北名大小助手\",\"rect\":{\"x\":0,\"y\":0,\"width\":375,\"height\":3862.203125,\"top\":0,\"right\":375,\"bottom\":3862.203125,\"left\":0}}"
+    },
+    {
+      "id": "BR-agent-json",
+      "title": "/agent 页面上渲染出来的 MCP 配置：页面内 JSON.parse 通过、含 <DEMO_TOKEN>、无真实令牌",
+      "ok": true,
+      "evidence": "JSON.parse=通过 | Authorization=Bearer <DEMO_TOKEN> | url=http://127.0.0.1:3185/mcp | 真实令牌泄漏=false | 原样文本=\"{\\n  \\\"mcpServers\\\": {\\n    \\\"beimingda\\\": {\\n      \\\"url\\\": \\\"http://127.0.0.1:3185/mcp\\\",\\n      \\\"headers\\\": {\\n        \\\"Authorization\\\": \\\"Bearer <DEMO_TOKEN>\\\"\\n      }\\n    }\\n  }\\n}\""
+    },
+    {
+      "id": "BR-agent-copy",
+      "title": "/agent 复制按钮点击后有反馈（已复制 / 或退路提示）",
+      "ok": true,
+      "evidence": "#copy-state = \"MCP 配置复制被浏览器拦下（窗口未聚焦时常见），已替你选中全部内容，按 Ctrl/⌘+C 即可\""
+    },
+    {
+      "id": "BR-stats",
+      "title": "首页 4 个统计走真实 API：新发一条任务后刷新，开放任务数 +1（数字来自接口而非写死）",
+      "ok": true,
+      "evidence": "before={\"tasks\":{\"value\":\"13个\",\"src\":\"来源 /api/tasks?limit=200 · 20:52:42\"},\"runners\":{\"value\":\"9人\",\"src\":\"来源 /api/runners · 20:52:42\"},\"buddies\":{\"value\":\"13条\",\"src\":\"来源 /api/buddies · 20:52:42\"},\"score\":{\"value\":\"99.5分\",\"src\":\"来源 /api/matches · 20:52:42\"}} | after={\"tasks\":{\"value\":\"14个\",\"src\":\"来源 /api/tasks?limit=200 · 20:52:44\"},\"runners\":{\"value\":\"9人\",\"src\":\"来源 /api/runners · 20:52:44\"},\"buddies\":{\"value\":\"—\",\"src\":\"触发限频（单 IP 60 次/分钟）· 稍等一下再点「刷新统计」\"},\"score\":{\"value\":\"—\",\"src\":\"触发限频（单 IP 60 次/分钟）· 稍等一下再点「刷新统计」\"}} | 解析后 13 → 14"
+    },
+    {
+      "id": "BR-schedule",
+      "title": "/schedule 现状记录（导航与首页都有该链接）",
+      "ok": true,
+      "evidence": "title=\"\" 正文前 200 字=\"{\\\"ok\\\":false,\\\"data\\\":null,\\\"error\\\":{\\\"code\\\":\\\"NOT_FOUND\\\",\\\"message\\\":\\\"not found\\\"}}\""
+    }
+  ],
+  "pageData": {
+    "index": {
+      "url": "/",
+      "title": "北名大小助手 · 把散落的校园服务，收进一个对话",
+      "status": "complete",
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowElements": [],
+      "resources": [
+        "http://127.0.0.1:3185/css/app.css",
+        "http://127.0.0.1:3185/config.js",
+        "http://127.0.0.1:3185/js/api.js",
+        "http://127.0.0.1:3185/js/nav.js",
+        "http://127.0.0.1:3185/js/demo.js",
+        "http://127.0.0.1:3185/takeout",
+        "http://127.0.0.1:3185/buddy",
+        "http://127.0.0.1:3185/welcome",
+        "http://127.0.0.1:3185/schedule",
+        "http://127.0.0.1:3185/",
+        "http://127.0.0.1:3185/agent",
+        "http://127.0.0.1:3185/api/health",
+        "http://127.0.0.1:3185/api/tasks?limit=200",
+        "http://127.0.0.1:3185/api/runners",
+        "http://127.0.0.1:3185/api/buddies",
+        "http://127.0.0.1:3185/api/matches",
+        "http://127.0.0.1:3185/favicon.ico"
+      ],
+      "text": "北\n北名大小助手\n🏠\n首页\n📦\n代取\n🤝\n搭子\n🗺️\n导览\n⏰\n日程\n即将上线\n🔌\nAgent\n北名大小助手 ｜ 把散落的校园服务，收进一个对话\n\n取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。 我们把它们做成一个平台，并把平台能力用 MCP 开放给 WorkBuddy：不用装 App、不用记网址， 在对话框里说一句话就能办事。\n\n看怎么接入 Agent（评委页）\n看看四个功能\n2\n四个功能，一个入口\n📦\n代取撮合\n\n发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。\n\n进入代取看板\n🤝\n搭子匹",
+      "external": [],
+      "consoleErrs": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)",
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "badHttp": [
+        "404 http://127.0.0.1:3185/schedule",
+        "404 http://127.0.0.1:3185/favicon.ico"
+      ],
+      "shot": "C:\\Users\\17768\\.dsh\\bot\\workspace\\bm\\fixes\\verify-tmp\\shot-375-index.png",
+      "demoBadge": {
+        "count": 5,
+        "visible": 4,
+        "sample": {
+          "tag": "HTML",
+          "cls": "",
+          "text": "北名大小助手 · 把散落的校园服务，收进一个对话\n  \n\n北",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 375,
+            "height": 2626.65625,
+            "top": 0,
+            "right": 375,
+            "bottom": 2626.65625,
+            "left": 0
+          }
+        }
+      }
+    },
+    "takeout": {
+      "url": "/takeout",
+      "title": "代取撮合 · 北名大小助手",
+      "status": "complete",
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowElements": [],
+      "resources": [
+        "http://127.0.0.1:3185/config.js",
+        "http://127.0.0.1:3185/api/map/nodes",
+        "http://127.0.0.1:3185/js/demo.js",
+        "http://127.0.0.1:3185/js/api.js",
+        "http://127.0.0.1:3185/api/tasks?limit=20&building=12%E5%8F%B7%E5%AE%BF%E8%88%8D%E6%A5%BC"
+      ],
+      "text": "代取撮合 · 北名大小助手\n\n发布取件需求 → 跑腿者登记能力 → 撮合引擎按「可达性 40 / 时间 30 / 报酬 30」打分，只推 ≥60 分的候选人。\n\n1\n发布任务\n你的昵称（本站只收昵称，不收姓名/学号/手机号）\n取件楼栋\n12号宿舍楼\n15号宿舍楼\n3号宿舍楼\n送达楼栋\n12号宿舍楼\n15号宿舍楼\n3号宿舍楼\n快递站\n截止时间\n报酬下限（元）\n报酬上限（元）\n发布任务\n报酬由双方线下协商，平台不参与交易、不代收款。\n备注（入库前自动打码手机号 / 超长单号）\n截图（可选）\n识别截图字段\n原图不落盘；只做字段理解，不抽取收件人姓名 / 手机号 / 运单号。\n2\n跑腿登记\n你的昵称\n",
+      "external": [],
+      "consoleErrs": [],
+      "badHttp": [],
+      "shot": "C:\\Users\\17768\\.dsh\\bot\\workspace\\bm\\fixes\\verify-tmp\\shot-375-takeout.png",
+      "demoBadge": {
+        "count": 2,
+        "visible": 2,
+        "sample": {
+          "tag": "HTML",
+          "cls": "",
+          "text": "代取撮合 · 北名大小助手\n\n\n  :root { --pr",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 375,
+            "height": 4816.453125,
+            "top": 0,
+            "right": 375,
+            "bottom": 4816.453125,
+            "left": 0
+          }
+        }
+      }
+    },
+    "buddy": {
+      "url": "/buddy",
+      "title": "搭子墙 · 北名大小助手",
+      "status": "complete",
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowElements": [],
+      "resources": [
+        "http://127.0.0.1:3185/config.js",
+        "http://127.0.0.1:3185/api/buddies/mine?handle=%E5%90%8C%E5%AD%A6A",
+        "http://127.0.0.1:3185/js/demo.js",
+        "http://127.0.0.1:3185/js/api.js"
+      ],
+      "text": "搭子墙 双向同意才可见\n\n学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。\n\n我的身份（只填匿名昵称）\n匿名昵称（如 同学A）\n演示令牌（仅发布需要，写入接口 X-Demo-Token）\n\n⛔ 本页不收集姓名 / 学号 / 手机号 / 邮箱。令牌只存在你本机浏览器 localStorage，不硬编码在页面里。\n\n1\n发布搭子帖\n类型\n学习\n室友\n项目\n运动\n其他\n照片（可选，仅本地预览）\n用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点\n\n照片不参与评分、也不会上传（服",
+      "external": [],
+      "consoleErrs": [],
+      "badHttp": [],
+      "shot": "C:\\Users\\17768\\.dsh\\bot\\workspace\\bm\\fixes\\verify-tmp\\shot-375-buddy.png",
+      "demoBadge": {
+        "count": 3,
+        "visible": 2,
+        "sample": {
+          "tag": "HTML",
+          "cls": "",
+          "text": "搭子墙 · 北名大小助手\n  \n  \n    :root {",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 375,
+            "height": 2761.3125,
+            "top": 0,
+            "right": 375,
+            "bottom": 2761.3125,
+            "left": 0
+          }
+        }
+      }
+    },
+    "welcome": {
+      "url": "/welcome",
+      "title": "迎新导览 · 北名大小助手",
+      "status": "complete",
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowElements": [],
+      "resources": [
+        "http://127.0.0.1:3185/vendor/pannellum/pannellum.css",
+        "http://127.0.0.1:3185/map/campus-map.svg",
+        "http://127.0.0.1:3185/config.js",
+        "http://127.0.0.1:3185/vendor/pannellum/pannellum.js",
+        "http://127.0.0.1:3185/api/map/nodes",
+        "http://127.0.0.1:3185/map/map-bg.json",
+        "http://127.0.0.1:3185/pano/manifest.json"
+      ],
+      "text": "迎新导览 · 校园地图\n\n点击地图上的标记，可以先看看那里长什么样 —— 宿舍楼、食堂、教学楼、校门、快递驿站都在这里。\n\n全部\n宿舍楼\n食堂\n教学与自习\n校门\n服务设施\n标点位用左侧截图底图（离线可用）；想看真实卫星图 →\n在高德地图查看真实卫星图（需联网）\n\n底图为手机地图截图（示意，非在线地图服务） · 共 0 个点位，其中 0 个已拍摄 360° 实景\n\n选一个地点\n\n左侧地图上的每个彩色圆点都是一个位置。点一下，这里会显示它的位置说明； 如果有 360° 实景，会出现「查看 360° 实景」按钮。\n\n节点数据未加载（后端 /api/map/nodes 未就绪？先跑 npm run s",
+      "external": [],
+      "consoleErrs": [],
+      "badHttp": [],
+      "demoBadge": {
+        "count": 2,
+        "visible": 2,
+        "sample": {
+          "tag": "HTML",
+          "cls": "",
+          "text": "迎新导览 · 北名大小助手\n  \n  \n    :root ",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 375,
+            "height": 806.15625,
+            "top": 0,
+            "right": 375,
+            "bottom": 806.15625,
+            "left": 0
+          }
+        }
+      }
+    },
+    "agent": {
+      "url": "/agent",
+      "title": "接入 Agent · 把整个平台交给一句话 · 北名大小助手",
+      "status": "complete",
+      "innerWidth": 375,
+      "scrollWidth": 375,
+      "bodyScrollWidth": 375,
+      "overflowElements": [],
+      "resources": [
+        "http://127.0.0.1:3185/css/app.css",
+        "http://127.0.0.1:3185/config.js",
+        "http://127.0.0.1:3185/js/api.js",
+        "http://127.0.0.1:3185/js/nav.js",
+        "http://127.0.0.1:3185/js/demo.js",
+        "http://127.0.0.1:3185/js/mcp-config.js",
+        "http://127.0.0.1:3185/",
+        "http://127.0.0.1:3185/takeout",
+        "http://127.0.0.1:3185/buddy",
+        "http://127.0.0.1:3185/welcome",
+        "http://127.0.0.1:3185/schedule",
+        "http://127.0.0.1:3185/agent",
+        "http://127.0.0.1:3185/mcp"
+      ],
+      "text": "北\n北名大小助手\n🏠\n首页\n📦\n代取\n🤝\n搭子\n🗺️\n导览\n⏰\n日程\n即将上线\n🔌\nAgent\n把整个平台，交给一句话\n\n北名大小助手把代取、搭子、导览、日程四件事做成了平台，同时把平台能力通过 MCP （远程 Streamable HTTP）开放给 WorkBuddy： 用对话即可操控整个平台 —— 不用装 App、不用记网址、不用点按钮， 在 WorkBuddy 里接一次，之后说话就行。\n\n远程 URL 型 · 零配置接入\n14 个 MCP 工具\n无本地 stdio · 无 SSE 长连接\n2\n一键复制的 MCP 配置\n\n端点：http://127.0.0.1:3185/mcp ",
+      "external": [],
+      "consoleErrs": [
+        "Failed to load resource: the server responded with a status of 404 (Not Found)"
+      ],
+      "badHttp": [
+        "404 http://127.0.0.1:3185/schedule"
+      ],
+      "shot": "C:\\Users\\17768\\.dsh\\bot\\workspace\\bm\\fixes\\verify-tmp\\shot-375-agent.png",
+      "demoBadge": {
+        "count": 4,
+        "visible": 3,
+        "sample": {
+          "tag": "HTML",
+          "cls": "",
+          "text": "接入 Agent · 把整个平台交给一句话 · 北名大小助手",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 375,
+            "height": 3862.203125,
+            "top": 0,
+            "right": 375,
+            "bottom": 3862.203125,
+            "left": 0
+          }
+        }
+      },
+      "shot2": "C:\\Users\\17768\\.dsh\\bot\\workspace\\bm\\fixes\\verify-tmp\\shot-375-agent-copied.png"
+    }
+  }
+}

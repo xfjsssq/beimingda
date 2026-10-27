@@ -37,6 +37,21 @@
     .ok { color:var(--ok); } .bad { color:#B91C1C; }
     .pill { display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px;
       background:rgba(31,78,140,.1); color:var(--pri); margin-left:6px; }
+    /* ⚠️ 7 列 × 节次的周课表在窄屏必然放进 375px：
+       ① 表格包在可横向滚动的容器里（表格自身宽度由内容决定，不能指望它收缩）
+       ② 窄屏再降一档字号/内边距，绝大多数情况无需滚动 */
+    #gridWrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    #gridWrap table { min-width:0; }
+    @media (max-width:640px) {
+      main { padding:16px 12px 56px; }
+      .card { padding:12px 12px; }
+      table { font-size:12px; }
+      th, td { padding:5px 4px; }
+      .grid td { height:34px; }
+      .slot { font-size:11px; padding:2px 4px; }
+      input[type="text"] { min-width:0; width:100%; }
+      input[type="number"] { width:88px; }
+    }
   </style>
 </head>
 <body>
@@ -120,6 +135,11 @@
 </main>
 
 <script src="/config.js"></script>
+<script>
+  /* ?demo=1 演示模式（contracts/frontend.md §5）：/js/demo.js 是 ES module，
+     由 F0 分支提供；未就绪时 import 失败不影响本页其余功能。⛔ 本页不读也不显示令牌。 */
+  import("/js/demo.js").then(function (m) { if (m && m.initDemo) m.initDemo(); }).catch(function () {});
+</script>
 <script>
 (function () {
   var WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];

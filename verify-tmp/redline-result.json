@@ -1,0 +1,108 @@
+{
+  "pass": 17,
+  "fail": 0,
+  "results": [
+    {
+      "id": "R1",
+      "title": "MCP tools/list 实际工具数（页面/文档宣称 14）",
+      "ok": true,
+      "evidence": "live tools/list = 10 个：[\"task_parse_screenshot\",\"task_publish\",\"runner_register\",\"match_find_for_task\",\"task_list_open\",\"buddy_publish\",\"buddy_search\",\"buddy_consent\",\"map_list_nodes\",\"map_get_node\"]\n      按模块={\"m1\":5,\"m2\":3,\"m3\":2} | mcp-config.js 宣称 count=count: 5,count: 3,count: 2,count: 4 → 合计 14 | 差集（宣称但 live 没有）=[\"schedule_import\",\"schedule_add\",\"schedule_query\",\"schedule_remove\"]"
+    },
+    {
+      "id": "R1b",
+      "title": "live tools/list 全部 additionalProperties:false",
+      "ok": true,
+      "evidence": "违规=[]"
+    },
+    {
+      "id": "R1c",
+      "title": "MCP 端点无令牌被拒（鉴权只认 DEMO_TOKEN）",
+      "ok": true,
+      "evidence": "{\"ok\":false,\"data\":null,\"error\":{\"code\":\"SCHEMA_REJECTED\",\"message\":\"invalid or missing DEMO_TOKEN\"}}"
+    },
+    {
+      "id": "R1d",
+      "title": "MCP tools/call 实调返回信封",
+      "ok": true,
+      "evidence": "isError=false structuredContent.ok=true count=3"
+    },
+    {
+      "id": "R2",
+      "title": "GET /api/runners 不含 user_id / contact_code；GET /api/buddies 不含 user_id；接口层无身份字段",
+      "ok": true,
+      "evidence": "runners 字段=[\"runner_id\",\"user_handle\",\"reachable_buildings\",\"reward_floor\",\"time_windows\",\"active\"] | buddies 字段=[\"post_id\",\"anon_token\",\"kind\",\"profile\",\"created_at\"] | 命中 user_id/contact_code=false/false; buddies.user_id=false"
+    },
+    {
+      "id": "R2b",
+      "title": "接口返回里无手机号 / 学号 / 宿舍号",
+      "ok": true,
+      "evidence": "扫了 3 个接口，0 命中"
+    },
+    {
+      "id": "R3",
+      "title": "M1 HTTP 4 路由 + 令牌门禁 + 5 分钟去重（HTTP 路径）+ 404 信封 + reason=score",
+      "ok": true,
+      "evidence": "MCP 登记 runner=runner_9be06250-d33d-4da4-aada-f513cffa0ba2 | GET /api/tasks ok=true(3条) | POST 无令牌=SCHEMA_REJECTED | POST 带令牌 task=task_9a772e86-0b7e-4255-b1b9-6df3f2e7ade0 | GET 详情 ok=true | 不存在 id → HTTP 404 {\"code\":\"NOT_FOUND\",\"message\":\"task not found: task_does_not_exist\"} | POST match 无令牌=SCHEMA_REJECTED | 第1次 pushed=true score=100 | 第2次 pushed=false skip_reason=\"同一跑腿者 5 分钟内已推送过该任务\" | 全部 reason 分对齐=true\n      第1次完整条目={\"runner_id\":\"runner_9be06250-d33d-4da4-aada-f513cffa0ba2\",\"runner_handle\":\"HTTP去重跑腿\",\"score\":100,\"reason\":\"可达 15号宿舍楼(+40)，时段完全覆盖(+30)，报酬 5元 vs 下限 1元(+30)\",\"pushed\":true,\"match_id\":\"match_2f082ae6-98b5-4113-b8fe-edf6085977a7\",\"state\":\"pushed\",\"skip_reason\":null}"
+    },
+    {
+      "id": "R3b",
+      "title": "（观察项）楼栋名未按 config/map-nodes.json 的规范名校验：写错也能发布成功，且永远匹配不到人",
+      "ok": true,
+      "evidence": "发布 \"12号楼\"→\"15号楼\" 成功=true task=task_e12fa4b4-552a-47d2-8baa-e064564dcaad；对它撮合返回 0 条候选（规范名 \"12号宿舍楼\"/\"15号宿舍楼\" 时同一 runner 是能匹配的）"
+    },
+    {
+      "id": "R4",
+      "title": "M2 HTTP 2 路由：GET /api/buddies（只回 anon_token）/ POST /api/buddies（需令牌 + additionalProperties:false）",
+      "ok": true,
+      "evidence": "GET ok=true 条数=11 首条={\"post_id\":\"demo-buddy-11\",\"anon_token\":\"anon_9a7b2d5e0c38\",\"kind\":\"other\",\"profile\":{\"kind\":\"other\",\"grade\":\"研二\",\"major_group\":\"文科\",\"schedule\":{\"early_bird\":0.45,\"weekend_free\":0.4,\"busy_slots\":[{\"we | POST 无令牌=SCHEMA_REJECTED | POST 带令牌 anon_token=anon_637ad2e13d77 | 多传字段=SCHEMA_REJECTED"
+    },
+    {
+      "id": "R5",
+      "title": "contracts/ 、src/db/schema.sql、src/util/*、src/middleware/* 在所有分支与集成 HEAD 上均未被改动",
+      "ok": true,
+      "evidence": "{\n \"verify\": \"(无改动)\",\n \"m1\": \"(无改动)\",\n \"m2\": \"(无改动)\",\n \"f0\": \"(无改动)\",\n \"m3\": \"(无改动)\"\n}"
+    },
+    {
+      "id": "R5b",
+      "title": "tests/skeleton.test.js 唯一例外：SHA256 前 16 位 = E092CA0D10683F77",
+      "ok": true,
+      "evidence": "实际 E092CA0D10683F77 | diff: tests/skeleton.test.js | 14 +++++++++++++-\n 1 file changed, 13 insertions(+), 1 deletion(-) | 其他受限路径：verify=(无改动) ; m1=(无改动) ; m2=(无改动) ; f0=(无改动) ; m3=(无改动)"
+    },
+    {
+      "id": "R6",
+      "title": "源码/静态页/fixtures 无硬编码密钥；演示令牌只出现在 .env（与 /config.js 的运行时注入）",
+      "ok": true,
+      "evidence": "可疑命中（生产代码/页面/fixtures）=[] | 仅测试桩命中（非密钥）=[\"tests/f0-frontend.test.js:Bearer injected-from-server\"] | 令牌仅 .env=true | 扫描文件数=81"
+    },
+    {
+      "id": "R6b",
+      "title": ".env / *.db 未被 git 跟踪，.gitignore 覆盖必需项",
+      "ok": true,
+      "evidence": "被跟踪的敏感文件=[] | .gitignore 含全部必需项=true"
+    },
+    {
+      "id": "R7",
+      "title": "fixtures：tasks≥8 / runners≥6 / buddy-posts≥10，且无手机号、学号、宿舍号、身份字段名",
+      "ok": true,
+      "evidence": "tasks=10 runners=9 buddy-posts=12 | PII 命中=[]"
+    },
+    {
+      "id": "R7b",
+      "title": "M1 fixtures 里的楼栋名全部能在 config/map-nodes.json 找到 label（字面一致）",
+      "ok": true,
+      "evidence": "map-nodes label 数=12 | fixtures 用到 3 个楼栋 | 对不上的=[]"
+    },
+    {
+      "id": "R8",
+      "title": "MCP 与 HTTP 共用同一套 service：MCP 发布的任务/帖子在 HTTP 侧可见，HTTP 发布的任务在 MCP 侧可见",
+      "ok": true,
+      "evidence": "MCP task task_c11817c8-1a61-48cb-ac41-92bce15fa94d → HTTP 详情 ok=true | HTTP task task_b7a8113e-7865-4b15-b049-2702d7aec412 → MCP task_list_open 命中=true | MCP 帖 post-5f57e132bab26fb6 → HTTP /api/buddies 命中=true"
+    },
+    {
+      "id": "R9",
+      "title": "/config.js 运行时注入演示令牌（契约允许，只读+限频）但页面 HTML / 静态源码里都没有真实令牌值",
+      "ok": true,
+      "evidence": "/config.js 含注入=true（只报是否命中，不贴值）| /agent HTML 含内联令牌值=false | .env 已被 .gitignore 忽略且未入库（见 R6b）"
+    }
+  ]
+}

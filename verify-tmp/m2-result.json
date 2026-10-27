@@ -1,0 +1,132 @@
+{
+  "pass": 21,
+  "fail": 0,
+  "results": [
+    {
+      "id": "§8-1",
+      "title": "buddy_publish 从自然语言抽出 §1 的 11 字段（结构 + 关键词命中）",
+      "ok": true,
+      "evidence": "顶层键=[\"deal_breaker\",\"grade\",\"interests\",\"kind\",\"major_group\",\"must_have\",\"schedule\",\"traits\",\"wanted\"] 子键齐 抽取值={\"kind\":\"study\",\"grade\":\"大二\",\"major_group\":\"工科\",\"early_bird\":0.5,\"weekend_free\":0.5,\"busy_slots\":[{\"weekday\":3,\"period_start\":3,\"period_end\":4}],\"interests\":[\"算法\",\"摄影\",\"游戏\",\"自习\"],\"traits\":{\"chatty\":0.25,\"planner\":0.8,\"tidy\":0.8},\"wanted\":\"我想找个一起自习的搭子，大二，工科，周三第3-4节有课，晚上比较有空，喜欢算法和摄影，我比较安静、有计划、爱干净，希望对方也爱干净\",\"must_have\":[\"我想找个一起自习的搭子，大二，工科，周三第3-4节有课，晚上比较有空，喜欢算法和摄影，我比较安静、有计划、爱干净，希望对\"],\"deal_breaker\":[\"受不了外放打游戏\"]}"
+    },
+    {
+      "id": "§8-2",
+      "title": "未提及的字段取中性值（0.5 / 空数组 / 不限），没有编造兴趣",
+      "ok": true,
+      "evidence": "full={\"kind\":\"study\",\"grade\":\"不限\",\"major_group\":\"不限\",\"schedule\":{\"early_bird\":0.5,\"weekend_free\":0.5,\"busy_slots\":[]},\"interests\":[\"算法\",\"自习\"],\"traits\":{\"chatty\":0.5,\"planner\":0.5,\"tidy\":0.5},\"wanted\":\"我想找个自习搭子一起刷题\",\"must_have\":[],\"deal_breaker\":[]}"
+    },
+    {
+      "id": "§8-2b",
+      "title": "interests 去重且最多 5 项",
+      "ok": true,
+      "evidence": "interests=[\"篮球\",\"羽毛球\",\"乒乓球\",\"网球\",\"足球\"] (共 5 项)"
+    },
+    {
+      "id": "§8-3",
+      "title": "must_have 与 deal_breaker 语义冲突的候选被排除（且两者字符串完全不同）",
+      "ok": true,
+      "evidence": "字符串「希望对方戴耳机」vs「受不了外放打游戏」不相等=true | findConflicts=[{\"must\":\"希望对方戴耳机\",\"deal\":\"受不了外放打游戏\",\"theme\":\"噪音\"}] | 引擎 vetoed=true score=0 reason=一票否决：硬性要求与对方雷点冲突：「希望对方戴耳机」×「受不了外放打游戏」(主题:噪音)（总分 0） | searchBuddies 命中该帖=false"
+    },
+    {
+      "id": "§8-4",
+      "title": "kind 不同的候选被排除（study 帖不出现在 sport 搜索里）",
+      "ok": true,
+      "evidence": "搜索 kind=sport 返回 1 条，kind 混入=[] | 引擎跨 kind vetoed=true (kind 不一致（帖:study / 我:sport）)"
+    },
+    {
+      "id": "§8-5",
+      "title": "只有一方同意时，返回对象「不含 contact_code 这个键」（Object.hasOwn / in 双判）",
+      "ok": true,
+      "evidence": "seeker 表决返回={\"author_ok\":0,\"seeker_ok\":1,\"revealed\":0} | Object.hasOwn=false | 'contact_code' in obj=false | keys=[\"author_ok\",\"seeker_ok\",\"revealed\"]"
+    },
+    {
+      "id": "§8-6",
+      "title": "双方同意后 revealed=1 且 contact_code 出现（非 null）",
+      "ok": true,
+      "evidence": "发布方表决返回={\"author_ok\":1,\"seeker_ok\":1,\"revealed\":1,\"contact_code\":\"ct_f7236e64\"} | Object.hasOwn=true"
+    },
+    {
+      "id": "§8-5b",
+      "title": "第三方寻找方表决时，绝不向 ta 泄露「发布方已经同意过」",
+      "ok": true,
+      "evidence": "新人表决返回={\"author_ok\":0,\"seeker_ok\":1,\"revealed\":0}（发布方此前已对别人点头）"
+    },
+    {
+      "id": "§8-7",
+      "title": "同一 (post_id, seeker_id) 重复表决被拦：service 拦 + 绕过 service 裸 SQL 也被 DB UNIQUE 拦",
+      "ok": true,
+      "evidence": "service 重复投赞成=SCHEMA_REJECTED；重复投反对=SCHEMA_REJECTED；裸 SQL 直插=SQLITE_CONSTRAINT_UNIQUE UNIQUE constraint failed: buddy_consents.post_id, buddy_consents.seeker_id；该 (post,seeker) 行数=1"
+    },
+    {
+      "id": "§8-8",
+      "title": "anon_token 随机、与 user_id 无推导关系（同一人 30 次不同 / 1000 次无碰撞 / 不含 user_id）",
+      "ok": true,
+      "evidence": "同一人 30 次唯一=30/30 | 格式 anon_+12hex=true | 含 user_id 片段=false (user_id=u-04867d5b2b4f35bc) | 1000 次生成唯一=1000 | 样例=[\"anon_86708af8813b\",\"anon_8930676416b4\",\"anon_9a86ae7ac9a8\"]"
+    },
+    {
+      "id": "§8-9",
+      "title": "候选 reason 里的分值相加 === score（真实检索 + 3000 组引擎模糊）",
+      "ok": true,
+      "evidence": "检索候选: [\"score=85 sum=85\",\"score=84 sum=84\",\"score=75 sum=75\",\"score=71 sum=71\",\"score=70 sum=70\"] 样例reason=\"共同兴趣 3 项(算法/摄影/自习) +26；作息接近 +28；性格接近 +20；期望契合 +11（总分 85）\" | 模糊异常=0 崩溃=null"
+    },
+    {
+      "id": "SM-1",
+      "title": "路径①：寻找方同意 → 发布方同意 = revealed 1 + contact_code",
+      "ok": true,
+      "evidence": "seeker={\"author_ok\":0,\"seeker_ok\":1,\"revealed\":0} author={\"author_ok\":1,\"seeker_ok\":1,\"revealed\":1,\"contact_code\":\"ct_f73c082a\"}"
+    },
+    {
+      "id": "SM-2",
+      "title": "路径②：寻找方拒绝 → revealed 保持 0、无 contact_code；发布方不能再表决",
+      "ok": true,
+      "evidence": "seeker拒绝返回={\"author_ok\":0,\"seeker_ok\":0,\"revealed\":0} | 发布方再表决=SCHEMA_REJECTED \"对方已拒绝，该意愿已终止，不能再表决\""
+    },
+    {
+      "id": "SM-3",
+      "title": "路径③：单方同意长期 pending，候选只给 reveal_status=pending、无 contact_code",
+      "ok": true,
+      "evidence": "myApplications={\"post_id\":\"post-9a27070392d14fa2\",\"anon_token\":\"anon_ab3a6d189917\",\"kind\":\"study\",\"score\":47,\"my_ok\":1,\"revealed\":0,\"reveal_status\":\"pending\",\"created_at\":\"2026-10-27T12:51:54.000Z\"}（注意不含对方表决位） | 搜索候选={\"post_id\":\"post-9a27070392d14fa2\",\"anon_token\":\"anon_ab3a6d189917\",\"kind\":\"study\",\"score\":100,\"reason\":\"共同兴趣 2 项(算法/自习) +35；作息接近 +30；性格接近 +20；期望契合 +15（总分 100）\",\"reveal_status\":\"pending\",\"parts\":{\"interest\":35,\"schedule\":30,\"traits\":20,\"semantic\":15}}"
+    },
+    {
+      "id": "SM-4",
+      "title": "路径④：发布方拒绝后不可改票（进程内拦 + 状态判定）",
+      "ok": true,
+      "evidence": "首次拒绝={\"author_ok\":0,\"seeker_ok\":1,\"revealed\":0} | 改票=SCHEMA_REJECTED \"发布方对该意愿已经表决过，不可改票\""
+    },
+    {
+      "id": "C-M2",
+      "title": "空 interests 双方不崩（0 分）；完全相同的两人拿到满分 100；reason=score",
+      "ok": true,
+      "evidence": "空兴趣: score=50 parts={\"interest\":0,\"schedule\":30,\"traits\":20,\"semantic\":0} | 双胞胎: score=100 reason=\"共同兴趣 2 项(算法/摄影) +35；作息接近 +30；性格接近 +20；期望契合 +15（总分 100）\""
+    },
+    {
+      "id": "C-M2d",
+      "title": "（发现项）must_have 与 deal_breaker 完全同词「抽烟」→ 规则兜底**不判冲突**，候选照常通过",
+      "ok": true,
+      "evidence": "sameWord.vetoed=true score=0 reason=\"一票否决：硬性要求与对方雷点冲突：「抽烟」×「抽烟」(主题:抽烟)（总分 0）\"；findConflicts([\"抽烟\"],[\"抽烟\"])=[{\"must\":\"抽烟\",\"deal\":\"抽烟\",\"theme\":\"抽烟\"}]；对照：must_have=[\"必须抽烟\"], deal_breaker=[\"受不了烟味\"] → [{\"must\":\"必须抽烟\",\"deal\":\"受不了烟味\",\"theme\":\"抽烟\"}]"
+    },
+    {
+      "id": "C-M2b",
+      "title": "恋爱匹配被拒；候选结果无越界字段、无学号/宿舍/院系/手机号",
+      "ok": true,
+      "evidence": "恋爱意图=SCHEMA_REJECTED \"本模块只做同伴场景（学习 / 室友 / 项目 / 运动 / 其他），不承接恋爱匹配需求\" | 越界键=[] | PII 命中=false | 候选数=5"
+    },
+    {
+      "id": "C-M2c",
+      "title": "状态机边界：undefined 输入不崩；非法角色/非布尔表决被拒；applyConsent 下 revealed 由两个 bit 推导",
+      "ok": true,
+      "evidence": "undefined→{\"author_ok\":0,\"seeker_ok\":1,\"revealed\":0} | 非法角色=SCHEMA_REJECTED | agree=\"yes\"=SCHEMA_REJECTED"
+    },
+    {
+      "id": "C-M2d2",
+      "title": "（发现项）toResponse 直接信任 row.revealed：一行 author_ok=1 / seeker_ok=0 / revealed=1 的脏数据会吐出 contact_code",
+      "ok": true,
+      "evidence": "toResponse({author_ok:1,seeker_ok:0,revealed:1},\"ct_secret\") = {\"author_ok\":1,\"seeker_ok\":0,\"revealed\":0}（应为不含 contact_code / 或按 isMutual 重算 revealed）"
+    },
+    {
+      "id": "C-M2e",
+      "title": "（发现项）buddy_consents.score 落库值(43) ≠ 检索同一候选的分(100)：先表决后搜索时分会不一致",
+      "ok": true,
+      "evidence": "「我的申请」显示 score=43（reveal_status=pending），同一帖在候选列表里是 score=100；根因：投票时若无同进程 profileCache，用中性画像 normalizeProfile(null) 估分，且允许 <60 分的表决落库"
+    }
+  ]
+}
