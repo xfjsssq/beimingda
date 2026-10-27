@@ -120,13 +120,27 @@ git checkout feat/<模块> && git merge origin/main
 - [x] 合并策略：允许 merge commit 与 squash，禁用 rebase merge
 - [x] 空仓库 `xfjsssq/-`（创建中文名时被 GitHub 规范化产生的）已删除
 
-### ⏳ 剩下两个待办（仓库管理员）
+### 👥 成员与权限（2026-10-27）
 
-- [ ] **添加协作者**：Settings → Collaborators → Add people → 填对方 GitHub 用户名，角色 **Write**
-      （不加的话对方既不能 push 自己的分支，也不能给你点批准）
-- [ ] **把 PR 批准数从 0 改回 1**：加完协作者后，在 GitHub 页面
-      *Settings → Branches → `main` 的规则 → Require approvals 填 1 → Save*
-      （现在设成 0 是为了在队友加入前不阻塞；流程本身要求"至少另一人 review 后合并"）
+| GitHub 账号 | 角色 | 负责 |
+|---|---|---|
+| `xfjsssq` | Owner（admin） | 骨架/核心、M1 代取撮合、M2 搭子匹配、M3 迎新导览、F0 前端门户、参赛材料 |
+| `CJY-sys` | Collaborator（**Write**） | **M4 日程与提醒**（分支 `feat/m4-schedule`） |
+
+- [x] 已邀请 `CJY-sys` 为协作者（Write 权限）
+      → **等对方在 <https://github.com/xfjsssq/beimingda/invitations> 点「Accept invitation」才生效**
+      （没接受之前：不能 push 自己的分支、也不能给别人点批准）
+- [x] PR 批准数已设为 **1**（`required_approving_review_count = 1`）：进 main 需要**另一个人的批准**
+
+### PR 批准与合并怎么操作（写给不熟 GitHub 的人）
+
+1. 打开 PR 页面 → 右上 **Review changes**（或在 *Files changed* 里点 *Review changes*）
+2. 写一句 review 意见（例：`M4 自测清单已逐条跑过，同意合并`）→ 选 **Approve** → **Submit review**
+3. 批准后 PR 页面下方的 **Merge pull request** 按钮变绿 → 由**开 PR 的人**点它合并（Squash 或 Merge commit 都行）
+4. 合并后来源分支自动删除（`delete_branch_on_merge = true`）；本地执行
+   `git checkout main && git pull`，再把自己的分支 `git merge origin/main` 跟上
+
+> ⚠️ **不能自己批准自己的 PR**。所以约定：谁开 PR，谁就等另一个人点 Approve 后再合并。
 
 > ⚠️ 因为 `enforce_admins = true`，**任何人对 `main` 的直接 push 都会被拒**（包括仓库管理员）。
 > 这是刻意设计：所有改动都必须经过 PR 留下记录。若确实需要临时绕过，先改分支保护规则，改完记得改回来。
