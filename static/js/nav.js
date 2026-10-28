@@ -23,12 +23,12 @@
 
 /** 冻版 6 页（顺序即导航顺序） */
 export const PAGES = [
-  { id: "index", href: "/", label: "首页", icon: "🏠", desc: "功能聚合门户" },
-  { id: "takeout", href: "/takeout", label: "代取", icon: "📦", desc: "代取撮合看板" },
-  { id: "buddy", href: "/buddy", label: "搭子", icon: "🤝", desc: "搭子墙" },
-  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", desc: "迎新地图与全景" },
-  { id: "schedule", href: "/schedule", label: "日程", icon: "⏰", desc: "课表与提醒" },
-  { id: "agent", href: "/agent", label: "Agent", icon: "🔌", desc: "接入 WorkBuddy（评委页）" },
+  { id: "index", href: "/", label: "首页", icon: "🏠", iconName: "home", desc: "功能聚合门户" },
+  { id: "takeout", href: "/takeout", label: "代取", icon: "📦", iconName: "package", desc: "代取撮合看板" },
+  { id: "buddy", href: "/buddy", label: "搭子", icon: "🤝", iconName: "users", desc: "搭子墙" },
+  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", iconName: "map-pin", desc: "迎新地图与全景" },
+  { id: "schedule", href: "/schedule", label: "日程", icon: "⏰", iconName: "calendar-event", desc: "课表与提醒" },
+  { id: "agent", href: "/agent", label: "Agent", icon: "🔌", iconName: "plug-connected", desc: "接入 WorkBuddy（评委页）" },
 ];
 
 /** 导航就绪事件（demo.js 等模块可监听，避免执行顺序耦合） */
@@ -313,7 +313,7 @@ function linkHTML(page, activeId) {
   return (
     `<a class="nav-link" href="${page.href}" data-nav="${page.id}"` +
     ` title="${page.desc}"${active ? ' aria-current="page"' : ""}>` +
-    `<span class="nav-link__icon" aria-hidden="true">${page.icon}</span>` +
+    `<span class="icon icon--18 nav-link__icon" aria-hidden="true" style="--icon:url(/vendor/tabler/icons/${page.iconName || "home"}.svg)"></span>` +
     `<span class="nav-link__label">${page.label}</span>` +
     `</a>`
   );
