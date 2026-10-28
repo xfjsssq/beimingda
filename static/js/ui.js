@@ -168,6 +168,7 @@ export async function copyText(text) {
 export default {
   esc,
   el,
+  icon,
   clearState,
   showLoading,
   showEmpty,
@@ -176,4 +177,188 @@ export default {
   showNotice,
   errorText,
   copyText,
+  mountTabs,
+  createSheet,
+  openModal,
+  toast,
 };
+
+/* =============================================================================
+   组件层 v2（2026-10-28）—— 图标 / 分栏 / 侧栏 / 弹层 / 轻提示
+   设计目标：把「一屏塞满」改成「分层 + 按需展开」。
+   全部零依赖、无外链；DOM 一律用 createElement/textContent 构造（外部字符串过 esc）。
+   ============================================================================= */
+
+/** 图标元素：用 CSS mask 着色，随父级文字颜色变化（一个 svg 文件适配所有场景） */
+export function icon(name, { size = 18, cls = "" } = {}) {
+  const n = el("span", "icon icon--" + size + (cls ? " " + cls : ""));
+  n.style.setProperty("--icon", `url(/vendor/tabler/icons/${name}.svg)`);
+  n.setAttribute("aria-hidden", "true");
+  return n;
+}
+
+function lockScroll(on) {
+  document.body.classList.toggle("is-locked", Boolean(on));
+}
+
+/* ---------------------------------------------------------------- 分栏（tabs） */
+/**
+ * 把一个 role=tablist 的容器 + 若干 tabpanel 接起来。
+ * 用法：
+ *   const tabs = mountTabs("#agentTabs", { syncHash: true });
+ *   <div class="tabs" id="agentTabs" role="tablist">
+ *     <button class="tab" role="tab" aria-controls="p-manual" aria-selected="true" data-panel="p-manual">手动接入</button>
+ *   </div>
+ *   <section class="tabpanel" id="p-manual" role="tabpanel">…</section>
+ */
+export function mountTabs(root, { syncHash = false, onChange } = {}) {
+  const list = box(root);
+  if (!list) return null;
+  const tabs = [...list.querySelectorAll('[role="tab"]')];
+
+  const select = (tab, { focus = false, silent = false } = {}) => {
+    for (const t of tabs) {
+      const on = t === tab;
+      t.setAttribute("aria-selected", on ? "true" : "false");
+      t.tabIndex = on ? 0 : -1;
+      const panel = document.getElementById(t.dataset.panel);
+      if (panel) panel.hidden = !on;
+    }
+    if (focus) tab.focus();
+    if (syncHash && tab.dataset.panel) {
+      const url = new URL(location.href);
+      url.hash = tab.dataset.panel;
+      history.replaceState(null, "", url);
+    }
+    if (!silent && typeof onChange === "function") onChange(tab.dataset.panel, tab);
+  };
+
+  tabs.forEach((t, i) => {
+    t.addEventListener("click", () => select(t));
+    t.addEventListener("keydown", (e) => {
+      const keys = ["ArrowRight", "ArrowLeft", "Home", "End"];
+      if (!keys.includes(e.key)) return;
+      e.preventDefault();
+      let next = i;
+      if (e.key === "ArrowRight") next = (i + 1) % tabs.length;
+      if (e.key === "ArrowLeft") next = (i - 1 + tabs.length) % tabs.length;
+      if (e.key === "Home") next = 0;
+      if (e.key === "End") next = tabs.length - 1;
+      select(tabs[next], { focus: true });
+    });
+  });
+
+  // 初始：优先 hash，其次 aria-selected，最后第一个
+  const fromHash = location.hash && tabs.find((t) => t.dataset.panel === location.hash.slice(1));
+  const current = fromHash || tabs.find((t) => t.getAttribute("aria-selected") === "true") || tabs[0];
+  if (current) select(current, { silent: true });
+  return { select: (id) => { const t = tabs.find((x) => x.dataset.panel === id); if (t) select(t); }, tabs };
+}
+
+/* ---------------------------------------------------------------- 侧栏（sheet） */
+/**
+ * 右侧抽屉（≤640px 自动变底部面板）。内容与按钮由调用方给，避免这里夹带业务。
+ * @returns {{open:Function, close:Function, body:HTMLElement, foot:HTMLElement, root:HTMLElement}}
+ */
+export function createSheet({ title = "", iconName = "", body = null, footer = null, onClose } = {}) {
+  const backdrop = el("div", "sheet-backdrop");
+  const root = el("aside", "sheet");
+  root.setAttribute("role", "dialog");
+  root.setAttribute("aria-modal", "true");
+  root.setAttribute("aria-label", title || "面板");
+
+  const head = el("div", "sheet__head");
+  const h = el("h3", "");
+  if (iconName) h.appendChild(icon(iconName, { size: 20 }));
+  const titleText = el("span", "", title);
+  titleText.style.marginLeft = iconName ? "8px" : "0";
+  h.appendChild(titleText);
+  const close = el("button", "sheet__close");
+  close.type = "button";
+  close.setAttribute("aria-label", "关闭");
+  close.appendChild(icon("x", { size: 18 }));
+  head.append(h, close);
+
+  const bodyEl = el("div", "sheet__body");
+  if (body) bodyEl.appendChild(body);
+  const footEl = el("div", "sheet__foot");
+  if (footer) footEl.appendChild(footer);
+  root.append(head, bodyEl, footEl);
+  document.body.append(backdrop, root);
+
+  const closeIt = () => {
+    root.classList.remove("is-open");
+    backdrop.classList.remove("is-open");
+    lockScroll(false);
+    if (typeof onClose === "function") onClose();
+  };
+  close.addEventListener("click", closeIt);
+  backdrop.addEventListener("click", closeIt);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeIt(); });
+
+  return {
+    root, body: bodyEl, foot: footEl,
+    open: () => { root.classList.add("is-open"); backdrop.classList.add("is-open"); lockScroll(true); },
+    close: closeIt,
+  };
+}
+
+/* ---------------------------------------------------------------- 弹层（modal） */
+/** 居中弹层（≤640px 变底部面板）；返回 promise：resolve(true)=确认，resolve(false)=取消 */
+export function openModal({ title = "", iconName = "", body = null, confirmText = "保存", cancelText = "取消", danger = false } = {}) {
+  const backdrop = el("div", "modal-backdrop");
+  const modal = el("div", "modal");
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.setAttribute("aria-label", title);
+
+  const head = el("div", "modal__head");
+  const h3 = el("h3", "");
+  if (iconName) h3.appendChild(icon(iconName, { size: 20 }));
+  const t = el("span", "", title);
+  if (iconName) t.style.marginLeft = "8px";
+  h3.appendChild(t);
+  head.appendChild(h3);
+
+  const bodyEl = el("div", "modal__body");
+  if (body) bodyEl.appendChild(body);
+  const foot = el("div", "modal__foot");
+  const cancel = el("button", "btn btn--quiet", cancelText);
+  cancel.type = "button";
+  const ok = el("button", "btn" + (danger ? " btn--danger" : ""), confirmText);
+  ok.type = "button";
+  foot.append(cancel, ok);
+  modal.append(head, bodyEl, foot);
+  backdrop.appendChild(modal);
+  document.body.appendChild(backdrop);
+  requestAnimationFrame(() => backdrop.classList.add("is-open"));
+  lockScroll(true);
+
+  return new Promise((resolve) => {
+    const done = (val) => {
+      backdrop.classList.remove("is-open");
+      lockScroll(false);
+      setTimeout(() => backdrop.remove(), 180);
+      resolve(val);
+    };
+    cancel.addEventListener("click", () => done(false));
+    ok.addEventListener("click", () => done(true));
+    backdrop.addEventListener("click", (e) => { if (e.target === backdrop) done(false); });
+    document.addEventListener("keydown", function onKey(e) {
+      if (e.key === "Escape") { document.removeEventListener("keydown", onKey); done(false); }
+    });
+    ok.focus();
+  });
+}
+
+/* ---------------------------------------------------------------- 轻提示（toast） */
+export function toast(text, kind = "") {
+  let wrap = document.querySelector(".toast-wrap");
+  if (!wrap) { wrap = el("div", "toast-wrap"); document.body.appendChild(wrap); }
+  const n = el("div", "toast" + (kind ? " toast--" + kind : ""));
+  n.appendChild(icon(kind === "danger" ? "alert-triangle" : kind === "ok" ? "circle-check" : "info-circle", { size: 16 }));
+  n.appendChild(el("span", "", text));
+  wrap.appendChild(n);
+  setTimeout(() => { n.style.opacity = "0"; n.style.transition = "opacity .25s"; setTimeout(() => n.remove(), 260); }, 2600);
+  return n;
+}

@@ -15,49 +15,62 @@
 
   <main class="page">
 
-    <!-- ============ 区块一 · 顶部标语 ============ -->
-    <section class="hero" aria-labelledby="hero-title">
-      <h1 id="hero-title">北名大小助手 ｜ 把散落的校园服务，收进一个对话</h1>
-      <p class="lead">
-        取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
-        我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
-        在对话框里说一句话就能办事。
-      </p>
-      <div class="hero__actions">
-        <a class="btn btn--light" href="/agent">看怎么接入 Agent（评委页）</a>
-        <a class="btn btn--ghost" href="#features">看看四个功能</a>
+    <!-- ============ 区块一 · Hero（左文案 + 右插画） ============ -->
+    <section class="hero hero--split" aria-labelledby="hero-title">
+      <div class="hero__copy">
+        <span class="hero__eyebrow">北名大小助手 · 银移杯赛道 17</span>
+        <h1 id="hero-title">把散落的校园服务，收进一个对话</h1>
+        <p class="lead">
+          取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
+          我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
+          在对话框里说一句话就能办事。
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn--light" href="/agent">看怎么接入 Agent（评委页）</a>
+          <a class="btn btn--ghost" href="#features">看看四个功能</a>
+        </div>
+        <div class="hero__tags">
+          <span class="hero__tag">远程 MCP · 零配置接入</span>
+          <span class="hero__tag">代取 / 搭子 / 导览 / 日程</span>
+          <span class="hero__tag">不收集姓名 / 学号 / 手机号</span>
+        </div>
       </div>
-      <div class="hero__tags">
-        <span class="hero__tag">远程 MCP · 零配置接入</span>
-        <span class="hero__tag">代取 / 搭子 / 导览 / 日程</span>
-        <span class="hero__tag">不收集姓名 / 学号 / 手机号</span>
+      <div class="hero__art">
+        <img src="/img/hero-campus.png" width="900" height="900" loading="lazy"
+             alt="校园服务插画：取件、找搭子、看地图、记日程四件事" />
       </div>
     </section>
 
     <!-- ============ 区块二 · 四张功能卡片 ============ -->
     <section class="section" id="features" aria-labelledby="features-title">
-      <h2 class="section__title" id="features-title"><span class="section__index">2</span>四个功能，一个入口</h2>
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">四个功能</span>
+          <h2 id="features-title">一个入口，各管一件事</h2>
+          <p>每块都有自己的看板与操作面板，不用把功能挤在一屏里。</p>
+        </div>
+      </div>
       <div class="grid grid--cards">
         <article class="card">
-          <span class="card__icon" aria-hidden="true">📦</span>
+          <span class="icon-tile icon-tile--dorm" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/package.svg)"></span></span>
           <h3 class="card__title">代取撮合</h3>
           <p class="card__desc">发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/takeout" data-page-check="/takeout">进入代取看板</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">🤝</span>
+          <span class="icon-tile icon-tile--teaching" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/users.svg)"></span></span>
           <h3 class="card__title">搭子匹配</h3>
           <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）才互相可见联系方式，单方面看不到。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/buddy" data-page-check="/buddy">进入搭子墙</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">🗺️</span>
+          <span class="icon-tile icon-tile--gate" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/map-pin.svg)"></span></span>
           <h3 class="card__title">迎新导览</h3>
-          <p class="card__desc">校园地图 + 360° 实景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
+          <p class="card__desc">校园地图 + 实景街景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/welcome" data-page-check="/welcome">进入迎新导览</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">⏰</span>
+          <span class="icon-tile icon-tile--canteen" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/calendar-event.svg)"></span></span>
           <h3 class="card__title">日程提醒</h3>
           <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。快到点了提前两小时喊你一声。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/schedule" data-page-check="/schedule">进入日程表</a>
