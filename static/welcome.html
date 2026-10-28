@@ -4,19 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>迎新导览 · 北名大小助手</title>
+  <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/vendor/pannellum/pannellum.css" />
   <style>
+    /* 本页只保留「地图 / 全景 / 高德视图」特有样式，其余全走 /css/app.css */
     :root {
-      --pri: #1F4E8C; --ok: #2E8B76; --warn: #C0392B; --bg: #F5F7FA;
-      --card: #FFFFFF; --line: #E3E8EF; --muted: #5B6470;
+      --pri: var(--color-primary); --ok: var(--color-accent); --warn: var(--color-danger);
+      --card: #FFFFFF; --line: var(--color-line); --muted: var(--color-muted);
     }
-    * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: #1C1C1E;
-      font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-    header { background: var(--card); border-bottom: 1px solid var(--line); padding: 14px 18px; }
-    header h1 { margin: 0 0 4px; font-size: 19px; color: var(--pri); }
-    header p { margin: 0; font-size: 13px; color: var(--muted); }
-    .wrap { max-width: 1080px; margin: 0 auto; padding: 14px 14px 40px; }
     .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
     .chip { border: 1px solid var(--line); background: #fff; color: var(--muted);
       padding: 6px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
@@ -40,8 +35,8 @@
     .marker[aria-current="true"] .dot { outline: 3px solid rgba(31,78,140,.35); }
     .marker[hidden] { display: none; }
     .source { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
-    .panel { background: var(--card); border-radius: 12px; padding: 16px;
-      box-shadow: 0 1px 3px rgba(16,24,40,.08); position: sticky; top: 14px; }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+      box-shadow: 0 1px 3px rgba(16,24,40,.08); position: sticky; top: calc(var(--header-h) + 12px); }
     .panel h2 { margin: 0 0 6px; font-size: 17px; }
     .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
       background: rgba(31,78,140,.1); color: var(--pri); margin-right: 6px; }
@@ -92,25 +87,25 @@
     .amap-bar button { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35);
       border-radius: 8px; padding: 5px 12px; cursor: pointer; }
     @media (max-width: 768px) { .amap-shell { inset: 8px; } }
-    #demoBadge { position: fixed; right: 12px; top: 12px; background: var(--warn); color: #fff;
-      font-size: 12px; padding: 4px 10px; border-radius: 999px; display: none; z-index: 60; }
+    /* 标签避让：同排会压字的点位，第二个标签改到圆点上方（由 JS 按坐标与字宽判定） */
+    .marker--alt .tag { position: absolute; bottom: 27px; left: 50%;
+      transform: translateX(-50%); margin-top: 0; box-shadow: 0 1px 4px rgba(16,24,40,.12); }
     @media (max-width: 768px) {
       .layout { grid-template-columns: 1fr; }
       .panel { position: static; }
       .marker .tag { display: none; }
       .marker .dot { width: 18px; height: 18px; }
+      /* 窄屏默认只留圆点，但当前选中的点位仍显示名字 */
+      .marker[aria-current="true"] .tag { display: block; }
     }
   </style>
 </head>
 <body>
-<div id="demoBadge">演示模式</div>
-
-<header>
-  <h1>迎新导览 · 校园地图</h1>
-  <p>点击地图上的标记，可以先看看那里长什么样 —— 宿舍楼、食堂、教学楼、校门、快递驿站都在这里。</p>
-</header>
-
-<div class="wrap">
+<main class="page">
+  <div class="page-head">
+    <h1>迎新导览 · 校园地图</h1>
+    <p class="lead">点击地图上的标记，可以先看看那里长什么样 —— 宿舍楼、食堂、教学楼、校门、快递驿站都在这里。</p>
+  </div>
   <div class="chips" id="chips">
     <button class="chip" data-cat="" aria-pressed="true">全部</button>
     <button class="chip" data-cat="dorm">宿舍楼</button>
@@ -130,7 +125,7 @@
         <button class="ghost" id="openAmap" type="button" hidden>查看真实卫星图（iframe）</button>
       </div>
       <div class="map-wrap" id="mapWrap">
-        <img class="base" id="baseImg" src="/map/campus-map.svg" alt="校园示意图底图" />
+        <img class="base" id="baseImg" src="/map/campus-map.jpg" alt="校园楼宇编号示意图底图" />
         <!-- 标记由 JS 按 /map/map-bg.json 的百分比坐标渲染 -->
       </div>
       <div class="map-wrap" id="amapWrap" hidden>
@@ -147,7 +142,7 @@
       <p id="summary" class="desc" style="color:var(--muted);font-size:13px"></p>
     </aside>
   </div>
-</div>
+</main>
 
 <div id="panoOverlay">
   <div class="pano-bar">
@@ -170,16 +165,19 @@
 
 <script src="/vendor/pannellum/pannellum.js"></script>
 <script src="/config.js"></script>
-<script>
+<script type="module">
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import { esc } from "/js/ui.js";
+
 const $ = (s) => document.querySelector(s);
 const CAT_LABEL = { dorm: "宿舍楼", canteen: "食堂", teaching: "教学与自习", gate: "校门", service: "服务设施" };
 
-if (new URLSearchParams(location.search).get("demo") === "1") {
-  $("#demoBadge").style.display = "block";
-}
+mountNav();
+initDemo();
 
 let NODES = [];
-let BG = { image: "/map/campus-map.svg", points: {}, attribution: "" };
+let BG = { image: "/map/campus-map.jpg", points: {}, attribution: "" };
 let MANIFEST = { default: { firstScene: "", sceneFadeDuration: 800 }, scenes: {} };
 let filter = "";
 
@@ -224,7 +222,7 @@ function setupCalibrate() {
     '<div style="font-weight:700;margin-bottom:6px">坐标校准模式</div>' +
     '<div style="opacity:.85;margin-bottom:8px">选点位 → 在底图上点它的真实位置。结果粘回 <b>static/map/map-bg.json</b> 的 points。</div>' +
     '<select id="calibSel" style="width:100%;padding:6px;border-radius:6px;margin-bottom:8px">' +
-    NODES.map((n) => `<option value="${n.id}">${n.label}（${n.id}）</option>`).join("") +
+    NODES.map((n) => `<option value="${esc(n.id)}">${esc(n.label)}（${esc(n.id)}）</option>`).join("") +
     "</select>" +
     '<pre id="calibOut" style="margin:0;background:#111c2e;padding:8px;border-radius:6px;white-space:pre-wrap;word-break:break-all">点一下底图开始</pre>';
   document.body.appendChild(box);
@@ -249,6 +247,37 @@ function setupCalibrate() {
   });
 }
 
+/* 标签避让：宿舍区（dorm-3/12/15）与食堂区（canteen-1/2）点位密集，标签原来互相压字。
+   做法：按 y 分成「同排」（纵向差 <6%），排内按 x 排序，用两条车道（标签在点下方 / 上方），
+   按字数估算标签宽度并与前标签右缘比较，放不下就换车道。⛔ 不改动任何点位坐标。 */
+function avoidLabelOverlap() {
+  const wrap = $("#mapWrap");
+  const width = wrap.clientWidth || 0;
+  const items = [...wrap.querySelectorAll(".marker")].filter((m) => !m.hidden);
+  for (const m of items) m.classList.remove("marker--alt");
+  if (!width || items.length < 2) return;
+  const rows = [];
+  for (const m of items) {
+    const x = parseFloat(m.style.left), y = parseFloat(m.style.top);
+    let row = rows.find((r) => Math.abs(r.y - y) < 6);
+    if (!row) { row = { y, list: [] }; rows.push(row); }
+    row.list.push({ m, x });
+  }
+  for (const row of rows) {
+    row.list.sort((a, b) => a.x - b.x);
+    const laneEnd = [-Infinity, -Infinity]; // 0 = 标签在点下方，1 = 标签在点上方
+    for (const it of row.list) {
+      const tag = it.m.querySelector(".tag");
+      const chars = (tag ? tag.textContent : "").length;
+      const half = ((chars * 11 + 14) / 2 / width) * 100; // 标签半宽（百分比）
+      let lane = it.x - half < laneEnd[0] ? 1 : 0;
+      if (it.x - half < laneEnd[lane]) lane = lane === 0 ? 1 : 0;
+      if (lane === 1) it.m.classList.add("marker--alt");
+      laneEnd[lane] = it.x + half;
+    }
+  }
+}
+
 function renderMarkers() {
   const wrap = $("#mapWrap");
   wrap.querySelectorAll(".marker").forEach((el) => el.remove());
@@ -263,13 +292,14 @@ function renderMarkers() {
     btn.style.left = p.x_pct + "%";
     btn.style.top = p.y_pct + "%";
     const hasPano = Boolean(n.pano_url) && Boolean(MANIFEST.scenes[n.id]);
-    btn.innerHTML = '<span class="dot"></span><span class="tag">' + n.label +
+    btn.innerHTML = '<span class="dot"></span><span class="tag">' + esc(n.label) +
       (hasPano ? ' · 实景' : '') + '</span>';
     btn.setAttribute("aria-label", n.label + "（" + catLabel(n.category) + "）");
     btn.hidden = Boolean(filter) && n.category !== filter;
     btn.addEventListener("click", () => selectNode(n.id));
     wrap.appendChild(btn);
   }
+  avoidLabelOverlap();
 }
 
 function selectNode(id) {
@@ -280,14 +310,14 @@ function selectNode(id) {
   });
   const hasPano = Boolean(n.pano_url) && Boolean(MANIFEST.scenes[n.id]);
   $("#panel").innerHTML = [
-    '<h2>' + n.label + '</h2>',
-    '<div><span class="badge">' + catLabel(n.category) + '</span>' +
+    '<h2>' + esc(n.label) + '</h2>',
+    '<div><span class="badge">' + esc(catLabel(n.category)) + '</span>' +
       '<span class="badge ' + (hasPano ? "pano-on" : "pano-off") + '">' +
       (hasPano ? "有 360° 实景" : "暂无实景") + '</span></div>',
-    '<p class="desc">' + (n.desc || "（暂无位置描述）") + '</p>',
+    '<p class="desc">' + esc(n.desc || "（暂无位置描述）") + '</p>',
     hasPano
-      ? '<button class="primary" id="openPano" type="button">查看 360° 实景</button>'
-      : '<p class="notice">该点暂无实景，以下是位置描述 —— 我们不会拿别的图糊弄你。</p>'
+      ? '<button class="btn" id="openPano" type="button">查看 360° 实景</button>'
+      : '<p class="notice notice--warn">该点暂无实景，以下是位置描述 —— 我们不会拿别的图糊弄你。</p>'
   ].join("");
   const open = $("#openPano");
   if (open) open.addEventListener("click", () => openPano(id));
@@ -455,9 +485,9 @@ function setupAmap() {
   }
   // JS API 开关
   const switchCfg = BG.jsapi || {};
+  $("#useShot").addEventListener("click", useShotBase); // 截图底图永远可切回（即使 JS API 被禁用）
   if (switchCfg.enabled === false) { $("#useAmap").disabled = true; return; }
   $("#useAmap").addEventListener("click", useAmapBase);
-  $("#useShot").addEventListener("click", useShotBase);
   setBasePressed("shot");
 }
 
@@ -476,6 +506,7 @@ function setupAmap() {
     " · 共 " + NODES.length + " 个点位，其中 " +
     NODES.filter((n) => n.pano_url && MANIFEST.scenes[n.id]).length + " 个已拍摄 360° 实景";
   renderMarkers();
+  window.addEventListener("resize", avoidLabelOverlap); // 底图变宽 / 变窄后重算标签车道
   setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
   $("#summary").textContent = NODES.length
     ? "点位类别：" + [...new Set(NODES.map((n) => catLabel(n.category)))].join(" / ")

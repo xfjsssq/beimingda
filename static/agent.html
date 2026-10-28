@@ -12,7 +12,7 @@
   <main class="page">
 
     <!-- ============ 区块一 · 一句话说明 ============ -->
-    <section class="section section--plain" aria-labelledby="block1-title">
+    <section class="hero" aria-labelledby="block1-title">
       <h1 id="block1-title">把整个平台，交给一句话</h1>
       <p class="lead">
         北名大小助手把代取、搭子、导览、日程四件事做成了平台，同时把<b>平台能力通过 MCP
@@ -20,36 +20,40 @@
         <b>用对话即可操控整个平台</b> —— 不用装 App、不用记网址、不用点按钮，
         在 WorkBuddy 里接一次，之后说话就行。
       </p>
-      <div class="row" style="margin-top:10px">
-        <span class="badge badge--ok">远程 URL 型 · 零配置接入</span>
-        <span class="badge" id="tool-count-badge">14 个 MCP 工具</span>
-        <span class="badge badge--muted">无本地 stdio · 无 SSE 长连接</span>
+      <div class="hero__tags">
+        <span class="hero__tag">远程 URL 型 · 零配置接入</span>
+        <span class="hero__tag" id="tool-count-badge">14 个 MCP 工具</span>
+        <span class="hero__tag">无本地 stdio · 无 SSE 长连接</span>
       </div>
     </section>
 
     <!-- ============ 区块二 · 一键复制的 MCP 配置 ============ -->
     <section class="section" aria-labelledby="block2-title">
       <h2 class="section__title" id="block2-title"><span class="section__index">2</span>一键复制的 MCP 配置</h2>
-      <p class="section__note" style="margin-top:0">
-        端点：<code class="inline" id="mcp-url">读取中…</code>
-        —— URL 取自<b>当前访问的站点</b>（<code class="inline">location.origin</code>），页面里没有写死任何域名。
-      </p>
+      <div class="split">
+        <div>
+          <p class="section__note" style="margin-top:0">
+            端点：<code class="inline" id="mcp-url">读取中…</code><br />
+            URL 取自<b>当前访问的站点</b>（<code class="inline">location.origin</code>），页面里没有写死任何域名。
+          </p>
 
-      <div class="row" role="group" aria-label="端点地址来源">
-        <button class="btn btn--quiet btn--sm" type="button" data-mode="origin" aria-pressed="true">当前站点地址</button>
-        <button class="btn btn--quiet btn--sm" type="button" data-mode="site" aria-pressed="false" id="mode-site">正式站点域名</button>
-        <span class="section__note" id="mode-note" style="margin:0"></span>
+          <div class="row" role="group" aria-label="端点地址来源" style="margin-top:12px">
+            <button class="btn btn--quiet btn--sm" type="button" data-mode="origin" aria-pressed="true">当前站点地址</button>
+            <button class="btn btn--quiet btn--sm" type="button" data-mode="site" aria-pressed="false" id="mode-site">正式站点域名</button>
+          </div>
+          <p class="section__note" id="mode-note"></p>
+
+          <ul class="hint-list" id="token-notes"></ul>
+        </div>
+        <div>
+          <pre class="code" id="mcp-json" style="margin-top:0" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
+          <div class="copy-row">
+            <button class="btn" type="button" id="copy-btn">复制配置</button>
+            <button class="btn btn--ghost btn--sm" type="button" id="download-btn">下载 mcp.json</button>
+            <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
+          </div>
+        </div>
       </div>
-
-      <pre class="code" id="mcp-json" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
-
-      <div class="copy-row">
-        <button class="btn" type="button" id="copy-btn">复制配置</button>
-        <button class="btn btn--ghost btn--sm" type="button" id="download-btn">下载 mcp.json</button>
-        <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
-      </div>
-
-      <ul class="hint-list" id="token-notes"></ul>
     </section>
 
     <!-- ============ 区块三 · 四步接入指引 ============ -->
@@ -129,10 +133,20 @@
       return { origin: location.origin, siteDomain: window.__SITE_DOMAIN__, mode };
     }
 
+    /* 仅用于展示的 JSON 着色：改的是 <pre> 里的 HTML，
+       复制 / 下载 / 全选拿到的仍然是 currentJson 原文（合法 JSON） */
+    function highlightJson(json) {
+      const escaped = json.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      return escaped.replace(/(&quot;(?:[^&]|&(?!quot;))*?&quot;)(\s*:)?/g, (m, str, colon) => {
+        const cls = colon ? "j-key" : str.indexOf("DEMO_TOKEN") !== -1 ? "j-tok" : "j-str";
+        return '<span class="' + cls + '">' + str + "</span>" + (colon || "");
+      });
+    }
+
     /** 复制出来的内容 = 页面上显示的内容，且必须是合法 JSON */
     function renderConfig() {
       const json = toMcpConfigJson(options());
-      jsonEl.textContent = json;
+      jsonEl.innerHTML = highlightJson(json);
 
       const url = resolveMcpUrl(options());
       $("#mcp-url").textContent = url || "（未取到，请用浏览器打开本站）";
@@ -300,7 +314,7 @@
 
     /* ---------------- 区块五：工具清单（静态清单 + 实时核对） ---------------- */
     const groupsEl = $("#tool-groups");
-    const chipIndex = new Map();
+    const rowIndex = new Map();
     for (const group of TOOLS_BY_MODULE) {
       const box = document.createElement("div");
       box.className = "tool-group";
@@ -313,23 +327,22 @@
       count.textContent = group.tools.length + " 个";
       head.appendChild(title);
       head.appendChild(count);
-      const ul = document.createElement("ul");
-      ul.className = "tool-list";
-      for (const t of group.tools) {
-        const li = document.createElement("li");
-        li.className = "tool-chip";
-        li.textContent = t.name;
-        li.title = t.desc;
-        ul.appendChild(li);
-        chipIndex.set(t.name, li);
-      }
-      const desc = document.createElement("p");
-      desc.className = "section__note";
-      desc.style.margin = "8px 0 0";
-      desc.textContent = group.tools.map((t) => t.name + "：" + t.desc).join("　");
       box.appendChild(head);
-      box.appendChild(ul);
-      box.appendChild(desc);
+      for (const t of group.tools) {
+        const row = document.createElement("div");
+        row.className = "tool-row";
+        const dot = document.createElement("span");
+        dot.className = "tool-row__dot";
+        const name = document.createElement("span");
+        name.className = "tool-row__name";
+        name.textContent = t.name;
+        const desc = document.createElement("span");
+        desc.className = "tool-row__desc";
+        desc.textContent = t.desc;
+        row.append(dot, name, desc);
+        box.appendChild(row);
+        rowIndex.set(t.name, row);
+      }
       groupsEl.appendChild(box);
     }
 
@@ -345,11 +358,11 @@
           " tools/list</code> —— 令牌由服务端注入后这里会自动显示实时结果。";
         return;
       }
-      const missing = [...chipIndex.keys()].filter((n) => !live.includes(n));
-      const extra = live.filter((n) => !chipIndex.has(n));
-      chipIndex.forEach((el, name) => {
-        if (live.includes(name)) el.style.borderColor = "rgba(46,139,118,.55)";
-        else el.style.borderColor = "rgba(192,57,43,.5)";
+      const missing = [...rowIndex.keys()].filter((n) => !live.includes(n));
+      const extra = live.filter((n) => !rowIndex.has(n));
+      rowIndex.forEach((row, name) => {
+        row.classList.toggle("is-live", live.includes(name));
+        row.classList.toggle("is-missing", !live.includes(name));
       });
       liveEl.innerHTML =
         "实时核对：<code class=\"inline\">POST " + MCP_PATH + " tools/list</code> 返回 <b>" + live.length +

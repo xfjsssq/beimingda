@@ -16,16 +16,21 @@
   <main class="page">
 
     <!-- ============ 区块一 · 顶部标语 ============ -->
-    <section class="section section--plain" aria-labelledby="hero-title">
+    <section class="hero" aria-labelledby="hero-title">
       <h1 id="hero-title">北名大小助手 ｜ 把散落的校园服务，收进一个对话</h1>
       <p class="lead">
         取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
         我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
         在对话框里说一句话就能办事。
       </p>
-      <div class="row" style="margin-top:12px">
-        <a class="btn" href="/agent">看怎么接入 Agent（评委页）</a>
+      <div class="hero__actions">
+        <a class="btn btn--light" href="/agent">看怎么接入 Agent（评委页）</a>
         <a class="btn btn--ghost" href="#features">看看四个功能</a>
+      </div>
+      <div class="hero__tags">
+        <span class="hero__tag">远程 MCP · 零配置接入</span>
+        <span class="hero__tag">代取 / 搭子 / 导览 / 日程</span>
+        <span class="hero__tag">不收集姓名 / 学号 / 手机号</span>
       </div>
     </section>
 
@@ -102,7 +107,7 @@
     </section>
 
     <!-- ============ 区块四 · Agent 入口提示 ============ -->
-    <section class="section" aria-labelledby="agent-title">
+    <section class="section section--callout" aria-labelledby="agent-title">
       <h2 class="section__title" id="agent-title"><span class="section__index">4</span>也可以只在 WorkBuddy 里说一句话</h2>
       <p class="lead">
         这个平台把能力做成了 <b>MCP 工具</b>，所以不用打开这些网页 —— 在 WorkBuddy 里接一次，
@@ -260,7 +265,7 @@
         const hint = failHint(err && err.code);
         srcEl.textContent = hint
           ? hint
-          : "接口未就绪（" + ((err && err.code) || "…") + "）· 等待 " + spec.owner;
+          : "接口未就绪（" + ((err && err.code) || "…") + "）· 对应模块尚未接入";
         return;
       }
       box.classList.remove("stat--pending");
@@ -283,8 +288,8 @@
       note.classList.remove("hidden");
       note.textContent =
         "仍有 " + pending.length + " 项统计的接口还没就绪（" +
-        pending.map((s) => s.paths[0] + " · " + s.owner).join("；") +
-        "）。这里显示「—」而不是编一个数字 —— 接口一上线刷新就会自动出现。";
+        pending.map((s) => s.paths[0]).join("；") +
+        "）。这里显示「—」而不是编一个数字 —— 接口一就绪，刷新就会自动出现。";
     }
 
     async function loadServer() {
@@ -332,7 +337,7 @@
         if (demo.seedPending) {
           const note = document.getElementById("demo-note");
           note.textContent =
-            "演示模式已开启，但演示数据接口尚未就绪（GET /api/demo/seed · 核心层/各模块分支负责）；" +
+            "演示模式已开启，但演示数据接口尚未就绪（GET /api/demo/seed）；" +
             "下面能看到多少数字取决于当前库里已有的数据。";
         }
       }
