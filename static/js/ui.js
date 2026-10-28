@@ -170,7 +170,6 @@ export default {
   el,
   icon,
   decorIcon,
-  ICON_NAMES,
   clearState,
   showLoading,
   showEmpty,
