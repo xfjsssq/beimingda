@@ -159,6 +159,12 @@ const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
 const busyMatches = new Set();   // 正在提交的 match_id（防连点）
 let boardLoading = false;
 
+/* 撮合结果缓存：同一任务 20 秒内不重复打写接口。
+   看板每张卡片都要撮合一次（写接口），单 IP 却只有 60 次/分钟 ——
+   缓存给「刷新」留出余量，避免演示现场连点几次就被限频（429）。 */
+const MATCH_TTL_MS = 20_000;
+const matchCache = new Map();    // task_id → { list, error, at }
+
 mountNav();
 
 /* =====================================================================
@@ -406,6 +412,7 @@ function buildPublishSheet() {
   const foot = el("div", "");
   const btnPublish = el("button", "btn");
   btnPublish.type = "button";
+  btnPublish.id = "btn-publish";
   btnPublish.appendChild(icon("package", { size: 16 }));
   btnPublish.appendChild(el("span", "", "发布代取"));
   const btnCancel = el("button", "btn btn--quiet", "取消");
@@ -493,7 +500,7 @@ function buildPublishSheet() {
       $("#parse-out").innerHTML = "";
       $("#publish-out").innerHTML = "";
       sheet.close();
-      await loadBoard();
+      await loadBoard({ force: true }); // 新任务要立刻撮合一次
     } catch (e) {
       mountNotice("#publish-out", "danger", "发布失败：" + errorText(e));
     } finally {
@@ -544,6 +551,7 @@ function buildRegisterSheet() {
   const foot = el("div", "");
   const btnRegister = el("button", "btn btn--ok");
   btnRegister.type = "button";
+  btnRegister.id = "btn-register";
   btnRegister.appendChild(icon("check", { size: 16 }));
   btnRegister.appendChild(el("span", "", "登记 / 覆盖登记"));
   const btnAdd = el("button", "btn btn--ghost btn--sm", "加一段时段");
@@ -586,7 +594,7 @@ function buildRegisterSheet() {
       toast("登记成功：可达楼栋 " + buildings.length + " 个 · 时段 " + windows.length + " 段", "ok");
       $("#register-out").innerHTML = "";
       sheet.close();
-      await loadBoard();
+      await loadBoard({ force: true }); // 新登记的能力可能改变候选
     } catch (e) {
       mountNotice("#register-out", "danger", "登记失败：" + errorText(e));
     } finally {
@@ -729,9 +737,10 @@ function paintCands(t) {
       onAction: () => {
         state.matches.delete(t.task_id);
         state.matchErrors.delete(t.task_id);
+        matchCache.delete(t.task_id);
         paintCands(t);
         paintSide(t);
-        void runMatch(t);
+        void runMatch(t, { force: true });
       },
     }));
     return;
@@ -838,19 +847,30 @@ function renderBoard() {
    撮合 + 接单
    ===================================================================== */
 
-/** 逐张卡片触发撮合（并发 3，避免把单 IP 60 次/分钟的限频打满） */
-async function runMatch(t) {
+/** 逐张卡片触发撮合（并发 3；20 秒内用缓存，避免把单 IP 60 次/分钟的限频打满） */
+async function runMatch(t, { force = false } = {}) {
+  const cached = matchCache.get(t.task_id);
+  if (!force && cached && Date.now() - cached.at < MATCH_TTL_MS) {
+    state.matches.set(t.task_id, cached.list);
+    if (cached.error) state.matchErrors.set(t.task_id, cached.error);
+    else state.matchErrors.delete(t.task_id);
+    repaintCard(t);
+    return;
+  }
   if (cardRefs.has(t.task_id)) paintCands(t);
   try {
     const list = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/match", {
       method: "POST",
       body: {},
     });
-    state.matches.set(t.task_id, Array.isArray(list) ? list : []);
+    const value = Array.isArray(list) ? list : [];
+    state.matches.set(t.task_id, value);
     state.matchErrors.delete(t.task_id);
+    matchCache.set(t.task_id, { list: value, error: null, at: Date.now() });
   } catch (e) {
     state.matches.set(t.task_id, null);
     state.matchErrors.set(t.task_id, e);
+    matchCache.set(t.task_id, { list: null, error: e, at: Date.now() });
   }
   repaintCard(t);
 }
@@ -891,7 +911,7 @@ async function refreshAccepted() {
   }
 }
 
-async function loadBoard() {
+async function loadBoard({ force = false } = {}) {
   if (boardLoading) return;
   boardLoading = true;
   const btn = $("#btn-reload");
@@ -922,7 +942,7 @@ async function loadBoard() {
 
     paintBoardCount();
     renderBoard();
-    await mapLimit(state.tasks, 3, (t) => runMatch(t));
+    await mapLimit(state.tasks, 3, (t) => runMatch(t, { force }));
     paintBoardCount();
   } finally {
     boardLoading = false;
@@ -959,7 +979,7 @@ async function acceptMatch(taskId, matchId) {
       await refreshAccepted();
       paintCands(t);
       paintSide(t);
-      void runMatch(t);
+      void runMatch(t, { force: true });
     }
   } finally {
     busyMatches.delete(matchId);
