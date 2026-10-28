@@ -3,17 +3,27 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>代取撮合 · 北名大小助手</title>
+<title>代取看板 · 北名大小助手</title>
 <!--
-  M1 · 代取撮合页（四个区块：发布任务 / 跑腿登记 / 任务看板 / 匹配结果）
-  - 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/ui.js
-  - 本文件只保留「代取特有」的布局（时段行、截图预览）与业务逻辑
-  - 令牌只从 /js/api.js 的运行时链路取（注入 / 会话 / ?token=），⛔ 不硬编码、不回显、不落 localStorage
-  - 平台不参与交易、不代收款：报酬由双方线下协商
+  代取撮合页（M1）—— 2026-10-28 改成「看单为主 · 功能收进按钮」
+
+  设计口径（来自用户原话）：
+    · 打开这一页第一屏就是**开放任务看板**，看到顺路的单子直接「接这一单」
+    · 「发布代取」「登记跑腿能力」不占看板的地方，收进右上角 .toolbar 的两个按钮，
+      点开用 createSheet() 弹出侧栏（≤640px 自动变底部面板）
+    · 删掉「先点一个按钮才看得到候选」的独立动作：撮合在看板加载时自动跑，候选直接铺在卡片里
+      （卡片上那行「系统已为你找到 N 位顺路的同学」→ 点开展示 昵称 / score / reason）
+    · 令牌内置：/config.js 注入 window.__DEMO_TOKEN__，/js/api.js 自动带 X-Demo-Token；
+      页面上 ⛔ 没有任何令牌输入框，也不回显令牌
+
+  约定：
+    · 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/demo.js、/js/ui.js
+    · 图标一律 static/vendor/tabler/icons/*.svg + .icon（⛔ 不用 emoji）
+    · ⛔ 不收姓名 / 学号 / 手机号；⛔ 截图原图不落盘；平台不参与交易、不代收款
 -->
 <link rel="stylesheet" href="/css/app.css" />
 <style>
-  /* 时段行：⚠️ datetime-local 固有最小宽约 182px，必须 minmax(0,1fr) 才允许收缩 */
+  /* 时段行：注意 datetime-local 固有最小宽约 182px，必须 minmax(0,1fr) 才允许收缩 */
   .wins .win { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
     gap:8px; margin-bottom:8px; align-items:end; }
   @media (max-width:640px) {
@@ -21,257 +31,320 @@
     .wins .win { grid-template-columns:minmax(0,1fr) auto; }
     .wins .win .w-start { grid-column:1 / -1; }
   }
-  .task-id { font-family:var(--font-mono); font-size:11.5px; color:var(--color-muted-soft); }
-  .board-toolbar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:12px; }
-  .board-toolbar select { max-width:220px; width:auto; }
-  .deadline { font-weight:600; color:var(--color-text-soft); }
+
+  /* ---- 工具栏 ---- */
+  .toolbar select { max-width:200px; width:auto; min-width:0; }
+
+  /* ---- 看板卡片 ---- */
+  .takeout-card__head { display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; }
+  .takeout-card__main { flex:1 1 240px; min-width:0; }
+  .takeout-card__route { margin:0; font-size:16.5px; font-weight:600; line-height:1.35;
+    color:var(--color-primary); overflow-wrap:anywhere; }
+  .takeout-card__side { display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+    margin-left:auto; flex:0 0 auto; }
+  .takeout-card__note { margin:10px 0 0; font-size:13px; line-height:1.7;
+    color:var(--color-muted); overflow-wrap:anywhere; }
+  .takeout-card__cands { margin-top:12px; }
+  .takeout-card__cands .empty-art { padding:14px 12px; }
+  .takeout-card__cands .empty-art img { width:112px; }
+
+  /* 倒计时：紧张 / 过期要有醒目标记（红底加粗 + 警示图标） */
+  .chip--soon { background:var(--color-primary-soft); border-color:var(--color-primary-line);
+    color:var(--color-primary); font-weight:600; }
+  .chip--urgent { background:var(--color-danger-soft); border-color:rgba(192,57,43,.3);
+    color:var(--color-danger); font-weight:600; }
+
+  /* ---- 候选行 ---- */
+  .cands-loading { display:flex; align-items:center; gap:9px; font-size:13px; color:var(--color-muted); }
+  .cand { border:1px solid var(--color-line); border-radius:var(--radius-md);
+    padding:11px 13px; background:#fff; min-width:0; }
+  .cand + .cand { margin-top:8px; }
+  .cand.is-dim { opacity:.5; }
+  .cand__line { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .cand__name { font-weight:600; font-size:14.5px; min-width:0; overflow-wrap:anywhere; }
+  .cand .reason { margin-top:8px; }
+  .cand__meta { margin-top:7px; font-family:var(--font-mono); font-size:11.5px;
+    color:var(--color-muted-soft); overflow-wrap:anywhere; }
+  .task-id { margin:10px 0 0; font-family:var(--font-mono); font-size:11.5px;
+    color:var(--color-muted-soft); overflow-wrap:anywhere; }
+
+  /* ---- 侧栏内部零件 ---- */
+  .sheet__foot { flex-wrap:wrap; }
+  .sheet__foot .hint { flex:1 1 100%; margin:0; }
+  #p-shot { max-width:100%; }
+  #publish-out, #register-out { margin-top:10px; }
+
+  @media (max-width:640px) {
+    /* 窄屏：主按钮不再挤在右侧，整行铺开，避免横向溢出 */
+    .takeout-card__side { flex-direction:row; align-items:center; justify-content:space-between;
+      width:100%; margin-left:0; flex-wrap:wrap; }
+    .cand__line .score { margin-left:0; }
+  }
 </style>
 </head>
 <body>
 <main class="page page--mid">
   <div class="page-head">
-    <h1>代取撮合</h1>
-    <p class="lead">发布取件需求 → 跑腿者登记能力 → 撮合引擎按「可达性 40 / 时间 30 / 报酬 30」打分，只推 ≥60 分的候选人。</p>
+    <h1>代取看板</h1>
+    <p class="lead">打开这一页就是开放任务：看到顺路的单子直接「接这一单」。发布需求、登记跑腿能力收在右上角按钮里，点开才出现，不占看单的地方。</p>
     <div class="page-head__tags">
-      <span class="badge">score ≥ 60 才推荐</span>
+      <span class="badge">打开即看单</span>
+      <span class="badge badge--muted">score ≥ 60 才进候选</span>
       <span class="badge badge--muted">平台不参与交易、不代收款</span>
     </div>
   </div>
 
-  <!-- ───────────── 区块一 · 发布任务 ───────────── -->
-  <section class="section" id="sec-publish">
-    <h2 class="section__title"><span class="section__index">1</span>发布任务</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="p-owner">你的昵称（本站只收昵称，不收姓名/学号/手机号）</label>
-        <input id="p-owner" value="同学A" maxlength="32" />
-      </div>
-      <div class="field">
-        <label for="p-from">取件楼栋</label>
-        <select id="p-from"></select>
-      </div>
-      <div class="field">
-        <label for="p-to">送达楼栋</label>
-        <select id="p-to"></select>
-      </div>
-      <div class="field">
-        <label for="p-station">快递站</label>
-        <input id="p-station" list="station-list" value="快递驿站" />
-        <datalist id="station-list"></datalist>
-      </div>
-      <div class="field">
-        <label for="p-deadline">截止时间</label>
-        <input id="p-deadline" type="datetime-local" />
-      </div>
-      <div class="field">
-        <label for="p-rmin">报酬区间（元，下限 – 上限）</label>
-        <div class="form-grid form-grid--2">
-          <input id="p-rmin" type="number" min="0" step="0.5" value="3" aria-label="报酬下限" />
-          <input id="p-rmax" type="number" min="0" step="0.5" value="5" aria-label="报酬上限" />
-        </div>
-      </div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <label for="p-note">备注（入库前自动打码手机号 / 超长单号）</label>
-      <textarea id="p-note" placeholder="例：小件，两个包裹；12号宿舍楼取快递送到15号宿舍楼，报酬3-5元"></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn" id="btn-publish" type="button">发布任务</button>
-      <span class="hint">报酬由双方线下协商，平台不参与交易、不代收款。</span>
-    </div>
-    <div class="form-actions">
-      <input id="p-shot" type="file" accept="image/*" aria-label="取件截图（可选）" />
-      <button class="btn btn--ghost btn--sm" id="btn-parse" type="button">识别截图字段</button>
-      <span class="hint">原图不落盘；只做字段理解，<b>不抽取收件人姓名 / 手机号 / 运单号</b>。</span>
-    </div>
-    <div id="parse-out"></div>
-    <div id="publish-out"></div>
-  </section>
+  <!-- ───────────── 工具栏：两个功能按钮 + 筛选/刷新 ───────────── -->
+  <div class="toolbar">
+    <button class="btn" id="btn-open-publish" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/package.svg)" aria-hidden="true"></span>
+      <span>发布代取</span>
+    </button>
+    <button class="btn btn--ghost" id="btn-open-register" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/walk.svg)" aria-hidden="true"></span>
+      <span>登记跑腿能力</span>
+    </button>
+    <span class="toolbar__spacer"></span>
+    <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
+    <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/refresh.svg)" aria-hidden="true"></span>
+      <span>刷新看板</span>
+    </button>
+  </div>
 
-  <!-- ───────────── 区块二 · 跑腿登记 ───────────── -->
-  <section class="section" id="sec-register">
-    <h2 class="section__title"><span class="section__index">2</span>跑腿登记</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="r-owner">你的昵称</label>
-        <input id="r-owner" value="同学B" maxlength="32" />
-      </div>
-      <div class="field">
-        <label for="r-floor">可接受报酬下限（元）</label>
-        <input id="r-floor" type="number" min="0" step="0.5" value="2" />
-      </div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <span class="field__label">可达楼栋（多选）</span>
-      <div class="chk" id="r-buildings"></div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <span class="field__label">可跑时段（可多段；只填你真正有空的时间）</span>
-      <div class="wins" id="r-windows"></div>
-    </div>
-    <div class="form-actions">
-      <button class="btn btn--ghost btn--sm" id="btn-add-window" type="button">+ 加一段时段</button>
-      <button class="btn btn--ok" id="btn-register" type="button">登记 / 覆盖登记</button>
-      <span class="hint">同一昵称重复登记 = 覆盖更新（<code>runners.user_id</code> 唯一）。</span>
-    </div>
-    <div id="register-out"></div>
-  </section>
-
-  <!-- ───────────── 区块三 · 任务看板 ───────────── -->
-  <section class="section" id="sec-board">
-    <h2 class="section__title"><span class="section__index">3</span>任务看板</h2>
-    <div class="board-toolbar">
-      <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
-      <button class="btn btn--ghost btn--sm" id="btn-reload" type="button">刷新</button>
-      <span class="hint" id="board-count"></span>
-    </div>
-    <div id="board"></div>
-  </section>
-
-  <!-- ───────────── 区块四 · 匹配结果 ───────────── -->
-  <section class="section" id="sec-match">
-    <h2 class="section__title"><span class="section__index">4</span>匹配结果</h2>
-    <p class="hint" style="margin:0 0 10px">
-      点看板里某个任务的「查看匹配」，这里会显示<b>候选跑腿者 + score + reason</b>（reason 里的分值相加正好等于 score）；
-      阈值 60，低于 60 分的一律不出现。同一任务对同一人 5 分钟内不重复推送。
-    </p>
-    <div id="match-out"></div>
-  </section>
-
+  <!-- ───────────── 开放任务看板（第一屏） ───────────── -->
   <section class="section">
-    <h2 class="section__title">演示令牌（写接口需要）</h2>
-    <p class="hint" style="margin:0">
-      发布 / 触发撮合 / 登记是写接口，需要 <code>X-Demo-Token</code>（MCP 端点是 <code>Authorization: Bearer</code>）。
-      令牌限频 + 短周期轮换、只能操作演示数据；真实值不进任何参赛材料。
-      令牌只存本机浏览器<b>会话</b>（sessionStorage），⛔ 不写进代码、⛔ 不回显到输入框。
-    </p>
-    <div class="form-grid" style="margin-top:12px">
-      <div class="field">
-        <label for="tk">令牌（留空则沿用服务端注入 / 已保存值）</label>
-        <input id="tk" type="password" placeholder="<DEMO_TOKEN>" autocomplete="off" />
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">开放任务</span>
+        <h2>待取看板</h2>
+        <p id="board-count">正在读取…</p>
       </div>
-      <div class="field">
-        <span class="field__label">当前状态</span>
-        <div class="row">
-          <button class="btn btn--ghost btn--sm" id="btn-tk" type="button">保存令牌</button>
-          <span class="pill" id="tk-state">未配置</span>
-        </div>
-      </div>
+      <span class="chip" id="token-chip"></span>
     </div>
+    <div id="board" class="stack"></div>
+    <p class="hint" id="board-note">
+      匹配结果直接铺在每张卡片里：点开「系统已为你找到 N 位顺路的同学」，就能看到每位候选的
+      score / 100 与 reason 原文（reason: 里的分值相加正好等于 score）。阈值 60，低于 60 分的一律不出现。
+    </p>
   </section>
 </main>
 
 <footer class="site-footer">
   <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+  <p>本页不需要你填任何令牌：写接口令牌已由服务端配置（<code class="inline">/config.js</code> 注入，前端自动带上）。</p>
 </footer>
 
 <script src="/config.js"></script>
 <script type="module">
-import { apiToken, setApiToken, hasWriteToken } from "/js/api.js";
+import { api, hasWriteToken, mcpRpc } from "/js/api.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo, displayName } from "/js/demo.js";
-import { el, showLoading, showEmpty, showError, showSuccess, showNotice, errorText } from "/js/ui.js";
+import { el, icon, createSheet, toast, showLoading, errorText } from "/js/ui.js";
 
 const $ = (s) => document.querySelector(s);
+const money = (n) => (Number.isFinite(Number(n)) ? String(Number(n)) : "—");
+
+/* 看板状态（页面自己的视图缓存；⛔ 不落 localStorage、不缓存令牌） */
+const state = {
+  tasks: [],                 // 当前看板上的开放任务
+  matches: new Map(),        // task_id → Match[]（含 reason 原文）；null = 撮合失败；undefined = 撮合中
+  matchErrors: new Map(),    // task_id → 错误对象
+  accepted: new Set(),       // 已经有 accepted 撮合记录的任务（跨 5 分钟去重窗口仍然准）
+  openSet: new Set(),        // 已展开候选列表的任务
+};
+const cardRefs = new Map();      // task_id → { card, side, cands }
+const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
+const busyMatches = new Set();   // 正在提交的 match_id（防连点）
+let boardLoading = false;
+
+/* 撮合结果缓存：同一任务 20 秒内不重复打写接口。
+   看板每张卡片都要撮合一次（写接口），单 IP 却只有 60 次/分钟 ——
+   缓存给「刷新」留出余量，避免演示现场连点几次就被限频（429）。 */
+const MATCH_TTL_MS = 20_000;
+const matchCache = new Map();    // task_id → { list, error, at }
+
 mountNav();
 
-/* ---------- 令牌：全站统一走 /js/api.js（注入 → 会话 → ?token= 并清地址栏） ---------- */
-function paintToken() {
-  const s = $("#tk-state");
-  const has = hasWriteToken();
-  s.textContent = has ? "已配置" : "未配置（写接口会 401）";
-  s.className = "pill " + (has ? "ok" : "warn");
-  $("#tk").value = ""; // ⛔ 永不回填，投屏 / 直播也不会露出令牌
-  $("#tk").placeholder = has ? "已保存（重新输入可覆盖）" : "<DEMO_TOKEN>";
-}
-$("#btn-tk").addEventListener("click", () => {
-  const v = $("#tk").value.trim();
-  if (v) setApiToken(v);
-  paintToken();
-});
+/* =====================================================================
+   通用小零件（图标一律走 .icon + Tabler svg，⛔ 不用 emoji）
+   ===================================================================== */
 
-/* ---------- 统一信封解包（读接口开放；写接口自动带令牌） ---------- */
-async function apiGet(path) {
-  const r = await fetch(path, { headers: { accept: "application/json" } });
-  const j = await r.json().catch(() => ({ ok: false, error: { message: "响应不是 JSON" } }));
-  return { status: r.status, ...j };
+function chip(iconName, text, extraCls = "") {
+  const c = el("span", "chip" + (extraCls ? " " + extraCls : ""));
+  c.appendChild(icon(iconName, { size: 15 }));
+  c.appendChild(el("span", "", String(text)));
+  return c;
 }
-async function apiPost(path, body) {
-  const r = await fetch(path, {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-demo-token": apiToken() },
-    body: JSON.stringify(body || {}),
-  });
-  const j = await r.json().catch(() => ({ ok: false, error: { message: "响应不是 JSON" } }));
-  return { status: r.status, ...j };
+
+/** 自绘三态块：ui.js 的三态组件自带 emoji 图标，这里统一换成 Tabler svg */
+function stateBox(kind, { iconName = "info-circle", title, hint, actionText, onAction } = {}) {
+  const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
+  const ic = el("div", "state__icon");
+  ic.appendChild(icon(iconName, { size: 28 }));
+  wrap.appendChild(ic);
+  if (title) wrap.appendChild(el("p", "state__title", title));
+  if (hint) wrap.appendChild(el("p", "state__hint", hint));
+  if (actionText && typeof onAction === "function") {
+    const actions = el("div", "state__action");
+    const btn = el("button", "btn btn--ghost btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    actions.appendChild(btn);
+    wrap.appendChild(actions);
+  }
+  return wrap;
 }
-async function mcpCall(name, args) {
-  const r = await fetch("/mcp", {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: "Bearer " + apiToken() },
-    body: JSON.stringify({ jsonrpc: "2.0", id: Date.now() % 100000, method: "tools/call", params: { name, arguments: args } }),
-  });
-  if (r.status === 401) return { ok: false, error: { code: "SCHEMA_REJECTED", message: "MCP 端点需要有效令牌（见下方「演示令牌」）" } };
-  const j = await r.json().catch(() => null);
-  const sc = j && j.result && j.result.structuredContent;
-  return sc || { ok: false, error: { code: "INTERNAL", message: (j && j.error && j.error.message) || "MCP 调用失败" } };
+
+/** 空态（用设计系统里的插画 + .empty-art） */
+function emptyArt(text, hint, actionText, onAction) {
+  const art = el("div", "empty-art");
+  const img = el("img");
+  img.src = "/img/empty-state.png";
+  img.alt = "";
+  img.setAttribute("loading", "lazy");
+  art.appendChild(img);
+  art.appendChild(el("p", "", text));
+  if (hint) art.appendChild(el("p", "hint small", hint));
+  if (actionText && typeof onAction === "function") {
+    const btn = el("button", "btn btn--ghost btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    art.appendChild(btn);
+  }
+  return art;
 }
+
+/** 行内提示条（带 Tabler 图标） */
+function mountNotice(target, kind, text) {
+  const box = typeof target === "string" ? $(target) : target;
+  if (!box) return;
+  box.innerHTML = "";
+  const p = el("p", "notice" + (kind ? " notice--" + kind : ""));
+  p.style.display = "flex";
+  p.style.alignItems = "center";
+  p.style.gap = "7px";
+  p.appendChild(icon(kind === "danger" ? "alert-triangle" : kind === "ok" ? "circle-check" : "info-circle", { size: 16 }));
+  p.appendChild(el("span", "", text));
+  if (kind === "danger") p.setAttribute("role", "alert");
+  box.appendChild(p);
+}
+
 function jsonNode(obj) {
   const pre = el("pre", "code");
   pre.textContent = JSON.stringify(obj, null, 2);
   return pre;
 }
-function failOf(j) {
-  return { code: j && j.error && j.error.code, message: j && j.error && j.error.message };
+
+/** 时间工具：本地 datetime-local ↔ ISO */
+function localInput(ts) {
+  const d = new Date(ts - new Date().getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
 }
 
-/* ---------- 楼栋 / 快递站：优先 M3 的 /api/map/nodes，没有就用规范名兜底 ---------- */
+/** 倒计时（距截止还有 XX 分钟；紧张 / 过期给醒目标记） */
+function countdownChip(t) {
+  const ms = new Date(t.deadline_iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) {
+    return chip("clock", "截止时间未知", "chip--soon");
+  }
+  if (ms <= 0) {
+    return chip("alert-triangle", "已过期", "chip--urgent");
+  }
+  const m = Math.floor(ms / 60000);
+  const text = m < 120
+    ? "距截止还有 " + m + " 分钟"
+    : m < 1440
+      ? "距截止还有 " + Math.floor(m / 60) + " 小时" + (m % 60 ? " " + (m % 60) + " 分" : "")
+      : "距截止还有 " + Math.floor(m / 1440) + " 天";
+  if (ms <= 30 * 60000) return chip("alert-triangle", text, "chip--urgent");
+  if (ms <= 120 * 60000) return chip("clock", text, "chip--soon");
+  return chip("clock", text);
+}
+
+function tickCountdowns() {
+  for (const t of state.tasks) {
+    const ref = countdownRefs.get(t.task_id);
+    if (!ref || !ref.parentNode) continue;
+    const fresh = countdownChip(t);
+    ref.parentNode.replaceChild(fresh, ref);
+    countdownRefs.set(t.task_id, fresh);
+  }
+}
+
+/* =====================================================================
+   楼栋 / 快递站（优先 M3 的 /api/map/nodes，没有就用规范名兜底）
+   ===================================================================== */
 const FALLBACK_NODES = [
   { label: "12号宿舍楼", category: "dorm" }, { label: "15号宿舍楼", category: "dorm" },
   { label: "第二食堂", category: "canteen" }, { label: "南门", category: "gate" },
   { label: "快递驿站", category: "service" },
 ];
 let NODES = FALLBACK_NODES;
-async function loadNodes() {
-  const j = await apiGet("/api/map/nodes").catch(() => null);
-  if (j && j.ok && Array.isArray(j.data) && j.data.length) NODES = j.data;
+
+function buildingLabels() {
   const dorms = NODES.filter((n) => n.category === "dorm").map((n) => n.label);
-  const opts = dorms.length ? dorms : NODES.map((n) => n.label);
-  for (const id of ["#p-from", "#p-to", "#b-filter"]) {
-    const sel = $(id); const keep = sel.value; sel.innerHTML = "";
-    if (id === "#b-filter") sel.appendChild(new Option("全部楼栋", ""));
-    opts.forEach((label) => sel.appendChild(new Option(label, label)));
-    if (id === "#p-to" && opts.length > 1) sel.value = opts[1];
-    else sel.value = keep || opts[0] || "";
-  }
-  const dl = $("#station-list"); dl.innerHTML = "";
+  return dorms.length ? dorms : NODES.map((n) => n.label);
+}
+
+function fillBuildingOptions(sel, { all = false, index = 0 } = {}) {
+  if (!sel) return;
+  const opts = buildingLabels();
+  const keep = sel.value;
+  sel.innerHTML = "";
+  if (all) sel.appendChild(new Option("全部楼栋", ""));
+  opts.forEach((label) => sel.appendChild(new Option(label, label)));
+  // 已经选过就保留用户选择；否则按调用方给的默认位次（取件楼 0 / 送达楼 1）
+  sel.value = all ? keep || "" : (opts.includes(keep) ? keep : opts[index] || opts[0] || "");
+}
+
+function fillStationList() {
+  const dl = $("#station-list");
+  if (!dl) return;
+  dl.innerHTML = "";
   NODES.forEach((n) => dl.appendChild(new Option(n.label, n.label)));
-  const box = $("#r-buildings"); box.innerHTML = "";
-  opts.forEach((label) => {
-    const l = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = label;
-    l.appendChild(cb); l.appendChild(document.createTextNode(label)); box.appendChild(l);
+}
+
+function fillBuildingChecks() {
+  const box = $("#r-buildings");
+  if (!box) return;
+  const checked = new Set([...box.querySelectorAll("input:checked")].map((c) => c.value));
+  box.innerHTML = "";
+  buildingLabels().forEach((label) => {
+    const l = el("label");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = label;
+    if (checked.has(label)) cb.checked = true;
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(label));
+    box.appendChild(l);
   });
 }
 
-/* ---------- 时间工具 ---------- */
-function localInput(ts) {
-  const d = new Date(ts - new Date().getTimezoneOffset() * 60000);
-  return d.toISOString().slice(0, 16);
-}
-function countdown(iso) {
-  const ms = new Date(iso).getTime() - Date.now();
-  if (!Number.isFinite(ms)) return "—";
-  if (ms <= 0) return "已过期";
-  const m = Math.floor(ms / 60000);
-  if (m < 60) return m + " 分钟后截止";
-  const h = Math.floor(m / 60), mm = m % 60;
-  if (h < 24) return h + " 小时" + (mm ? mm + " 分" : "") + "后截止";
-  return Math.floor(h / 24) + " 天" + (h % 24) + " 小时后截止";
+async function loadNodes() {
+  try {
+    const data = await api("/api/map/nodes");
+    if (Array.isArray(data) && data.length) NODES = data;
+  } catch {
+    /* 归到兜底规范名，页面照常可用 */
+  }
+  fillBuildingOptions($("#b-filter"), { all: true });
+  fillBuildingOptions($("#p-from"), { index: 0 });
+  fillBuildingOptions($("#p-to"), { index: 1 });
+  fillStationList();
+  fillBuildingChecks();
 }
 
-/* ---------- 时段行 ---------- */
+/* =====================================================================
+   侧栏一 · 发布代取（点按钮才出现）
+   ===================================================================== */
+let publishSheet = null;
+
 function addWindow(startMin, endMin) {
+  const box = $("#r-windows");
+  if (!box) return;
   const wrap = el("div", "win");
   const s = el("input"); s.type = "datetime-local"; s.className = "w-start";
   s.setAttribute("aria-label", "时段开始");
@@ -282,190 +355,672 @@ function addWindow(startMin, endMin) {
   const del = el("button", "btn btn--quiet btn--sm", "删除"); del.type = "button";
   del.addEventListener("click", () => wrap.remove());
   wrap.append(s, e, del);
-  $("#r-windows").appendChild(wrap);
+  box.appendChild(wrap);
 }
 
-/* ---------- 区块一：识别截图 ---------- */
-$("#btn-parse").addEventListener("click", async () => {
-  const f = $("#p-shot").files && $("#p-shot").files[0];
-  if (!f) { showNotice("#parse-out", "先选一张截图。", "danger"); return; }
-  if (f.size > 1.4 * 1024 * 1024) { showNotice("#parse-out", "图片过大（≤1.4MB，请求体上限 2mb）。", "danger"); return; }
-  const dataUrl = await new Promise((res, rej) => {
-    const fr = new FileReader();
-    fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("读取失败"));
-    fr.readAsDataURL(f);
-  }).catch(() => "");
-  if (!dataUrl) { showError("#parse-out", "读取图片失败"); return; }
-  showLoading("#parse-out", "识别中…（图片只在本次请求内使用，不落盘）");
-  const j = await mcpCall("task_parse_screenshot", { image_base64: dataUrl, hint: $("#p-note").value.trim() });
-  if (!j.ok) { showError("#parse-out", failOf(j)); return; }
-  const d = j.data || {};
-  const box = $("#parse-out"); box.innerHTML = "";
-  box.appendChild(el("p", "hint",
-    (d.degraded ? "⚠️ 降级模式（未配置视觉模型）：" : "✅ 模型识别：") +
-    "confidence=" + d.confidence + "（识别不出的字段为 null，绝不猜）" + (d.degrade_reason ? "｜" + d.degrade_reason : "")));
-  if (d.from_building) $("#p-from").value = d.from_building;
-  if (d.to_building) $("#p-to").value = d.to_building;
-  if (d.station) $("#p-station").value = d.station;
-  if (d.deadline_iso) { const t = new Date(d.deadline_iso); if (!Number.isNaN(t.getTime())) $("#p-deadline").value = localInput(t.getTime()); }
-  if (typeof d.reward_min === "number") $("#p-rmin").value = d.reward_min;
-  if (typeof d.reward_max === "number") $("#p-rmax").value = d.reward_max;
-  box.appendChild(jsonNode(d));
-});
+function buildPublishSheet() {
+  const body = el("div");
+  body.innerHTML = [
+    '<div class="stack">',
+    '  <div class="form-grid">',
+    '    <div class="field">',
+    '      <label for="p-owner">你的昵称（本站只收昵称，不收姓名/学号/手机号）</label>',
+    '      <input id="p-owner" value="同学A" maxlength="32" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-from">取件楼栋</label>',
+    '      <select id="p-from"></select>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-to">送达楼栋</label>',
+    '      <select id="p-to"></select>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-station">快递站</label>',
+    '      <input id="p-station" list="station-list" value="快递驿站" />',
+    '      <datalist id="station-list"></datalist>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-deadline">截止时间</label>',
+    '      <input id="p-deadline" type="datetime-local" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-rmin">报酬区间（元，下限 – 上限）</label>',
+    '      <div class="form-grid form-grid--2">',
+    '        <input id="p-rmin" type="number" min="0" step="0.5" value="3" aria-label="报酬下限" />',
+    '        <input id="p-rmax" type="number" min="0" step="0.5" value="5" aria-label="报酬上限" />',
+    '      </div>',
+    '    </div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <label for="p-note">备注（入库前自动打码手机号 / 超长单号）</label>',
+    '    <textarea id="p-note" rows="3" placeholder="例：小件，两个包裹"></textarea>',
+    '  </div>',
+    '  <div class="field">',
+    '    <label for="p-shot">取件截图（可选）</label>',
+    '    <input id="p-shot" type="file" accept="image/*" aria-label="取件截图（可选）" />',
+    '    <div class="form-actions">',
+    '      <button class="btn btn--ghost btn--sm" id="btn-parse" type="button">识别截图字段</button>',
+    '      <span class="hint">原图不落盘；只做字段理解，<b>不抽取收件人姓名 / 手机号 / 运单号</b>。</span>',
+    '    </div>',
+    '  </div>',
+    '  <div id="parse-out"></div>',
+    '  <div id="publish-out"></div>',
+    '</div>',
+  ].join("\n");
 
-/* ---------- 区块一：发布 ---------- */
-$("#btn-publish").addEventListener("click", async () => {
-  const dl = $("#p-deadline").value;
-  const body = {
-    from_building: $("#p-from").value,
-    to_building: $("#p-to").value,
-    station: $("#p-station").value.trim(),
-    deadline_iso: dl ? new Date(dl).toISOString() : "",
-    reward_min: Number($("#p-rmin").value),
-    reward_max: Number($("#p-rmax").value),
-    note: $("#p-note").value.trim() || null,
-    screenshot_path: null, // ⛔ 截图原图不落服务器磁盘，所以发布时不带路径
-    owner_handle: $("#p-owner").value.trim(),
-  };
-  const btn = $("#btn-publish"); btn.disabled = true;
-  const j = await apiPost("/api/tasks", body).finally(() => { btn.disabled = false; });
-  if (j.ok) {
-    showSuccess("#publish-out", "已发布，task_id " + j.data.task_id, "看板已刷新；点该任务的「查看匹配」即可看到候选跑腿者。");
-    $("#p-note").value = "";
-    loadBoard();
-  } else {
-    showError("#publish-out", failOf(j), { title: "发布失败" });
-  }
-});
+  const foot = el("div", "");
+  const btnPublish = el("button", "btn");
+  btnPublish.type = "button";
+  btnPublish.id = "btn-publish";
+  btnPublish.appendChild(icon("package", { size: 16 }));
+  btnPublish.appendChild(el("span", "", "发布代取"));
+  const btnCancel = el("button", "btn btn--quiet", "取消");
+  btnCancel.type = "button";
+  foot.append(btnPublish, btnCancel, el("p", "hint", "报酬由双方线下协商，平台不参与交易、不代收款。"));
 
-/* ---------- 区块二：登记 ---------- */
-$("#btn-add-window").addEventListener("click", () => addWindow(30, 240));
-$("#btn-register").addEventListener("click", async () => {
-  const buildings = [...document.querySelectorAll("#r-buildings input:checked")].map((c) => c.value);
-  const wins = [...document.querySelectorAll("#r-windows .win")].map((w) => ({
-    start_iso: w.querySelector(".w-start").value ? new Date(w.querySelector(".w-start").value).toISOString() : "",
-    end_iso: w.querySelector(".w-end").value ? new Date(w.querySelector(".w-end").value).toISOString() : "",
-  }));
-  const j = await mcpCall("runner_register", {
-    user_handle: $("#r-owner").value.trim(),
-    reachable_buildings: buildings,
-    reward_floor: Number($("#r-floor").value),
-    time_windows: wins,
-  });
-  if (j.ok) showSuccess("#register-out", "登记成功", "可达楼栋 " + buildings.length + " 个 · 时段 " + wins.length + " 段。");
-  else showError("#register-out", failOf(j), { title: "登记失败" });
-});
+  const sheet = createSheet({ title: "发布代取任务", iconName: "package", body, footer: foot });
 
-/* ---------- 区块三：看板 ---------- */
-async function loadBoard() {
-  const b = $("#b-filter").value;
-  showLoading("#board", "正在读取开放任务…");
-  const j = await apiGet("/api/tasks?limit=20" + (b ? "&building=" + encodeURIComponent(b) : ""));
-  if (!j.ok) {
-    $("#board-count").textContent = "";
-    showError("#board", failOf(j), { title: "看板读取失败", onRetry: loadBoard });
-    return;
-  }
-  const list = j.data || [];
-  $("#board-count").textContent = "开放任务 " + list.length + " 条（只含 open 且未过期）";
-  if (!list.length) {
-    showEmpty("#board", {
-      icon: "📦",
-      title: "暂时没有开放任务",
-      hint: "先在上面的区块一发布一条；带 ?demo=1 打开可灌入虚构演示数据。",
-    });
-    return;
-  }
-  const box = $("#board"); box.innerHTML = "";
-  for (const t of list) {
-    const c = el("div", "item");
-    const head = el("div", "item__head");
-    head.appendChild(el("span", "item__title", t.from_building + " → " + t.to_building));
-    head.appendChild(el("span", "badge", t.reward_min + "–" + t.reward_max + " 元"));
-    c.appendChild(head);
-    c.appendChild(el("div", "item__meta", "取件点：" + t.station + "｜报酬由双方线下协商"));
-    const meta2 = el("div", "item__meta");
-    meta2.appendChild(document.createTextNode("截止：" + new Date(t.deadline_iso).toLocaleString("zh-CN") + "（"));
-    meta2.appendChild(el("span", "deadline", countdown(t.deadline_iso)));
-    meta2.appendChild(document.createTextNode("）"));
-    c.appendChild(meta2);
-    if (t.note) c.appendChild(el("div", "item__meta", "备注：" + t.note));
-    const act = el("div", "item__actions");
-    const btn = el("button", "btn btn--ghost btn--sm", "查看匹配");
-    btn.type = "button";
-    btn.addEventListener("click", () => runMatch(t));
-    act.appendChild(btn);
-    act.appendChild(el("span", "task-id", "task_id " + t.task_id));
-    c.appendChild(act);
-    box.appendChild(c);
-  }
-}
-$("#btn-reload").addEventListener("click", loadBoard);
-$("#b-filter").addEventListener("change", loadBoard);
+  btnCancel.addEventListener("click", () => sheet.close());
 
-/* ---------- 区块四：撮合 ---------- */
-async function runMatch(task) {
-  showLoading("#match-out", "正在撮合：" + task.from_building + " → " + task.to_building + " …");
-  if (!hasWriteToken()) {
-    showError("#match-out", "写接口需要演示令牌", {
-      title: "还没有配置演示令牌",
-      hint: "请在下方「演示令牌」里粘贴后保存，再点一次「查看匹配」。",
-    });
-    return;
-  }
-  const j = await apiPost("/api/tasks/" + encodeURIComponent(task.task_id) + "/match", {});
-  if (!j.ok) { showError("#match-out", failOf(j), { title: "撮合失败" }); return; }
-
-  const box = $("#match-out"); box.innerHTML = "";
-  box.appendChild(el("p", "hint",
-    "任务 " + task.from_building + " → " + task.to_building +
-    "｜候选（score ≥ 60）：" + (j.data || []).length + " 人｜按 score 降序"));
-
-  if (!(j.data || []).length) {
-    showEmpty("#match-out", {
-      icon: "🎯",
-      title: "暂无 ≥60 分的候选",
-      hint: "引擎已把不可达 / 时间不重叠 / 总分不足的跑腿者筛掉了；可以先在区块二登记一位顺路的跑腿者。",
-    });
-    return;
-  }
-  for (const m of j.data) {
-    const c = el("div", "item item--accent");
-    const top = el("div", "item__head");
-    top.appendChild(el("span", "item__title", displayName(m.runner_handle || m.runner_id)));
-    top.appendChild(el("span", "pill " + (m.pushed ? "ok" : "warn"),
-      m.pushed ? "已推送（写 matches）" : (m.skip_reason || "未推送")));
-    const sc = el("span", "score");
-    sc.appendChild(el("span", "score__num", String(m.score)));
-    sc.appendChild(el("span", "score__max", "/ 100"));
-    top.appendChild(sc);
-    c.appendChild(top);
-    const meter = el("div", "meter");
-    const fill = el("i", "meter__fill");
-    fill.style.width = Math.max(0, Math.min(100, m.score)) + "%";
-    meter.appendChild(fill);
-    c.appendChild(meter);
-    c.appendChild(el("div", "reason", "reason: " + m.reason));
-    box.appendChild(c);
-  }
-  box.appendChild(el("p", "section__note",
-    "reason 里的分值相加正好等于 score（引擎按整数「分」相加，不会出现 +30 却 59.7 的矛盾）。报酬由双方线下协商，平台不参与交易。"));
-}
-
-/* ---------- 启动 ---------- */
-async function boot() {
-  paintToken();
   $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
-  addWindow(-30, 300);
-  showEmpty("#match-out", {
-    icon: "🎯",
-    title: "还没有触发撮合",
-    hint: "在上方任务看板里点任意一条任务的「查看匹配」，候选跑腿者会带 score 与 reason 显示在这里。",
+
+  /* 识别截图（走 MCP 工具 task_parse_screenshot；图片只在本次请求内，不落盘） */
+  $("#btn-parse").addEventListener("click", async () => {
+    const f = $("#p-shot").files && $("#p-shot").files[0];
+    if (!f) { mountNotice("#parse-out", "danger", "先选一张截图。"); return; }
+    if (f.size > 1.4 * 1024 * 1024) {
+      mountNotice("#parse-out", "danger", "图片过大（≤1.4MB，请求体上限 2mb）。");
+      return;
+    }
+    const dataUrl = await new Promise((res, rej) => {
+      const fr = new FileReader();
+      fr.onload = () => res(String(fr.result));
+      fr.onerror = () => rej(new Error("读取失败"));
+      fr.readAsDataURL(f);
+    }).catch(() => "");
+    if (!dataUrl) { mountNotice("#parse-out", "danger", "读取图片失败"); return; }
+
+    mountNotice("#parse-out", "", "识别中…（图片只在本次请求内使用，不落盘）");
+    let parsed;
+    try {
+      const result = await mcpRpc("tools/call", {
+        name: "task_parse_screenshot",
+        arguments: { image_base64: dataUrl, hint: $("#p-note").value.trim() },
+      });
+      parsed = result && result.structuredContent;
+    } catch (e) {
+      mountNotice("#parse-out", "danger", "识别失败：" + errorText(e));
+      return;
+    }
+    if (!parsed || parsed.ok !== true) {
+      mountNotice("#parse-out", "danger", "识别失败：" + errorText(parsed && parsed.error));
+      return;
+    }
+    const d = parsed.data || {};
+    if (d.from_building) $("#p-from").value = d.from_building;
+    if (d.to_building) $("#p-to").value = d.to_building;
+    if (d.station) $("#p-station").value = d.station;
+    if (d.deadline_iso) {
+      const ts = new Date(d.deadline_iso).getTime();
+      if (Number.isFinite(ts)) $("#p-deadline").value = localInput(ts);
+    }
+    if (typeof d.reward_min === "number") $("#p-rmin").value = d.reward_min;
+    if (typeof d.reward_max === "number") $("#p-rmax").value = d.reward_max;
+
+    const box = $("#parse-out");
+    box.innerHTML = "";
+    box.appendChild(el("p", "hint",
+      (d.degraded ? "降级模式（未配置视觉模型）：" : "模型识别：") +
+      "confidence=" + d.confidence + "（识别不出的字段为 null，绝不猜）" +
+      (d.degrade_reason ? "｜" + d.degrade_reason : "")));
+    box.appendChild(jsonNode(d));
   });
-  await initDemo();
+
+  /* 发布任务（写接口自动带 X-Demo-Token；成功后 toast + 刷新看板） */
+  btnPublish.addEventListener("click", async () => {
+    const dl = $("#p-deadline").value;
+    const payload = {
+      from_building: $("#p-from").value,
+      to_building: $("#p-to").value,
+      station: $("#p-station").value.trim(),
+      deadline_iso: dl ? new Date(dl).toISOString() : "",
+      reward_min: Number($("#p-rmin").value),
+      reward_max: Number($("#p-rmax").value),
+      note: $("#p-note").value.trim() || null,
+      screenshot_path: null, // ⛔ 截图原图不落服务器磁盘，所以发布时不带路径
+      owner_handle: $("#p-owner").value.trim(),
+    };
+    btnPublish.disabled = true;
+    try {
+      await api("/api/tasks", { method: "POST", body: payload });
+      toast("已发布代取任务，看板已刷新", "ok");
+      $("#p-note").value = "";
+      $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
+      $("#parse-out").innerHTML = "";
+      $("#publish-out").innerHTML = "";
+      sheet.close();
+      await loadBoard({ force: true }); // 新任务要立刻撮合一次
+    } catch (e) {
+      mountNotice("#publish-out", "danger", "发布失败：" + errorText(e));
+    } finally {
+      btnPublish.disabled = false;
+    }
+  });
+
+  return sheet;
+}
+
+function openPublish() {
+  if (!publishSheet) publishSheet = buildPublishSheet();
+  publishSheet.open();
+}
+
+/* =====================================================================
+   侧栏二 · 登记跑腿能力（点按钮才出现）
+   ===================================================================== */
+let registerSheet = null;
+
+function buildRegisterSheet() {
+  const body = el("div");
+  body.innerHTML = [
+    '<div class="stack">',
+    '  <div class="form-grid">',
+    '    <div class="field">',
+    '      <label for="r-owner">你的昵称</label>',
+    '      <input id="r-owner" value="同学B" maxlength="32" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="r-floor">可接受报酬下限（元）</label>',
+    '      <input id="r-floor" type="number" min="0" step="0.5" value="2" />',
+    '    </div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <span class="field__label">可达楼栋（多选）</span>',
+    '    <div class="chk" id="r-buildings"></div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <span class="field__label">可跑时段（可多段；只填你真正有空的时间）</span>',
+    '    <div class="wins" id="r-windows"></div>',
+    '    <p class="field__hint">同一昵称重复登记 = 覆盖更新（<code>runners.user_id</code> 唯一）。</p>',
+    '  </div>',
+    '  <div id="register-out"></div>',
+    '</div>',
+  ].join("\n");
+
+  const foot = el("div", "");
+  const btnRegister = el("button", "btn btn--ok");
+  btnRegister.type = "button";
+  btnRegister.id = "btn-register";
+  btnRegister.appendChild(icon("check", { size: 16 }));
+  btnRegister.appendChild(el("span", "", "登记 / 覆盖登记"));
+  const btnAdd = el("button", "btn btn--ghost btn--sm", "加一段时段");
+  btnAdd.type = "button";
+  btnAdd.addEventListener("click", () => addWindow(30, 240));
+  const btnCancel = el("button", "btn btn--quiet", "取消");
+  btnCancel.type = "button";
+  foot.append(btnRegister, btnAdd, btnCancel);
+
+  const sheet = createSheet({ title: "登记跑腿能力", iconName: "walk", body, footer: foot });
+  btnCancel.addEventListener("click", () => sheet.close());
+  addWindow(-30, 300);
+
+  btnRegister.addEventListener("click", async () => {
+    const buildings = [...document.querySelectorAll("#r-buildings input:checked")].map((c) => c.value);
+    const windows = [...document.querySelectorAll("#r-windows .win")].map((w) => ({
+      start_iso: w.querySelector(".w-start").value ? new Date(w.querySelector(".w-start").value).toISOString() : "",
+      end_iso: w.querySelector(".w-end").value ? new Date(w.querySelector(".w-end").value).toISOString() : "",
+    }));
+    btnRegister.disabled = true;
+    try {
+      const result = await mcpRpc("tools/call", {
+        name: "runner_register",
+        arguments: {
+          user_handle: $("#r-owner").value.trim(),
+          reachable_buildings: buildings,
+          reward_floor: Number($("#r-floor").value),
+          time_windows: windows,
+        },
+      });
+      const env = result && result.structuredContent;
+      if (!env || typeof env !== "object") {
+        mountNotice("#register-out", "danger", "登记失败：MCP 没有返回结构化结果");
+        return;
+      }
+      if (env.ok !== true) {
+        mountNotice("#register-out", "danger", "登记失败：" + errorText(env.error));
+        return;
+      }
+      toast("登记成功：可达楼栋 " + buildings.length + " 个 · 时段 " + windows.length + " 段", "ok");
+      $("#register-out").innerHTML = "";
+      sheet.close();
+      await loadBoard({ force: true }); // 新登记的能力可能改变候选
+    } catch (e) {
+      mountNotice("#register-out", "danger", "登记失败：" + errorText(e));
+    } finally {
+      btnRegister.disabled = false;
+    }
+  });
+
+  return sheet;
+}
+
+function openRegister() {
+  if (!registerSheet) registerSheet = buildRegisterSheet();
+  registerSheet.open();
+}
+
+/* =====================================================================
+   看板：卡片（第一屏就是它）
+   ===================================================================== */
+
+function pickableOf(list) {
+  return (Array.isArray(list) ? list : []).filter((m) => m && m.match_id && m.state === "pushed");
+}
+
+function taskOf(taskId) {
+  return state.tasks.find((t) => t.task_id === taskId) || null;
+}
+
+function acceptedNameOf(taskId) {
+  const list = state.matches.get(taskId);
+  const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
+  return hit ? displayName(hit.runner_handle) : "";
+}
+
+/** 卡片右侧：未接单 → 主按钮「接这一单」；已接单 → 「已接单 · 进行中」 */
+function paintSide(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.side;
+  box.innerHTML = "";
+
+  if (state.accepted.has(t.task_id)) {
+    const b = el("span", "badge badge--ok");
+    b.appendChild(icon("circle-check", { size: 14 }));
+    b.appendChild(el("span", "", "已接单 · 进行中"));
+    box.appendChild(b);
+    const who = acceptedNameOf(t.task_id);
+    if (who) box.appendChild(el("span", "hint small", "接单人：" + who));
+    return;
+  }
+
+  const list = state.matches.get(t.task_id);
+  const pickable = pickableOf(list);
+  const btn = el("button", "btn btn--ok");
+  btn.type = "button";
+  btn.appendChild(icon("list-check", { size: 16 }));
+  btn.appendChild(el("span", "", "接这一单"));
+
+  if (!pickable.length) {
+    btn.disabled = true;
+    btn.title = list === undefined
+      ? "系统正在找顺路的同学…"
+      : list === null
+        ? "撮合接口暂时不可用，先点「刷新看板」重试"
+        : "暂时没人顺路，等有同学登记跑腿能力后再来";
+  } else {
+    btn.title = "由当前最高分候选接单；想选别人就展开候选列表";
+    btn.addEventListener("click", () => acceptMatch(t.task_id, pickable[0].match_id));
+  }
+  box.appendChild(btn);
+  if (pickable.length) box.appendChild(el("span", "hint small", "默认由最高分候选接单"));
+}
+
+function candRow(t, m) {
+  const row = el("div", "cand");
+  const line = el("div", "cand__line");
+  line.appendChild(el("span", "cand__name", displayName(m.runner_handle || "匿名")));
+
+  const sc = el("span", "score");
+  sc.appendChild(el("span", "score__num", String(m.score)));
+  sc.appendChild(el("span", "score__max", "/ 100"));
+  line.appendChild(sc);
+
+  if (state.accepted.has(t.task_id)) {
+    if (m.state === "accepted") {
+      const b = el("span", "badge badge--ok");
+      b.appendChild(icon("circle-check", { size: 14 }));
+      b.appendChild(el("span", "", "已接单"));
+      line.appendChild(b);
+    } else {
+      row.classList.add("is-dim"); // 同任务其它候选置灰
+      const b = el("button", "btn btn--quiet btn--sm", "已有同学接单");
+      b.type = "button";
+      b.disabled = true;
+      line.appendChild(b);
+    }
+  } else {
+    const b = el("button", "btn btn--ok btn--sm");
+    b.type = "button";
+    b.appendChild(icon("check", { size: 14 }));
+    b.appendChild(el("span", "", "选 TA 接单"));
+    const usable = Boolean(m.match_id) && m.state === "pushed";
+    if (usable) {
+      b.addEventListener("click", () => acceptMatch(t.task_id, m.match_id));
+    } else {
+      b.disabled = true;
+      b.title = "这条撮合记录当前状态是 " + m.state + "，不能再接";
+    }
+    line.appendChild(b);
+  }
+
+  row.appendChild(line);
+  row.appendChild(el("div", "reason", "reason: " + m.reason));
+  row.appendChild(el("div", "cand__meta",
+    "match_id " + (m.match_id || "—") + "｜state " + m.state));
+  return row;
+}
+
+/** 卡片下半部分：撮合中 / 暂无人顺路 / 候选列表（默认折叠） */
+function paintCands(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.cands;
+  box.innerHTML = "";
+  const list = state.matches.get(t.task_id);
+
+  if (list === undefined) {
+    const row = el("div", "cands-loading");
+    row.appendChild(el("span", "spinner"));
+    row.appendChild(el("span", "", "系统正在为你找顺路的同学…"));
+    box.appendChild(row);
+    return;
+  }
+
+  if (list === null) {
+    box.appendChild(stateBox("error", {
+      iconName: "alert-triangle",
+      title: "撮合没跑通",
+      hint: errorText(state.matchErrors.get(t.task_id)),
+      actionText: "重试",
+      onAction: () => {
+        state.matches.delete(t.task_id);
+        state.matchErrors.delete(t.task_id);
+        matchCache.delete(t.task_id);
+        paintCands(t);
+        paintSide(t);
+        void runMatch(t, { force: true });
+      },
+    }));
+    return;
+  }
+
+  if (!list.length) {
+    box.appendChild(emptyArt("暂时没人顺路", "引擎只推 score ≥ 60 的候选人；等有同学登记跑腿能力后这里会自动出现。"));
+    return;
+  }
+
+  const open = state.openSet.has(t.task_id);
+  const toggle = el("button", "btn btn--light btn--sm");
+  toggle.type = "button";
+  toggle.setAttribute("aria-expanded", open ? "true" : "false");
+  toggle.appendChild(icon("users", { size: 16 }));
+  toggle.appendChild(el("span", "", "系统已为你找到 " + list.length + " 位顺路的同学"));
+  const chev = icon(open ? "chevron-down" : "chevron-right", { size: 16 });
+  toggle.appendChild(chev);
+
+  const panel = el("div", "cand-list");
+  panel.style.marginTop = "10px";
+  panel.hidden = !open;
+  list.forEach((m) => panel.appendChild(candRow(t, m)));
+
+  toggle.addEventListener("click", () => {
+    const next = !state.openSet.has(t.task_id);
+    if (next) state.openSet.add(t.task_id); else state.openSet.delete(t.task_id);
+    panel.hidden = !next;
+    toggle.setAttribute("aria-expanded", next ? "true" : "false");
+    chev.style.setProperty("--icon",
+      "url(/vendor/tabler/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
+  });
+
+  box.append(toggle, panel);
+}
+
+function repaintCard(t) {
+  paintCands(t);
+  paintSide(t);
+}
+
+function buildCard(t) {
+  const card = el("article", "card takeout-card");
+
+  const head = el("div", "takeout-card__head");
+  const tile = el("span", "icon-tile icon-tile--dorm");
+  tile.setAttribute("aria-hidden", "true");
+  tile.appendChild(icon("route", { size: 24 }));
+  head.appendChild(tile);
+
+  const main = el("div", "takeout-card__main");
+  main.appendChild(el("h3", "takeout-card__route", t.from_building + " → " + t.to_building));
+
+  const chips = el("div", "chip-row");
+  chips.style.marginTop = "8px";
+  chips.appendChild(chip("truck-delivery", "取件点：" + t.station));
+  const cd = countdownChip(t);
+  chips.appendChild(cd);
+  countdownRefs.set(t.task_id, cd);
+  chips.appendChild(chip("bolt", money(t.reward_min) + "–" + money(t.reward_max) + " 元", "chip--brand"));
+  main.appendChild(chips);
+  head.appendChild(main);
+
+  const side = el("div", "takeout-card__side");
+  head.appendChild(side);
+  card.appendChild(head);
+
+  card.appendChild(el("p", "takeout-card__note",
+    t.note ? "备注：" + t.note : "备注：无（取件点 " + t.station + "）"));
+
+  const cands = el("div", "takeout-card__cands");
+  card.appendChild(cands);
+
+  card.appendChild(el("p", "task-id",
+    "task_id " + t.task_id + "｜发布者 " + displayName(t.owner_handle || "匿名")));
+
+  cardRefs.set(t.task_id, { card, side, cands });
+  repaintCard(t);
+  return card;
+}
+
+function renderBoard() {
+  const box = $("#board");
+  box.innerHTML = "";
+  cardRefs.clear();
+  countdownRefs.clear();
+  box.setAttribute("role", "status");
+  box.setAttribute("aria-live", "polite");
+
+  if (!state.tasks.length) {
+    const f = $("#b-filter").value;
+    box.appendChild(emptyArt(
+      "暂时没有开放任务",
+      f ? "「" + f + "」当前没有 open 的单子，换一个楼栋看看。" : "点右上角「发布代取」发一条，或用 ?demo=1 打开灌入演示数据。",
+      "发布代取",
+      openPublish,
+    ));
+    return;
+  }
+  for (const t of state.tasks) box.appendChild(buildCard(t));
+}
+
+/* =====================================================================
+   撮合 + 接单
+   ===================================================================== */
+
+/** 逐张卡片触发撮合（并发 3；20 秒内用缓存，避免把单 IP 60 次/分钟的限频打满） */
+async function runMatch(t, { force = false } = {}) {
+  const cached = matchCache.get(t.task_id);
+  if (!force && cached && Date.now() - cached.at < MATCH_TTL_MS) {
+    state.matches.set(t.task_id, cached.list);
+    if (cached.error) state.matchErrors.set(t.task_id, cached.error);
+    else state.matchErrors.delete(t.task_id);
+    repaintCard(t);
+    return;
+  }
+  if (cardRefs.has(t.task_id)) paintCands(t);
+  try {
+    const list = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/match", {
+      method: "POST",
+      body: {},
+    });
+    const value = Array.isArray(list) ? list : [];
+    state.matches.set(t.task_id, value);
+    state.matchErrors.delete(t.task_id);
+    matchCache.set(t.task_id, { list: value, error: null, at: Date.now() });
+  } catch (e) {
+    state.matches.set(t.task_id, null);
+    state.matchErrors.set(t.task_id, e);
+    matchCache.set(t.task_id, { list: null, error: e, at: Date.now() });
+  }
+  repaintCard(t);
+}
+
+function countAccepted() {
+  return state.tasks.filter((t) => state.accepted.has(t.task_id)).length;
+}
+
+function paintBoardCount() {
+  const n = state.tasks.length;
+  $("#board-count").textContent = n
+    ? "开放任务 " + n + " 条（只含 open 且未过期）｜已接单 " + countAccepted() + " 条"
+    : "当前没有开放任务";
+}
+
+async function mapLimit(items, limit, fn) {
+  const queue = [...items.entries()];
+  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) {
+      const [i, item] = queue.shift();
+      await fn(item, i);
+    }
+  });
+  await Promise.all(workers);
+}
+
+/** 读一次最近撮合记录，把「已经接了」的任务标出来（比 5 分钟去重窗口更稳） */
+async function refreshAccepted() {
+  try {
+    const recent = await api("/api/matches?limit=50");
+    state.accepted = new Set(
+      (Array.isArray(recent) ? recent : [])
+        .filter((m) => m && m.state === "accepted")
+        .map((m) => m.task_id),
+    );
+  } catch {
+    state.accepted = new Set();
+  }
+}
+
+async function loadBoard({ force = false } = {}) {
+  if (boardLoading) return;
+  boardLoading = true;
+  const btn = $("#btn-reload");
+  if (btn) btn.disabled = true;
+  try {
+    showLoading("#board", "正在读取开放任务…");
+    const f = $("#b-filter").value;
+    let tasks;
+    try {
+      tasks = await api("/api/tasks?limit=20" + (f ? "&building=" + encodeURIComponent(f) : ""));
+    } catch (e) {
+      $("#board-count").textContent = "";
+      const box = $("#board");
+      box.innerHTML = "";
+      box.appendChild(stateBox("error", {
+        iconName: "alert-triangle",
+        title: "看板读取失败",
+        hint: errorText(e),
+        actionText: "重试",
+        onAction: () => loadBoard(),
+      }));
+      return;
+    }
+    state.tasks = Array.isArray(tasks) ? tasks : [];
+    state.matches = new Map();
+    state.matchErrors = new Map();
+    await refreshAccepted();
+
+    paintBoardCount();
+    renderBoard();
+    await mapLimit(state.tasks, 3, (t) => runMatch(t, { force }));
+    paintBoardCount();
+  } finally {
+    boardLoading = false;
+    if (btn) btn.disabled = false;
+  }
+}
+
+/** 接单：把一条 matches 从 pushed 改成 accepted（写接口，令牌由 /js/api.js 自动带上） */
+async function acceptMatch(taskId, matchId) {
+  if (!matchId || busyMatches.has(matchId)) return;
+  busyMatches.add(matchId);
+  const refs = cardRefs.get(taskId);
+  // 先禁用当前卡片上的按钮，防连点；成功/失败后统一按服务端事实重画
+  if (refs) [...refs.card.querySelectorAll("button")].forEach((b) => { b.disabled = true; });
+  try {
+    const r = await api("/api/matches/" + encodeURIComponent(matchId) + "/accept", {
+      method: "POST",
+      body: {},
+    });
+    const list = state.matches.get(taskId);
+    if (Array.isArray(list)) {
+      state.matches.set(taskId, list.map((m) => (m && m.match_id === r.match_id ? { ...m, state: r.state } : m)));
+    }
+    state.accepted.add(taskId);
+    const who = acceptedNameOf(taskId);
+    toast("已接单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
+    paintBoardCount();
+  } catch (e) {
+    toast(errorText(e), "danger");
+    // 多半是别人先接走了（SCHEMA_REJECTED）：把这一单的最新状态重新取回来
+    const t = taskOf(taskId);
+    if (t) {
+      state.matches.delete(taskId);
+      await refreshAccepted();
+      paintCands(t);
+      paintSide(t);
+      void runMatch(t, { force: true });
+    }
+  } finally {
+    busyMatches.delete(matchId);
+    for (const t of state.tasks) repaintCard(t);
+  }
+}
+
+/* =====================================================================
+   令牌状态（只读展示；⛔ 页面上没有任何令牌输入框）
+   ===================================================================== */
+function paintTokenChip() {
+  const c = $("#token-chip");
+  if (!c) return;
+  c.innerHTML = "";
+  const has = hasWriteToken();
+  c.appendChild(icon(has ? "shield-check" : "alert-triangle", { size: 15 }));
+  c.appendChild(el("span", "", has
+    ? "写接口令牌已由服务端配置"
+    : "写接口令牌未配置：发布 / 接单会被服务端拒绝"));
+}
+
+/* =====================================================================
+   事件接线 + 启动
+   ===================================================================== */
+$("#btn-open-publish").addEventListener("click", openPublish);
+$("#btn-open-register").addEventListener("click", openRegister);
+$("#btn-reload").addEventListener("click", () => loadBoard());
+$("#b-filter").addEventListener("change", () => loadBoard());
+
+async function boot() {
+  paintTokenChip();
+  showLoading("#board", "正在读取开放任务…");
+  // 两个侧栏先建好（默认是关着的）：这样「接单截图上传」控件始终在页面里，且点开按钮零延迟
+  publishSheet = buildPublishSheet();
+  registerSheet = buildRegisterSheet();
+  await initDemo();   // ?demo=1：显示演示徽章 + 昵称假名 + 灌一次演示数据
   await loadNodes();
   await loadBoard();
+  setInterval(tickCountdowns, 30000);
 }
+
 boot();
 </script>
 </body>

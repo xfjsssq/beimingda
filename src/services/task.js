@@ -388,6 +388,64 @@ export function listRecentMatches(limit = DEFAULT_LIMIT) {
     }));
 }
 
+// ---------------------------------------------------------------- 接单 / 拒单
+
+/**
+ * `matches.state` 的合法取值（契约 contracts/m1-takeout.md §1）
+ * `pushed`：撮合引擎刚推出去；`accepted`：有人接了；`declined`：明确不接；`expired`：过了截止时间
+ */
+export const MATCH_STATES = Object.freeze(["pushed", "accepted", "declined", "expired"]);
+
+/**
+ * 改一条撮合记录的状态（接单 / 拒单）—— 前端卡片上的「接这一单」「选 TA 接单」走这里。
+ *
+ * 规则（M1 契约 §1 的 matches.state）：
+ *   - 只接受 `accepted` / `declined` 两个目标态（状态机由撮合引擎与这个函数共同推进）
+ *   - **只有 `state='pushed'` 的记录能被改**：已经被接走 / 已拒单的记录再改 → SCHEMA_REJECTED，
+ *     message 里带上「当前状态」——前端据此提示「这一单已经被别人接走了」，而不是静默失败
+ *   - 记录不存在 → NOT_FOUND
+ *
+ * ⛔ 不在这里改任务状态、⛔ 不写其它候选的行：把「同任务其它候选置灰」留给展示层，
+ *    后端只保证「一条撮合记录的状态迁移是原子的」（UPDATE ... WHERE state='pushed'）。
+ *
+ * @param {string} matchId
+ * @param {"accepted"|"declined"} state
+ * @returns {{match_id:string, task_id:string, state:string}}
+ */
+export function setMatchState(matchId, state) {
+  const id = typeof matchId === "string" ? matchId.trim() : "";
+  if (!id) reject(CODES.NOT_FOUND, "match not found: 空 id");
+
+  const next = typeof state === "string" ? state.trim() : "";
+  if (next !== "accepted" && next !== "declined") {
+    reject(CODES.SCHEMA_REJECTED, `state 只允许 accepted / declined（收到「${next || "空"}」）`);
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT id, task_id, state FROM matches WHERE id = ?").get(id);
+  if (!row) reject(CODES.NOT_FOUND, `match not found: ${id}`);
+  if (row.state !== "pushed") {
+    reject(
+      CODES.SCHEMA_REJECTED,
+      `match ${id} 当前状态是 ${row.state}，只有 pushed 的记录可以被接单 / 拒单`,
+    );
+  }
+
+  // 带上 state='pushed' 条件：即使并发调用，也只有一个能把行改走
+  const changed = db
+    .prepare("UPDATE matches SET state = ? WHERE id = ? AND state = 'pushed'")
+    .run(next, id).changes;
+  if (changed !== 1) {
+    const now = db.prepare("SELECT state FROM matches WHERE id = ?").get(id);
+    reject(
+      CODES.SCHEMA_REJECTED,
+      `match ${id} 当前状态是 ${now?.state ?? "未知"}，只有 pushed 的记录可以被接单 / 拒单`,
+    );
+  }
+
+  return { match_id: row.id, task_id: row.task_id, state: next };
+}
+
 // ---------------------------------------------------------------- 截图理解（task_parse_screenshot）
 //
 // 契约 §3.1：
@@ -590,6 +648,8 @@ export default {
   matchForTask,
   listMatches,
   listRecentMatches,
+  setMatchState,
+  MATCH_STATES,
   parseTaskFromImage,
   isVisionConfigured,
   toTaskView,
