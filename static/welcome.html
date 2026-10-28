@@ -697,9 +697,10 @@ function closeStreet() {
   MANIFEST = Object.assign(MANIFEST, manifest || {});
   if (BG.image) $("#baseImg").src = BG.image;
   setupMapHud();
+  // ⚠️ 口径：有实景 = 该节点能通过 pano_url 关联到 manifest 里的场景（不是拿节点 id 去猜场景 id）
+  const panoCount = NODES.filter((n) => Boolean(sceneOf(n))).length;
   $("#source").textContent = (BG.attribution || "底图为示意截图，非在线地图服务") +
-    " · 共 " + NODES.length + " 个点位，其中 " +
-    NODES.filter((n) => n.pano_url && MANIFEST.scenes[n.id]).length + " 个已拍摄 360° 实景";
+    " · 共 " + NODES.length + " 个点位，其中 " + panoCount + " 个已拍摄 360° 实景";
   renderMarkers();
   window.addEventListener("resize", avoidLabelOverlap); // 底图变宽 / 变窄后重算标签车道
   setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）

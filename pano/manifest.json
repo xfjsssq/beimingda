@@ -10,7 +10,7 @@
   "scenes": {
     "pano-1": {
       "panorama": "/pano/pano-1.jpg",
-      "title": "实景点位 1（第一点位）",
+      "title": "明湖实景 1（原第一点位素材）",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -34,7 +34,7 @@
     },
     "pano-2": {
       "panorama": "/pano/pano-2.jpg",
-      "title": "实景点位 2（第二点位）",
+      "title": "明湖实景 2（原第二点位素材）",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -58,7 +58,7 @@
     },
     "pano-3": {
       "panorama": "/pano/pano-3.jpg",
-      "title": "实景点位 3（第三点位）",
+      "title": "明湖实景 3（原第三点位素材）",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,

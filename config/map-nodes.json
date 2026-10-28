@@ -1,17 +1,170 @@
 {
-  "_comment": "校园地图节点（冻版结构，见 contracts/m3-welcome.md §2）。⚠️ 12 个节点覆盖 dorm/canteen/teaching/gate/service 五类。label 为**楼栋规范名**，M1 的 from_building/to_building 必须与它字面一致（id 也不要改，前端按 id 关联底图坐标）。lat/lng 在截图底图方案下不参与渲染，先留 0。",
+  "_comment": "校园地图节点（冻版结构，见 contracts/m3-welcome.md §2）。⚠️ 12 个节点覆盖 dorm/canteen/teaching/gate/service 五类。label 为**楼栋规范名**，M1 的 from_building/to_building 必须与它字面一致（id 也不要改，前端按 id 关联底图坐标）。lat/lng 在截图底图方案下不参与渲染，先留 0。  ⭐ 2026-10-28：新增 3 个「明湖实景点位」并绑定拼好的 360 实景（pano/*.jpg），后续再细分到具体楼栋。",
   "nodes": [
-    { "id": "dorm-12",        "label": "12号宿舍楼", "category": "dorm",     "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 180, "desc": "位于校园东侧，紧邻第二食堂，楼下有快递驿站。", "sort": 10 },
-    { "id": "dorm-15",        "label": "15号宿舍楼", "category": "dorm",     "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "与 12 号楼同片区，靠近操场，晚间人多。",       "sort": 20 },
-    { "id": "dorm-3",         "label": "3号宿舍楼",  "category": "dorm",     "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 90,  "desc": "校园西侧，离教学楼最近，早八人流量最大。",     "sort": 30 },
-    { "id": "canteen-1",      "label": "第一食堂",   "category": "canteen",  "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "一层自选、二层档口，午高峰 11:50-12:40。",     "sort": 40 },
-    { "id": "canteen-2",      "label": "第二食堂",   "category": "canteen",  "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "清真窗口与面食在二层，营业到 21:00。",         "sort": 50 },
-    { "id": "teaching-a",     "label": "教学楼A",    "category": "teaching", "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "主教学楼，公共课与实验课集中在这里。",         "sort": 60 },
-    { "id": "library",        "label": "图书馆",     "category": "teaching", "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "自习位较多，考试周需早起占座。",               "sort": 70 },
-    { "id": "playground",     "label": "操场",       "category": "teaching", "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "400 米标准跑道，晚间有夜跑与社团活动。",       "sort": 80 },
-    { "id": "gate-south",     "label": "南门",       "category": "gate",     "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "外卖与快递的集散点，取件高峰在中午。",         "sort": 90 },
-    { "id": "gate-north",     "label": "北门",       "category": "gate",     "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 180, "desc": "靠近公交站，出行走这里最方便。",               "sort": 100 },
-    { "id": "service-express","label": "快递驿站",   "category": "service",  "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "代取任务的主要取件点，下课后排队 10 分钟左右。", "sort": 110 },
-    { "id": "service-clinic", "label": "校医院",     "category": "service",  "lat": 0, "lng": 0, "pano_url": null, "pano_yaw": 0,   "desc": "门诊时间 8:00-17:30，夜间急诊走南门侧门。",     "sort": 120 }
+    {
+      "id": "dorm-12",
+      "label": "12号宿舍楼",
+      "category": "dorm",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 180,
+      "desc": "位于校园东侧，紧邻第二食堂，楼下有快递驿站。",
+      "sort": 10
+    },
+    {
+      "id": "dorm-15",
+      "label": "15号宿舍楼",
+      "category": "dorm",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "与 12 号楼同片区，靠近操场，晚间人多。",
+      "sort": 20
+    },
+    {
+      "id": "dorm-3",
+      "label": "3号宿舍楼",
+      "category": "dorm",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 90,
+      "desc": "校园西侧，离教学楼最近，早八人流量最大。",
+      "sort": 30
+    },
+    {
+      "id": "canteen-1",
+      "label": "第一食堂",
+      "category": "canteen",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "一层自选、二层档口，午高峰 11:50-12:40。",
+      "sort": 40
+    },
+    {
+      "id": "canteen-2",
+      "label": "第二食堂",
+      "category": "canteen",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "清真窗口与面食在二层，营业到 21:00。",
+      "sort": 50
+    },
+    {
+      "id": "teaching-a",
+      "label": "教学楼A",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "主教学楼，公共课与实验课集中在这里。",
+      "sort": 60
+    },
+    {
+      "id": "library",
+      "label": "图书馆",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "自习位较多，考试周需早起占座。",
+      "sort": 70
+    },
+    {
+      "id": "playground",
+      "label": "操场",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "400 米标准跑道，晚间有夜跑与社团活动。",
+      "sort": 80
+    },
+    {
+      "id": "gate-south",
+      "label": "南门",
+      "category": "gate",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "外卖与快递的集散点，取件高峰在中午。",
+      "sort": 90
+    },
+    {
+      "id": "gate-north",
+      "label": "北门",
+      "category": "gate",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 180,
+      "desc": "靠近公交站，出行走这里最方便。",
+      "sort": 100
+    },
+    {
+      "id": "service-express",
+      "label": "快递驿站",
+      "category": "service",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "代取任务的主要取件点，下课后排队 10 分钟左右。",
+      "sort": 110
+    },
+    {
+      "id": "service-clinic",
+      "label": "校医院",
+      "category": "service",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": null,
+      "pano_yaw": 0,
+      "desc": "门诊时间 8:00-17:30，夜间急诊走南门侧门。",
+      "sort": 120
+    },
+    {
+      "id": "ming-lake-1",
+      "label": "明湖实景点1",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": "/pano/pano-1.jpg",
+      "pano_yaw": 0,
+      "sort": 210,
+      "desc": "明湖一带的实拍实景（第一段素材）。点「进入 3D 街景」可环视；后续会细分到具体楼栋。"
+    },
+    {
+      "id": "ming-lake-2",
+      "label": "明湖实景点2",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": "/pano/pano-2.jpg",
+      "pano_yaw": 0,
+      "sort": 220,
+      "desc": "明湖一带的实拍实景（第二段素材，两段重叠 33%、接缝匹配度最高的一段）。"
+    },
+    {
+      "id": "ming-lake-3",
+      "label": "明湖实景点3",
+      "category": "teaching",
+      "lat": 0,
+      "lng": 0,
+      "pano_url": "/pano/pano-3.jpg",
+      "pano_yaw": 0,
+      "sort": 230,
+      "desc": "明湖一带的实拍实景（第三段素材）。"
+    }
   ]
 }
