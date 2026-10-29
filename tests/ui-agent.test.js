@@ -63,8 +63,9 @@ test("/agent：用共享层的 mountTabs 接线并开 hash 同步（刷新后停
   assert.match(ui, /export function mountTabs/);
   assert.match(ui, /location\.hash/);
   assert.match(ui, /history\.replaceState/);
-  // 浏览器前进/后退（同文档 hash 变化）也要跟着切栏
-  assert.match(html, /addEventListener\("hashchange"/);
+  // 浏览器前进/后退（同文档 hash 变化）由共享层负责，页面里不再重复监听一遍
+  assert.match(ui, /addEventListener\("hashchange"/);
+  assert.ok(!/addEventListener\("hashchange"/.test(html), "页面不该再自己写一遍 hashchange（ui.js 已内置）");
 });
 
 /* ------------------------------------------------------------------ 2. Hero + 顶部概览 */
@@ -223,4 +224,64 @@ test("/agent：合规红线 —— 无文件上传控件、无真实令牌、无
   for (const b of bearers) assert.equal(b, "&lt;DEMO_TOKEN&gt;", `Bearer 后必须是占位符，实际是 ${b}`);
   // 页面只出现占位符形态
   assert.match(html, /&lt;DEMO_TOKEN&gt;/);
+});
+
+/* ------------------------------------------------------------------ 7. 精简：合规只留一处、分栏之间不重复 */
+test("/agent：合规的详细说明只集中在「合规声明」分栏，别处不再重复介绍一遍", () => {
+  // 剥掉与分栏正文无关的部分：样式 / 脚本 / 注释 / head / tab 标签栏 / 页脚（共享版式）
+  const body = html
+    .replace(/<style>[\s\S]*?<\/style>/g, "")
+    .replace(/<script[\s\S]*?<\/script>/g, "")
+    .replace(/<!--[\s\S]*?-->/g, "")
+    .replace(/<head[\s\S]*?<\/head>/g, "")
+    .replace(/<div class="tabs"[\s\S]*?<\/div>/, "")
+    .replace(/<footer[\s\S]*?<\/footer>/g, "");
+
+  const panel = /<section class="tabpanel" id="p-compliance"[\s\S]*?<\/section>/.exec(body);
+  assert.ok(panel, "找不到合规声明分栏");
+  const outside = body.replace(panel[0], "");
+
+  // 1) 合规的长句一条都不许出现在别处（重复介绍 = 界面变乱）
+  for (const kw of [
+    "不收集身份信息",
+    "不接学校内部系统",
+    "不接入、不登录",
+    "没有课表上传入口",
+    "脱敏审计只记字段名",
+    "限频",
+    "泄露无风险",
+  ]) {
+    assert.ok(!outside.includes(kw), `「${kw}」只该出现在合规声明分栏里，别处不要再介绍一遍`);
+  }
+
+  // 2) 别处最多留一句带锚点的指引
+  const hits = [...outside.matchAll(/合规/g)];
+  assert.ok(hits.length <= 1, `合规声明以外的「合规」字样最多 1 处（带锚点的指引），实际 ${hits.length} 处`);
+  if (hits.length === 1) {
+    const line = outside.split("\n").find((l) => l.includes("合规"));
+    assert.match(line, /href="#p-compliance"/, "唯一那处应是指向合规声明分栏的锚点链接");
+  }
+});
+
+test("/agent：分栏之间不再互相重复，每栏说明收敛（不再把话堆在一处）", () => {
+  // 顶部已有「三步接入概览」，分栏 1 里不再重复一份三步走
+  assert.ok(!/id="quick-steps"/.test(html), "分栏 1 里的三步走与顶部概览重复，应已删除");
+  assert.ok(!/class="icon-steps"/.test(html), "icon-steps 是重复的三步走样式，应已删除");
+
+  // 手动接入：与四步正文重复的补充卡已删，只留一张卡
+  const manual = /<section class="tabpanel" id="p-manual"[\s\S]*?<\/section>/.exec(html);
+  assert.ok(manual, "找不到手动接入分栏");
+  assert.equal([...manual[0].matchAll(/class="rule"/g)].length, 0, "手动接入不该再有与四步重复的说明卡");
+  assert.equal([...manual[0].matchAll(/class="panel-card"/g)].length, 1, "手动接入只保留一张卡");
+
+  // 一键配置：令牌只讲操作性那一条，合规口径回合规栏讲
+  assert.match(html, /TOKEN_NOTES\[TOKEN_NOTES\.length - 1\]/, "令牌说明只渲染最后一条（操作性）");
+  assert.ok(!/for \(const note of TOKEN_NOTES\)/.test(html), "不要再把 TOKEN_NOTES 全量铺出来");
+
+  // 每栏的说明段落收敛到 ≤3 段
+  for (const id of ["p-oneclick", "p-manual", "p-examples", "p-tools"]) {
+    const panel = new RegExp(`<section class="tabpanel" id="${id}"[\\s\\S]*?</section>`).exec(html)[0];
+    const notes = [...panel.matchAll(/class="section__note"/g)].length;
+    assert.ok(notes <= 3, `${id} 的说明段落有 ${notes} 段，还是太杂`);
+  }
 });
