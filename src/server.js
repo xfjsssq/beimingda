@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { initDb, dbPath } from "./db/index.js";
-import { apiLimiter } from "./middleware/ratelimit.js";
+import { apiLimiter, createRateLimiter } from "./middleware/ratelimit.js";
 import { createApiRouter } from "./api/routes.js";
 import { createMcpRouter } from "./mcp/server.js";
 
@@ -77,7 +77,12 @@ export function createApp() {
   });
 
   // HTTP API
-  app.use("/api", apiLimiter, createApiRouter());
+  // 读接口放宽（演示时连续翻页/截图会被自己的限频挡住）：读 240 次/分钟，写仍 60 次/分钟
+  const readLimiter = createRateLimiter({ windowMs: 60_000, max: 240, label: "api-read" });
+  app.use("/api", (req, res, next) => {
+    const isRead = req.method === "GET" || req.method === "HEAD";
+    return (isRead ? readLimiter : apiLimiter)(req, res, next);
+  }, createApiRouter());
 
   // MCP 远程端点（必须零配置可接入：POST /mcp）
   app.use("/mcp", createMcpRouter());
