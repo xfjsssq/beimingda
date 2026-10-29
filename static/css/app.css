@@ -1395,11 +1395,7 @@ code.inline {
   min-width:0;
 }
 
-.step__body b {
-  display:block;
-  color:var(--color-text);
-  margin-bottom: 2px;
-}
+.step__body > b:first-child { display: block; }
 
 .step__body div {
   color:var(--color-muted);
