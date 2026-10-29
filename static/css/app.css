@@ -2290,3 +2290,57 @@ body > * { position: relative; z-index: 1; }
   border: 1px solid var(--color-primary-line); border-radius: var(--radius-card); font-size: 13px;
 }
 @media (max-width: 768px) { .palette { top: 8px; right: 8px; } .palette__panel { width: 248px; } }
+
+/* =============================================================================
+   B7 导航收缩（用户要求）
+     桌面：默认只留"品牌 + 当前页"，鼠标移上去或键盘聚焦才展开全部栏目
+     手机：底部条默认收起（只留把手 + 当前页），点把手展开且不自动收回；按住往上滑收起
+   ============================================================================= */
+.nav-handle { display: none; }                      /* 桌面不显示把手 */
+
+@media (min-width: 769px) {
+  .nav-link { max-width: 0; padding-inline: 0; opacity: 0; overflow: hidden; white-space: nowrap;
+    transition: max-width var(--dur-color) var(--ease), padding var(--dur-color) var(--ease),
+                opacity var(--dur-color) var(--ease), background var(--dur-color) var(--ease); }
+  /* 当前页一直可见：用户随时知道自己在哪 */
+  .nav-link[aria-current="page"] { max-width: 200px; padding-inline: 12px; opacity: 1; }
+  /* 悬停整条导航、或在导航内部聚焦（Tab）时，全部栏目展开 */
+  .site-header__inner:hover .nav-link,
+  .site-header__inner:focus-within .nav-link {
+    max-width: 200px; padding-inline: 12px; opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .nav-handle { display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 32px; margin: 0 auto; border: 0; cursor: pointer;
+    background: var(--color-primary-soft); color: var(--color-primary); border-radius: 9999px; }
+  .nav-handle .icon { transition: transform var(--dur-color) var(--ease); }
+  html[data-nav="open"] .nav-handle .icon { transform: rotate(180deg); }
+  /* 收起态：底部条只留把手与当前页 */
+  .site-nav { display: none; }
+  html[data-nav="open"] .site-nav { display: flex; }
+  html[data-nav="open"] .site-header { padding-bottom: 4px; }
+}
+
+/* ---------- FAQ（原生 details，无 JS 依赖）+ 收尾 CTA ---------- */
+.faq { display: flex; flex-direction: column; gap: 8px; max-width: 880px; }
+.faq__item { background: var(--color-card); border: 1px solid var(--color-line);
+  border-radius: var(--radius-card); padding: 16px 20px; }
+.faq__item summary { cursor: pointer; font-size: 16px; font-weight: 600; color: var(--color-text);
+  list-style: none; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.faq__item summary::-webkit-details-marker { display: none; }
+.faq__item summary::after { content: "+"; color: var(--color-primary); font-size: 20px; line-height: 1;
+  transition: transform var(--dur-color) var(--ease); }
+.faq__item[open] summary::after { transform: rotate(45deg); }
+.faq__item p { margin: 12px 0 0; color: var(--color-muted); line-height: 1.75; text-wrap: pretty; }
+
+.cta-final { padding: 48px 0 64px; }
+.cta-final__inner { background: var(--brand-flat); color: #fff; border-radius: var(--radius-card);
+  padding: 32px; display: flex; flex-wrap: wrap; gap: 24px; align-items: center; justify-content: space-between; }
+.cta-final__title { margin: 0 0 8px; font-size: 24px; color: #fff; }
+.cta-final__desc { margin: 0; color: rgba(255, 255, 255, 0.86); max-width: 520px; text-wrap: pretty; }
+.cta-final .chip-row { margin: 0; }
+.cta-final .btn--ghost { background: rgba(255, 255, 255, 0.14); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
+.cta-final .btn--ghost:hover { background: rgba(255, 255, 255, 0.24); }
+@media (max-width: 768px) { .cta-final__inner { padding: 24px; } .cta-final__title { font-size: 20px; } }

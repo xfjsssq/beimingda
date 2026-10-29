@@ -322,7 +322,8 @@ function linkHTML(page, activeId) {
 /** 页头 HTML（含演示模式徽章占位；徽章显示由 body[data-demo="1"] 控制） */
 export function navHTML(activeId) {
   return (
-    `<div class="site-header__inner">` +
+    `<div class="site-header__inner">
+        <button class="nav-handle" id="navHandle" type="button" aria-expanded="false" aria-controls="siteNav" aria-label="展开导航栏"><span class="icon icon--18" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/caret-up.svg)"></span></button>` +
     `<a class="brand" href="/">` +
     `<img class="brand__logo" src="/img/school-logo.png" alt="北方民族大学校徽" width="28" height="25" />` +
     `<span class="brand__text">北名大小助手</span>` +
@@ -361,6 +362,23 @@ export function mountNav(opts = {}) {
   if (created) {
     document.body.insertBefore(host, document.body.firstChild);
   }
+
+  // B7 导航收缩：手机端把手点开/再点收起，按住往上滑也能收起；桌面端靠 CSS :hover / :focus-within 展开
+  const handle = host.querySelector("#navHandle");
+  const rootEl = document.documentElement;
+  const setOpen = (open) => {
+    rootEl.dataset.nav = open ? "open" : "closed";
+    handle?.setAttribute("aria-expanded", open ? "true" : "false");
+    handle?.setAttribute("aria-label", open ? "收起导航栏" : "展开导航栏");
+  };
+  rootEl.dataset.nav = rootEl.dataset.nav || "closed";
+  handle?.addEventListener("click", () => setOpen(rootEl.dataset.nav !== "open"));
+  let touchY = 0;
+  host.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  host.addEventListener("touchmove", (e) => {
+    if (rootEl.dataset.nav !== "open") return;
+    if (touchY - e.touches[0].clientY > 40) setOpen(false);   // 上滑 40px 收起
+  }, { passive: true });
 
   // 点「品牌」或「当前页」不再重复加载（用户反馈：点了没反应才对，不该重新弹一下）
   host.querySelectorAll("a[href]").forEach((a) => {

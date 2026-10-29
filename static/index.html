@@ -130,7 +130,94 @@
       <p class="notice hidden" id="pending-note"></p>
     </section>
 
-    <!-- ============ 区块四 · Agent 入口提示 ============ -->
+  
+  <!-- ============ 区块五 · 可核验的证明（Part A：proof） ============ -->
+  <section class="section reveal" id="proof" aria-labelledby="proof-title">
+    <h2 class="section__title" id="proof-title"><span class="section__index">5</span>现场就能核验的事</h2>
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span></div>
+        <h3 class="card__title">工具是真的在调</h3>
+        <p class="card__desc">打开 <a href="/agent#p-tools">接入说明的「MCP 工具」分栏</a>，页面会现场请求一次 <code class="inline">tools/list</code>，
+          把服务端真实返回的工具名逐个列出来，不是写死的清单。</p>
+      </div>
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></div>
+        <h3 class="card__title">数据字段可查</h3>
+        <p class="card__desc">四个模块的接口都是统一信封：<code class="inline">/api/tasks</code>、<code class="inline">/api/runners</code>、
+          <code class="inline">/api/buddies</code>、<code class="inline">/api/schedule</code>。字段里没有姓名、学号、手机号。</p>
+      </div>
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span></div>
+        <h3 class="card__title">三条命令全绿</h3>
+        <p class="card__desc">仓库自带自检：<code class="inline">npm test</code> 120 项、<code class="inline">npm run smoke</code> 8 项、
+          <code class="inline">npm run verify</code> 107 项（含 14 个 MCP 工具真实调用与六个页面探活）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 区块六 · 常见问题（Part A：objection handling / FAQ） ============ -->
+  <section class="section reveal" id="faq" aria-labelledby="faq-title">
+    <h2 class="section__title" id="faq-title"><span class="section__index">6</span>你可能想问的</h2>
+    <div class="faq">
+      <details class="faq__item" open>
+        <summary>会不会收集我的姓名、学号、手机号？</summary>
+        <p>不会，数据库里也没有能存这些的字段。展示的所有任务、跑腿者、搭子帖都是虚构的演示数据（链接带 <code class="inline">demo=1</code> 时页面会明确标注）。
+          课表只收星期、节次、课程名、教室、周次五个字段；一旦夹带身份字段，服务端会丢弃并只把<strong>字段名</strong>记进脱敏审计，不记值。</p>
+      </details>
+      <details class="faq__item">
+        <summary>要装 App 吗？我怎么用？</summary>
+        <p>两种路任选。想点按钮：直接开网页，四个模块都有看板与操作面板。想说话：把平台接入 WorkBuddy，在对话框里说
+          「帮我发个代取，12 号楼取快递送到 15 号楼，今晚 8 点前，报酬 3 到 5 块」就行，不用打开任何网页。</p>
+      </details>
+      <details class="faq__item">
+        <summary>怎么知道背后的 AI 是真的在调工具，而不是写死的假数据？</summary>
+        <p>三个可现场验证的点：① 首页统计与每个看板都来自真实接口，页面上标了来源路径与刷新时间；② 接入说明的「MCP 工具」分栏会现场调一次
+          <code class="inline">tools/list</code> 并显示服务端实际返回的工具数；③ 撮合结果里每一条都带可解释的加分理由（可达性、时段覆盖、报酬），不是随机数。</p>
+      </details>
+      <details class="faq__item">
+        <summary>断网还能演示吗？</summary>
+        <p>能。页面不依赖任何外部 CDN，样式、脚本、字体、图标、封面插画、360 度全景全部随代码托管在本机。
+          唯一需要联网的是地图右上角的「卫星图」视图（用的是官方嵌入），断网时它会给一句说明，其余功能照常。</p>
+      </details>
+      <details class="faq__item">
+        <summary>代取是怎么撮合的？为什么只推这几位？</summary>
+        <p>按三维打分：可达性 40 分、时段覆盖 30 分、报酬匹配 30 分，只推 60 分以上的顺路同学，并在候选行里逐条写出加分理由。
+          接单是一个状态机：只有 <code class="inline">pushed</code> 的记录能被接单或拒单，同一单被接走后重复点击会被明确拒绝。</p>
+      </details>
+      <details class="faq__item">
+        <summary>搭子匹配会不会一眼看穿我是谁？</summary>
+        <p>不会。发帖先转成匿名画像（兴趣、作息、性格），对方只能看到画像与匿名标识；只有双方都表达意愿、状态变成 reveal 之后，才互相可见联系方式，
+          单方面看不到。</p>
+      </details>
+      <details class="faq__item">
+        <summary>3D 街景是真的实拍吗？</summary>
+        <p>是真的：队员用手机全景模式实拍，仓库里的脚本把两段 180 度拼成一张 360 度等距柱状全景（用互相关找接缝、再做羽化过渡）。
+          没拍过的点位会如实显示「暂无实景」，我们不会拿别的图冒充实景。</p>
+      </details>
+      <details class="faq__item">
+        <summary>现在有真实用户在用吗？</summary>
+        <p>诚实说：目前是参赛 Demo，数据是虚构的，还没有真实用户量。可核验的是<strong>工程完成度</strong>——四个模块的接口、契约、自检与
+          14 个 MCP 工具都是完整可跑的，接上真实数据源就能用。</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 区块七 · 收尾 CTA（与顶部一致） ============ -->
+  <section class="section cta-final reveal" aria-label="开始使用">
+    <div class="cta-final__inner">
+      <div>
+        <h2 class="cta-final__title">想先看接入，还是先逛功能？</h2>
+        <p class="cta-final__desc">接入只要一段 JSON；功能四个模块都是点开就能用的看板。</p>
+      </div>
+      <p class="chip-row">
+        <a class="btn" href="/agent">怎么接入 Agent（评委页）</a>
+        <a class="btn btn--ghost" href="#features">看看四个功能</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 区块四 · Agent 入口提示 ============ -->
     <section class="section section--callout" aria-labelledby="agent-title">
       <h2 class="section__title" id="agent-title"><span class="section__index">4</span>也可以只在 WorkBuddy 里说一句话</h2>
       <p class="lead">
