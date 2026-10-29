@@ -3,145 +3,305 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>搭子匹配：匿名画像与双选揭示</title>
+  <title>搭子墙：匿名画像 · 匹配可视化 · 双向揭示</title>
   <!--
-    契约：contracts/m2-buddy.md §6（4 个区块）
-    样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/ui.js
-    ⚠️ 候选卡片上不得出现任何可反推身份的字段：只渲染接口白名单字段
-        （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
+    契约：contracts/m2-buddy.md §6（发布 / 搜索 / 候选卡片 / 我的申请）
+    信息架构：桌面（≥1024px）左侧「功能栏」常驻（发帖 / 找搭子 / 我的申请），主区只放搭子帖列表；
+             窄屏功能栏收成一个「功能」按钮，点开从左侧滑入，默认收起。
+    复用共享层：/css/app.css（设计令牌）· /js/api.js · /js/nav.js · /js/demo.js · /js/ui.js（三态 / 侧栏 / 弹层 / 轻提示）
+    图标：一律 /vendor/phosphor/icons/*.svg，走 .icon + CSS mask（⛔ 无 emoji、⛔ 无外链）
+    ⛔ 候选卡片上不得出现任何可反推身份的字段：只渲染接口白名单字段
+       （anon_token / score / reason / parts / reveal_status / contact_code-仅互相可见时）
     ⛔ 本页不含任何文件上传控件（frontend.md §7）；搭子匹配不需要照片，照片不参与评分、不入库
-    ⛔ 令牌只走 /js/api.js 的运行时链路，不写 localStorage、不回填输入框
+    ⛔ 令牌只走 /js/api.js 的运行时链路（服务端注入 / 本机会话），页面不回填、不硬编码
   -->
   <link rel="stylesheet" href="/css/app.css" />
   <style>
-    .anon { font-family:var(--font-mono); font-size:12px; color:var(--color-muted); overflow-wrap:anywhere; }
-    .contact { font-family:var(--font-mono); color:var(--color-accent); font-weight:600; }
-    .bars { margin-top:10px; }
-    /* 「我的申请」：桌面表格 / 手机卡片，任何宽度下都不再隐藏「状态」 */
-    .mine-cards { display:none; }
-    @media (max-width:768px) {
-      .mine-table { display:none; }
-      .mine-cards { display:block; }
+    /* ============================================================
+       本页局部样式（只动 buddy 页；⛔ 不改 app.css）
+       字号只用 --size-*，间距只用 --sp-*，圆角只用 --r-*，曲线用 --ease
+       ============================================================ */
+
+    /* 0. 修正：[hidden] 会被 .btn/.code 自带的 display 覆盖（作者样式优先于 UA 的 [hidden]），
+          导致「返回搭子墙」这类按状态显隐的按钮一直露在外面 —— 这里显式钉死 */
+    [hidden] { display: none !important; }
+
+    /* ---- 1. 两栏骨架：左功能栏 + 右主区列表 ---- */
+    .buddy-layout { display: grid; gap: var(--sp-300); align-items: start; }
+
+    .buddy-rail {
+      display: flex; flex-direction: column; gap: var(--sp-200);
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+      padding: var(--sp-200);
+    }
+
+    /* 窄屏：功能栏 = 从左滑入的抽屉（默认收起，不占位） */
+    @media (max-width: 1023px) {
+      .buddy-rail {
+        position: fixed; top: 0; bottom: 0; left: 0; z-index: 88;
+        width: min(320px, 86vw); border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+        overflow-y: auto; transform: translateX(-100%);
+        transition: transform var(--dur-move) var(--ease);
+      }
+      .buddy-rail.is-open { transform: none; }
+      .buddy-rail__backdrop {
+        position: fixed; inset: 0; z-index: 87; background: rgba(12, 20, 33, .42);
+        opacity: 0; pointer-events: none; transition: opacity var(--dur-move) var(--ease);
+      }
+      .buddy-rail__backdrop.is-open { opacity: 1; pointer-events: auto; }
+    }
+
+    /* 桌面：功能栏常驻在左，随页面滚动吸顶 */
+    @media (min-width: 1024px) {
+      .buddy-layout { grid-template-columns: 248px minmax(0, 1fr); }
+      .buddy-rail {
+        position: sticky; top: calc(var(--header-h) + var(--sp-200));
+        width: auto; max-height: calc(100vh - var(--header-h) - var(--sp-400)); overflow: auto;
+      }
+      .buddy-rail__backdrop, .buddy-rail__toggle { display: none; }
+    }
+
+    .buddy-rail__head { display: flex; align-items: center; gap: var(--sp-100); }
+    .buddy-rail__head b { display: block; font-size: var(--size-sm); }
+    .buddy-rail__head p { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-rail__nav { display: flex; flex-direction: column; gap: var(--sp-75); }
+
+    .buddy-rail__item {
+      appearance: none; font-family: inherit; text-align: left; cursor: pointer;
+      display: flex; align-items: center; gap: var(--sp-100);
+      padding: var(--sp-100); border-radius: var(--r-md);
+      border: 1px solid var(--color-line); background: var(--color-sunken);
+      color: var(--color-text-soft); font-size: var(--size-sm);
+      transition: background var(--dur-color) var(--ease), border-color var(--dur-color) var(--ease);
+    }
+    .buddy-rail__item:hover { background: var(--color-primary-soft); border-color: var(--color-primary-line); color: var(--color-primary); }
+    .buddy-rail__item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .buddy-rail__item .icon { color: var(--color-primary); }
+    .buddy-rail__item.is-primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-rail__item.is-primary .icon { color: #fff; }
+    .buddy-rail__item-text { display: block; }
+    .buddy-rail__item-text small { display: block; font-size: var(--size-xs); color: var(--color-muted); margin-top: var(--sp-25); }
+    .buddy-rail__item.is-primary .buddy-rail__item-text small { color: rgba(255, 255, 255, .82); }
+    .buddy-rail__grow { flex: 1 1 auto; min-width: 0; }
+    .buddy-rail__count {
+      flex: 0 0 auto; font-size: var(--size-xs); font-variant-numeric: tabular-nums;
+      background: var(--color-primary-soft); color: var(--color-primary);
+      border-radius: var(--radius-pill); padding: 0 var(--sp-75);
+    }
+
+    .buddy-rail__identity {
+      border-top: 1px dashed var(--color-line-strong); padding-top: var(--sp-100);
+      display: flex; flex-direction: column; gap: var(--sp-75);
+    }
+    .buddy-rail__identity .field { margin: 0; }
+
+    .buddy-facts { display: flex; flex-direction: column; gap: var(--sp-50); font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-facts span b { color: var(--color-text-soft); font-variant-numeric: tabular-nums; }
+
+    /* ---- 2. 主区 ---- */
+    .buddy-main { min-width: 0; }
+    .buddy-mode { display: inline-flex; align-items: center; gap: var(--sp-50); font-size: var(--size-sm); font-weight: 600; color: var(--color-primary); }
+    .buddy-mode .icon { color: var(--color-primary); }
+
+    /* 搭子帖卡片 */
+    .buddy-card { display: block; }
+    .buddy-card__head { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-card__head .badge { display: inline-flex; align-items: center; gap: var(--sp-25); }
+    .buddy-card__anon { font-family: var(--font-mono); font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-card__head .score { margin-left: auto; }
+    .buddy-want { margin: var(--sp-100) 0 0; font-size: var(--size-base); line-height: 1.6; color: var(--color-text); }
+    .buddy-sub { margin: var(--sp-50) 0 0; font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-block { margin-top: var(--sp-100); }
+    .buddy-block__label {
+      display: flex; align-items: center; gap: var(--sp-50); margin-bottom: var(--sp-50);
+      font-size: var(--size-xs); color: var(--color-muted);
+    }
+    .buddy-block__label .icon { color: var(--color-primary-mid); }
+
+    /* 作息：24 小时段条（由画像 early_bird 推导激活窗口） */
+    .buddy-hours { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: var(--sp-25); }
+    .buddy-hours i {
+      height: var(--sp-200); border-radius: var(--r-sm);
+      background: var(--color-sunken); border: 1px solid var(--color-line);
+    }
+    .buddy-hours i.on { background: var(--color-primary-line); border-color: var(--color-primary-mid); }
+    .buddy-hours__ticks {
+      display: flex; justify-content: space-between; margin-top: var(--sp-25);
+      font-size: var(--size-xs); color: var(--color-muted-soft);
+    }
+
+    /* 双选揭示成功视觉（纯 CSS 光环 + 插画，不用外链） */
+    .buddy-reveal {
+      position: relative; overflow: hidden;
+      display: flex; align-items: center; gap: var(--sp-200); flex-wrap: wrap;
+      background: var(--color-accent-soft); border: 1px solid var(--color-accent);
+      border-radius: var(--radius-lg); padding: var(--sp-200); margin-bottom: var(--sp-200);
+    }
+    .buddy-reveal__art { flex: 0 0 auto; width: 88px; height: auto; }
+    .buddy-reveal__body { flex: 1 1 220px; min-width: 0; }
+    .buddy-reveal__title { display: flex; align-items: center; gap: var(--sp-50); margin: 0; font-size: var(--size-lg); color: var(--color-accent-dark); }
+    .buddy-reveal__code { font-family: var(--font-mono); font-size: var(--size-xl); font-weight: 700; color: var(--color-accent-dark); margin: var(--sp-50) 0; }
+    .buddy-reveal__acts { display: flex; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-reveal__burst { position: absolute; right: -24px; top: -24px; width: 120px; height: 120px; pointer-events: none; }
+    .buddy-reveal__burst::before, .buddy-reveal__burst::after {
+      content: ""; position: absolute; inset: 0; border-radius: var(--radius-pill);
+      border: 2px solid var(--color-accent); opacity: 0;
+      animation: buddyRing 2.4s var(--ease) 2;
+    }
+    .buddy-reveal__burst::after { animation-delay: .6s; }
+    @keyframes buddyRing {
+      0% { transform: scale(.35); opacity: .55; }
+      70% { opacity: .12; }
+      100% { transform: scale(1); opacity: 0; }
+    }
+
+    /* 我的申请：时间线（.steps 复用设计系统）+ 成功视觉 */
+    .buddy-timeline .step__body b { font-size: var(--size-sm); }
+    .buddy-timeline__head { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-timeline__meta { margin-top: var(--sp-25); font-size: var(--size-xs); color: var(--color-muted); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .buddy-reveal__burst::before, .buddy-reveal__burst::after { animation: none; opacity: 0; }
+      .buddy-rail { transition: none; }
     }
   </style>
   <meta name="description" content="一段大白话变成匿名画像，双方都点头才互相可见联系方式，单方面看不到。" />
-  <meta property="og:title" content="搭子匹配：匿名画像与双选揭示" />
+  <meta property="og:title" content="搭子墙：匿名画像 · 匹配可视化 · 双向揭示" />
   <meta property="og:description" content="一段大白话变成匿名画像，双方都点头才互相可见联系方式，单方面看不到。" />
   <meta property="og:type" content="website" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
 <a class="skip-link" href="#main">跳到主要内容</a>
+
 <main id="main" class="page page--mid">
-  <div class="page-head">
+  <div class="page-head reveal">
     <h1>搭子墙</h1>
     <p class="lead">学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。</p>
     <div class="page-head__tags">
       <span class="badge badge--ok">双向同意才可见</span>
       <span class="badge badge--muted">不收集姓名 / 学号 / 手机号 / 邮箱</span>
+      <span class="badge badge--muted">照片不参与评分</span>
+    </div>
+    <div class="grid grid--stats buddy-block">
+      <div class="stat stat--pending" id="statWall">
+        <p class="stat__label">墙内搭子帖</p>
+        <div class="stat__value">—</div>
+        <p class="stat__src">读取中…</p>
+      </div>
+      <div class="stat stat--pending" id="statMine">
+        <p class="stat__label">我发出的意愿</p>
+        <div class="stat__value">—</div>
+        <p class="stat__src">读取中…</p>
+      </div>
+      <div class="stat stat--pending" id="statMutual">
+        <p class="stat__label">已互相可见</p>
+        <div class="stat__value">—</div>
+        <p class="stat__src">读取中…</p>
+      </div>
     </div>
   </div>
 
-  <section class="section">
-    <h2 class="section__title">我的身份（只填匿名昵称）</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="handle">匿名昵称（如 同学A）</label>
-        <input id="handle" placeholder="同学A" maxlength="32" />
+  <div class="buddy-layout">
+    <!-- ===================== 左：常驻功能栏（窄屏为左侧抽屉） ===================== -->
+    <aside class="buddy-rail" id="buddyRail" aria-label="搭子功能栏">
+      <div class="buddy-rail__head">
+        <span class="icon-tile" aria-hidden="true">
+          <span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/users.svg)"></span>
+        </span>
+        <div class="buddy-rail__grow">
+          <b>搭子功能</b>
+          <p>发帖 / 找搭子 / 我的申请</p>
+        </div>
       </div>
-      <div class="field">
-        <label for="token">演示令牌（仅写接口需要，X-Demo-Token）</label>
-        <input id="token" type="password" placeholder="<DEMO_TOKEN>" autocomplete="off" />
-        <p class="field__hint" id="tokenState">令牌只存本机浏览器会话，不回显、不写进代码。</p>
-      </div>
-    </div>
-  </section>
 
-  <!-- 区块一 · 发布 -->
-  <section class="section">
-    <h2 class="section__title"><span class="section__index">1</span>发布搭子帖</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="pubKind">类型</label>
-        <select id="pubKind">
+      <nav class="buddy-rail__nav" aria-label="搭子功能">
+        <button class="buddy-rail__item is-primary" id="navPublish" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/pencil.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            发帖
+            <small>一句话描述 → 自动抽成匿名画像</small>
+          </span>
+        </button>
+        <button class="buddy-rail__item" id="navSearch" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/search.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            找搭子
+            <small>按类型 + 描述算匹配分</small>
+          </span>
+        </button>
+        <button class="buddy-rail__item" id="navMine" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/send.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            我的申请
+            <small>时间线看你发出的意愿</small>
+          </span>
+          <span class="buddy-rail__count" id="railMineCount">0</span>
+        </button>
+      </nav>
+
+      <div class="buddy-facts">
+        <span>墙内 <b id="factWall">0</b> 条搭子帖</span>
+        <span>待对方同意 <b id="factPending">0</b> 条</span>
+        <span>已互相可见 <b id="factMutual">0</b> 条</span>
+      </div>
+
+      <div class="buddy-rail__identity">
+        <div class="field">
+          <label for="handle">我的匿名昵称</label>
+          <input id="handle" placeholder="同学A" maxlength="32" />
+        </div>
+        <div class="field">
+          <label for="token">演示令牌（仅写接口需要）</label>
+          <input id="token" type="password" placeholder="&lt;DEMO_TOKEN&gt;" autocomplete="off" />
+          <p class="field__hint" id="tokenState">令牌由服务端注入或本机会话提供，页面不回填、不硬编码。</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===================== 右：主区只放列表 ===================== -->
+    <section class="buddy-main" aria-label="搭子帖列表">
+      <div class="toolbar">
+        <span class="buddy-mode" id="modeTag">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/users.svg)" aria-hidden="true"></span>
+          <span id="modeText">搭子墙</span>
+        </span>
+        <select id="kindFilter" aria-label="按类型筛选">
+          <option value="">全部类型</option>
           <option value="study">学习</option>
           <option value="roommate">室友</option>
           <option value="project">项目</option>
           <option value="sport">运动</option>
           <option value="other">其他</option>
         </select>
+        <span class="toolbar__spacer"></span>
+        <button class="btn btn--ghost btn--sm" id="btnBackWall" type="button" hidden>返回搭子墙</button>
+        <button class="btn btn--ghost btn--sm" id="btnRefresh" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          刷新
+        </button>
+        <button class="btn btn--ghost btn--sm buddy-rail__toggle" id="btnRail" type="button"
+                aria-controls="buddyRail" aria-expanded="false">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)" aria-hidden="true"></span>
+          功能
+        </button>
       </div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
-      <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn" id="btnPublish" type="button">发布</button>
-      <button class="btn btn--ghost" id="btnPreview" type="button">先看画像抽取结果</button>
-    </div>
-    <div id="pubMsg"></div>
-    <pre class="code" id="pubOut" style="display:none"></pre>
-  </section>
 
-  <!-- 区块二 · 搜索 -->
-  <section class="section">
-    <h2 class="section__title"><span class="section__index">2</span>找搭子</h2>
-    <div class="form-grid">
-      <div class="field">
-        <label for="searchKind">类型</label>
-        <select id="searchKind">
-          <option value="study">学习</option>
-          <option value="roommate">室友</option>
-          <option value="project">项目</option>
-          <option value="sport">运动</option>
-          <option value="other">其他</option>
-        </select>
-      </div>
-      <div class="field">
-        <label for="topK">返回条数（1-20）</label>
-        <input id="topK" type="number" min="1" max="20" value="5" />
-      </div>
-    </div>
-    <div class="field" style="margin-top:12px">
-      <label for="seekText">描述你想要的搭子</label>
-      <textarea id="seekText" placeholder="例：大二 工科 想找一起刷算法题和摄影的同学，作息偏夜猫，周末有空，周三1-2节有课"></textarea>
-    </div>
-    <div class="form-actions">
-      <button class="btn" id="btnSearch" type="button">搜索候选</button>
-      <button class="btn btn--ghost" id="btnList" type="button">只看搭子墙（不评分）</button>
-    </div>
-    <div id="searchMsg"></div>
-  </section>
-
-  <!-- 区块三 · 候选卡片 -->
-  <section class="section">
-    <h2 class="section__title"><span class="section__index">3</span>候选 <small>只显示评分 ≥ 60 的候选</small></h2>
-    <div id="cands"></div>
-    <p class="section__note">
-      候选卡上的分数 = 用你<b>这次搜索的画像</b>算出的匹配分（兴趣 35 / 作息 30 / 性格 20 / 语义 15）。
-      同意 / 拒绝在 WorkBuddy 里让 Agent 调用 <code class="inline">buddy_consent</code>（同一帖只能表决一次）；
-      也可以点卡片上的「复制『同意』话术」，直接粘给 Agent。双方都同意后这里会出现中转码。
-    </p>
-  </section>
-
-  <!-- 区块四 · 我的申请 -->
-  <section class="section">
-    <h2 class="section__title"><span class="section__index">4</span>我的申请</h2>
-    <div id="mine"></div>
-    <div class="form-actions"><button class="btn btn--ghost btn--sm" id="btnMine" type="button">刷新我的申请</button></div>
-    <p class="section__note">
-      这里的分数是<b>表决那一刻</b>估算的（表决接口不收画像，取你最近一次搜索的画像；从没搜过则按中性画像，会偏低），
-      所以和候选卡上的分数可能不同 —— 这是两处口径的固有差异，不是 bug。
-      <b>是否揭示联系方式只由双选状态机决定，与分数无关。</b>
-    </p>
-  </section>
+      <!-- 双选揭示那一刻的成功视觉落点 -->
+      <div id="revealHost"></div>
+      <div id="listMsg"></div>
+      <div id="listHost" class="stack"></div>
+    </section>
+  </div>
 </main>
+
+<div class="buddy-rail__backdrop" id="railBackdrop" aria-hidden="true"></div>
 
 <footer class="site-footer">
   <p>北名大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
   <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
-<nav class="site-footer__legal" aria-label="法律与来源">
+  <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
     <a href="/legal.html">许可与素材来源</a>
     <a href="/agent">接入说明</a>
@@ -150,260 +310,751 @@
 
 <script src="/config.js"></script>
 <script type="module">
-import { apiToken, setApiToken, hasWriteToken } from "/js/api.js";
+import { api, apiToken, setApiToken, hasWriteToken } from "/js/api.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo } from "/js/demo.js";
-import { esc, el, showLoading, showEmpty, showError, showNotice, copyText } from "/js/ui.js";
+import {
+  el, icon, copyText, createSheet, openModal, toast,
+  showLoading, showEmpty, showError, showNotice, initReveals,
+} from "/js/ui.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 mountNav();
 
-/* ---------- 昵称与令牌 ---------- */
+/* ============================================================ 常量与工具 */
+
+const KINDS = [
+  { v: "study", label: "学习", icon: "book" },
+  { v: "roommate", label: "室友", icon: "building-community" },
+  { v: "project", label: "项目", icon: "tools" },
+  { v: "sport", label: "运动", icon: "bolt" },
+  { v: "other", label: "其他", icon: "sparkles" },
+];
+const kindOf = (v) => KINDS.find((k) => k.v === v) || KINDS[4];
+const NEUTRAL = "不限";
+
+/** ISO → 「10-29 20:31」；拿不准就原样返回，不猜 */
+function fmtTs(iso) {
+  const d = new Date(String(iso || ""));
+  if (Number.isNaN(d.getTime())) return String(iso || "");
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** 0..1 → 百分比整数（用于 meter 宽度） */
+const pct = (v) => Math.round(Math.max(0, Math.min(1, Number(v) || 0)) * 100);
+
+/** 画像里那个 0..1 的连续值，翻译成一句人话 */
+function sideWord(v, lowText, midText, highText) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return midText;
+  if (n <= 0.4) return lowText;
+  if (n >= 0.6) return highText;
+  return midText;
+}
+
+function iconSpan(name, size) {
+  const n = icon(name, { size });
+  return n;
+}
+
+function badgeWithIcon(text, iconName, cls = "badge badge--muted") {
+  const b = el("span", cls);
+  if (iconName) b.appendChild(icon(iconName, { size: 14 }));
+  b.appendChild(el("span", null, text));
+  return b;
+}
+
+/** 空态：设计系统插画 + 标题 + 下一步 + 可选主按钮 */
+function emptyArt(host, { title, hint, actionText, onAction, img = "/img/empty-state.png" }) {
+  const box = el("div", "empty-art");
+  const image = document.createElement("img");
+  image.src = img;
+  image.alt = "";
+  image.loading = "lazy";
+  box.appendChild(image);
+  box.appendChild(el("p", null, title));
+  if (hint) box.appendChild(el("p", "small", hint));
+  if (actionText && typeof onAction === "function") {
+    const btn = el("button", "btn btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    box.appendChild(btn);
+  }
+  host.innerHTML = "";
+  host.appendChild(box);
+  return box;
+}
+
+/* ============================================================ 状态 */
+
+let mode = "wall";              // wall | candidates
+let wallPosts = [];             // GET /api/buddies
+const wallById = new Map();     // post_id -> 帖子（用来给候选补画像）
+let mineRows = [];              // GET /api/buddies/mine
+const celebrated = new Set();   // 已经展示过「互相可见」成功视觉的 anon_token
+
+/* ============================================================ 身份与令牌 */
+
 const getHandle = () => ($("handle").value || "").trim() || "同学A";
-const getToken = () => apiToken();
 
 $("handle").value = params.get("handle") || localStorage.getItem("beimingda.handle") || "同学A";
 $("handle").addEventListener("change", () => {
   try { localStorage.setItem("beimingda.handle", getHandle()); } catch { /* 隐私模式：忽略 */ }
+  loadMine();
 });
 
 function paintTokenState() {
-  $("token").value = ""; // ⛔ 永不回填（含 localStorage 里的旧值），投屏不会露出令牌
+  $("token").value = ""; // ⛔ 永不回填（含会话里的旧值），投屏不会露出令牌
   $("token").placeholder = hasWriteToken() ? "已配置（重新输入可覆盖）" : "<DEMO_TOKEN>";
   $("tokenState").textContent = hasWriteToken()
     ? "写接口已就绪：令牌来自服务端注入或本机会话。"
-    : "未配置令牌：搜索 / 看墙可用，发布会返回 401。";
+    : "未配置令牌：看墙 / 找搭子可用，发帖会返回 401。";
 }
 $("token").addEventListener("change", () => { setApiToken($("token").value); paintTokenState(); });
 
-/* ---------- 统一信封解包 ---------- */
-async function api(path, opts) {
-  const res = await fetch(path, opts);
-  let body = null;
-  try { body = await res.json(); } catch { throw new Error("响应不是 JSON（HTTP " + res.status + "）"); }
-  if (!body.ok) throw Object.assign(new Error((body.error && body.error.message) || "请求失败"), {
-    code: body.error && body.error.code,
-  });
-  return body.data;
-}
+/* ============================================================ 画像可视化 */
 
-/* ---------- 区块一：发布 ---------- */
-async function publish() {
-  const text = $("pubText").value.trim();
-  if (text.length < 4) { showNotice("pubMsg", "先把需求写清楚一点（至少一句话）。", "danger"); return; }
-  showLoading("pubMsg", "发布中…");
-  try {
-    const data = await api("/api/buddies", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-demo-token": getToken() },
-      body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text }),
-    });
-    $("pubMsg").innerHTML = "";
-    showNotice("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
-    $("pubOut").style.display = "block";
-    $("pubOut").textContent = "抽取出的 11 字段画像：\n" + JSON.stringify(data.profile, null, 2);
-  } catch (e) {
-    showError("pubMsg", e, { title: "发布失败" });
+/** 作息 24 小时段条：由 early_bird 推导「活跃窗口」（0=夜猫，1=早睡早起） */
+function hoursStrip(profile) {
+  const eb = Number(profile.schedule && profile.schedule.early_bird);
+  const early = Number.isFinite(eb) ? eb : 0.5;
+  const start = Math.round(6 + (1 - early) * 6);      // 6..12 点起
+  const end = Math.round(22 + (1 - early) * 4);       // 22..26 点止（>24 表示跨零点）
+  const wrap = el("div", null);
+  const strip = el("div", "buddy-hours");
+  for (let h = 0; h < 24; h += 1) {
+    const cell = document.createElement("i");
+    const on = end <= 24 ? h >= start && h < end : h >= start || h < end - 24;
+    if (on) cell.className = "on";
+    strip.appendChild(cell);
   }
+  wrap.appendChild(strip);
+  const ticks = el("div", "buddy-hours__ticks");
+  for (const t of ["0", "6", "12", "18", "23"]) ticks.appendChild(el("span", null, t));
+  wrap.appendChild(ticks);
+  return wrap;
 }
-$("btnPublish").addEventListener("click", publish);
 
-$("btnPreview").addEventListener("click", async () => {
-  const text = $("pubText").value.trim();
-  if (!text) { showNotice("pubMsg", "先写一段描述。", "danger"); return; }
-  showLoading("pubMsg", "正在抽取画像（不落库）…");
-  try {
-    const rows = await api("/api/buddies/search?kind=" + $("pubKind").value +
-      "&handle=" + encodeURIComponent(getHandle()) + "&text=" + encodeURIComponent(text));
-    $("pubMsg").innerHTML = "";
-    showNotice("pubMsg", "抽取完成：这段描述能匹配到 " + rows.length + " 个候选（下方候选卡可见评分与理由）", "ok");
-    renderCandidates(rows);
-  } catch (e) { showError("pubMsg", e, { title: "抽取失败" }); }
-});
+function block(label, iconName, node) {
+  const wrap = el("div", "buddy-block");
+  const head = el("div", "buddy-block__label");
+  head.appendChild(iconSpan(iconName, 14));
+  head.appendChild(el("span", null, label));
+  wrap.appendChild(head);
+  wrap.appendChild(node);
+  return wrap;
+}
 
-/* ---------- 区块三：候选卡片 ---------- */
-function meterRow(label, val, max) {
+function meterRow(label, value01, valText) {
   const row = el("div", "meter-row");
   row.appendChild(el("b", null, label));
   const meter = el("div", "meter meter--primary");
   const fill = el("i", "meter__fill");
-  fill.style.width = Math.round((Number(val) || 0) / max * 100) + "%";
+  fill.style.width = pct(value01) + "%";
   meter.appendChild(fill);
   row.appendChild(meter);
-  row.appendChild(el("span", "meter-row__val", (Number(val) || 0) + "/" + max));
+  row.appendChild(el("span", "meter-row__val", valText === undefined ? pct(value01) + "%" : valText));
   return row;
 }
 
-function renderCandidates(rows) {
-  const box = $("cands");
-  if (!rows || !rows.length) {
-    showEmpty(box, {
-      icon: "🤝",
-      title: "没有评分 ≥ 60 的候选",
-      hint: "可以换个类型，或把描述写得更具体（年级 / 专业大类 / 作息 / 兴趣都写上，匹配更准）。",
-    });
-    return;
+/**
+ * 画像可视化（兴趣 chips + 作息小时段条 + 周末/性格进度条 + 忙时/硬性要求/雷点 chips）
+ * ⛔ 只吃 §1 画像结构里的字段，不引入任何身份信息
+ */
+function profileBlock(profile) {
+  const p = profile || {};
+  const sch = p.schedule || {};
+  const traits = p.traits || {};
+  const box = el("div", null);
+
+  /* 年级 / 专业大类 */
+  const facts = el("div", "chip-row buddy-block");
+  facts.appendChild(el("span", "chip", "年级 " + (p.grade || NEUTRAL)));
+  facts.appendChild(el("span", "chip", "专业大类 " + (p.major_group || NEUTRAL)));
+  facts.appendChild(el("span", "chip", "类型 " + kindOf(p.kind).label));
+  box.appendChild(facts);
+
+  /* 兴趣 */
+  const interests = Array.isArray(p.interests) ? p.interests : [];
+  const chips = el("div", "chip-row");
+  if (interests.length) {
+    for (const it of interests) chips.appendChild(el("span", "chip chip--brand", it));
+  } else {
+    chips.appendChild(el("span", "chip", "未提及兴趣"));
   }
-  box.innerHTML = "";
-  for (const c of rows) {
-    const p = c.parts || {};
-    const mutual = c.reveal_status === "mutual";
-    const card = el("div", "item item--accent");
-    const top = el("div", "item__head");
-    top.appendChild(el("span", "anon", c.anon_token));
-    top.appendChild(el("span", "badge " + (mutual ? "badge--ok" : "badge--warn"),
-      mutual ? "已互相可见" : "待对方同意"));
-    const sc = el("span", "score");
-    sc.appendChild(el("span", "score__num", String(c.score)));
-    sc.appendChild(el("span", "score__max", "分 / 100"));
-    top.appendChild(sc);
-    card.appendChild(top);
+  box.appendChild(block("兴趣（最多 5 项，未提及即空，不编造）", "sparkles", chips));
 
-    const bars = el("div", "bars");
-    bars.appendChild(meterRow("兴趣", p.interest, 35));
-    bars.appendChild(meterRow("作息", p.schedule, 30));
-    bars.appendChild(meterRow("性格", p.traits, 20));
-    bars.appendChild(meterRow("语义", p.semantic, 15));
-    card.appendChild(bars);
-    card.appendChild(el("div", "reason", c.reason || "（无评分理由）"));
+  /* 作息：小时段条 + 周末空闲度 */
+  const hoursWrap = el("div", null);
+  hoursWrap.appendChild(hoursStrip(p));
+  const ebWord = sideWord(sch.early_bird, "夜猫型", "作息中立", "早睡早起型");
+  hoursWrap.appendChild(el("p", "buddy-sub", "作息倾向：" + ebWord + "（段条按画像 early_bird 推导的活跃窗口）"));
+  hoursWrap.appendChild(meterRow("周末空闲", sch.weekend_free, sideWord(sch.weekend_free, "周末忙", "周末一般", "周末空")));
+  box.appendChild(block("作息（0 = 夜猫，1 = 早睡早起）", "clock", hoursWrap));
 
-    if (mutual && c.contact_code) {
-      const contact = el("div", "item__meta");
-      contact.appendChild(document.createTextNode("中转码："));
-      contact.appendChild(el("span", "contact", c.contact_code));
-      contact.appendChild(document.createTextNode("（双方已同意才会下发）"));
-      card.appendChild(contact);
+  /* 忙时 */
+  const slots = Array.isArray(sch.busy_slots) ? sch.busy_slots : [];
+  const slotRow = el("div", "chip-row");
+  if (slots.length) {
+    const WD = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+    for (const s of slots) {
+      slotRow.appendChild(el("span", "chip", (WD[s.weekday] || "周?") + " 第" + s.period_start + "-" + s.period_end + "节"));
     }
-    const actions = el("div", "item__actions");
-    const btn = el("button", "btn btn--quiet btn--sm", "复制「同意」话术");
-    btn.type = "button";
-    btn.addEventListener("click", async () => {
-      const text = "我想和匿名标识为 " + c.anon_token +
-        " 的搭子互相可见联系方式，请用 buddy_consent 替我表示「同意」。";
-      const ok = await copyText(text);
-      btn.textContent = ok ? "已复制 ✓ 粘给 Agent 即可" : "复制被浏览器拦下，请手动复制";
-      setTimeout(() => { btn.textContent = "复制「同意」话术"; }, 2200);
-    });
-    actions.appendChild(btn);
-    card.appendChild(actions);
-    box.appendChild(card);
+  } else {
+    slotRow.appendChild(el("span", "chip", "未提及固定占用"));
   }
+  box.appendChild(block("忙时（节次）", "calendar-event", slotRow));
+
+  /* 性格三项小进度条 */
+  const traitBox = el("div", null);
+  traitBox.appendChild(meterRow("话多", traits.chatty, sideWord(traits.chatty, "偏安静", "中性", "偏话多")));
+  traitBox.appendChild(meterRow("计划", traits.planner, sideWord(traits.planner, "偏随性", "中性", "计划控")));
+  traitBox.appendChild(meterRow("整洁", traits.tidy, sideWord(traits.tidy, "偏随意", "中性", "偏洁癖")));
+  box.appendChild(block("性格（0→1，未提及取 0.5）", "chart-bar", traitBox));
+
+  /* 硬性要求 / 雷点（一票否决就发生在这一层） */
+  const rules = el("div", "chip-row");
+  const must = Array.isArray(p.must_have) ? p.must_have : [];
+  const brk = Array.isArray(p.deal_breaker) ? p.deal_breaker : [];
+  if (must.length) for (const m of must) rules.appendChild(el("span", "chip chip--brand", "必须：" + m));
+  if (brk.length) for (const b of brk) rules.appendChild(el("span", "chip", "雷点：" + b));
+  if (!must.length && !brk.length) rules.appendChild(el("span", "chip", "未提及硬性要求"));
+  box.appendChild(block("硬性要求 / 雷点（命中即一票否决）", "shield-check", rules));
+
+  return box;
 }
 
-$("btnSearch").addEventListener("click", async () => {
-  const text = $("seekText").value.trim();
-  if (text.length < 2) { showNotice("searchMsg", "先写一句「我想要什么样的搭子」。", "danger"); return; }
-  showLoading("searchMsg", "检索中…");
-  showLoading("cands", "正在按你的描述计算匹配分…");
-  try {
-    const rows = await api("/api/buddies/search?kind=" + $("searchKind").value +
-      "&handle=" + encodeURIComponent(getHandle()) +
-      "&top_k=" + encodeURIComponent($("topK").value) +
-      "&text=" + encodeURIComponent(text));
-    $("searchMsg").innerHTML = "";
-    showNotice("searchMsg", "命中 " + rows.length + " 个候选（仅显示评分 ≥ 60 且未被一票否决的）", "ok");
-    renderCandidates(rows);
-  } catch (e) {
-    $("searchMsg").innerHTML = "";
-    showError("cands", e, { title: "搜索失败" });
-  }
-});
+/* ============================================================ 表达意愿（弹层 + 复制话术） */
 
-$("btnList").addEventListener("click", async () => {
-  showLoading("searchMsg", "读取搭子墙…");
-  try {
-    const rows = await api("/api/buddies?kind=" + $("searchKind").value);
-    $("searchMsg").innerHTML = "";
-    showNotice("searchMsg", "共 " + rows.length + " 条（列表不含评分）", "ok");
-    const box = $("cands");
-    if (!rows.length) {
-      showEmpty(box, { icon: "🤝", title: "搭子墙还没有内容", hint: "先在区块一发布一条搭子帖。" });
-      return;
-    }
-    box.innerHTML = "";
-    for (const p of rows) {
-      const card = el("div", "item");
-      const top = el("div", "item__head");
-      top.appendChild(el("span", "anon", p.anon_token));
-      top.appendChild(el("span", "badge badge--muted", p.kind + " · " + p.created_at));
-      card.appendChild(top);
-      card.appendChild(el("div", "reason", (p.profile && p.profile.wanted) || "（未填写期望）"));
-      box.appendChild(card);
-    }
-  } catch (e) {
-    $("searchMsg").innerHTML = "";
-    showError("cands", e, { title: "搭子墙读取失败" });
-  }
-});
-
-/* ---------- 区块四：我的申请（桌面表格 / 手机卡片，状态列任何宽度都保留） ---------- */
-function statusBadge(r) {
-  if (r.reveal_status === "mutual") return el("span", "badge badge--ok", "已互相可见");
-  if (r.my_ok === 1) return el("span", "badge badge--warn", "待对方同意");
-  return el("span", "badge badge--muted", "我已拒绝");
+async function copyConsentText(anonToken, agree, btn) {
+  const text = agree
+    ? `我想和匿名标识为 ${anonToken} 的搭子互相可见联系方式，请用 buddy_consent 替我表示「同意」。`
+    : `请用 buddy_consent 替我拒绝匿名标识为 ${anonToken} 的搭子。`;
+  const ok = await copyText(text);
+  const label = ok ? "已复制，粘给 Agent 即可" : "复制被浏览器拦下，请手动选中复制";
+  if (btn) btn.textContent = label;
+  toast(ok ? "话术已复制" : "复制失败，请手动复制", ok ? "ok" : "danger");
+  if (!ok); // 提示已经给出，不再弹别的层
 }
 
-function renderMine(rows) {
-  const box = $("mine");
+function openIntentModal(post) {
+  const body = el("div", null);
+  body.appendChild(el("p", "small muted", "表决只能由 WorkBuddy 里的 Agent 调 MCP 工具完成（同一帖只能表决一次）。把下面的话术复制给它即可："));
+  const pre = el("p", "reason");
+  pre.appendChild(el("span", "mono", post.anon_token));
+  body.appendChild(pre);
+
+  const actions = el("div", "form-actions");
+  const okBtn = el("button", "btn btn--ok btn--sm", "复制「同意」话术");
+  okBtn.type = "button";
+  okBtn.addEventListener("click", () => copyConsentText(post.anon_token, true, okBtn));
+  const noBtn = el("button", "btn btn--ghost btn--sm", "复制「拒绝」话术");
+  noBtn.type = "button";
+  noBtn.addEventListener("click", () => copyConsentText(post.anon_token, false, noBtn));
+  actions.append(okBtn, noBtn);
+  body.appendChild(actions);
+  body.appendChild(el("p", "small muted", "只有双方都点头，双方的中转码才会互相出现；单方面看不到对方任何联系方式。"));
+
+  openModal({ title: "表达意愿", iconName: "message-chatbot", body, confirmText: "知道了", cancelText: "关闭" });
+}
+
+/* ============================================================ 卡片渲染 */
+
+function cardShell() {
+  const card = el("article", "item item--accent buddy-card");
+  return card;
+}
+
+function headRow(node) {
+  const top = el("div", "buddy-card__head");
+  const k = kindOf(node.kind);
+  top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
+  top.appendChild(el("span", "buddy-card__anon", node.anon_token));
+  return top;
+}
+
+/** 搭子墙卡片：kind 徽章 + 画像要点 + 期望 + 匿名标识 + 「表达意愿」 */
+function postCard(post) {
+  const card = cardShell();
+  const top = headRow(post);
+  const when = el("span", "buddy-sub", "发布于 " + fmtTs(post.created_at));
+  when.style.marginLeft = "auto";
+  top.appendChild(when);
+  card.appendChild(top);
+
+  const want = el("p", "buddy-want", (post.profile && post.profile.wanted) || "（未填写期望）");
+  card.appendChild(want);
+  card.appendChild(profileBlock(post.profile));
+
+  const actions = el("div", "item__actions");
+  const btn = el("button", "btn btn--sm", "表达意愿");
+  btn.type = "button";
+  btn.addEventListener("click", () => openIntentModal(post));
+  actions.appendChild(btn);
+  card.appendChild(actions);
+  return card;
+}
+
+/** 候选卡片：总分 + 四段进度条 + 理由 + 揭示状态（有画像就补可视化） */
+function candidateCard(c) {
+  const card = cardShell();
+  const top = headRow(c);
+  const score = el("span", "score");
+  score.appendChild(el("span", "score__num", String(c.score)));
+  score.appendChild(el("span", "score__max", "分 / 100"));
+  top.appendChild(score);
+  card.appendChild(top);
+
+  const mutual = c.reveal_status === "mutual";
+  const statusRow = el("div", "chip-row");
+  statusRow.appendChild(badgeWithIcon(mutual ? "已互相可见" : "待对方同意", mutual ? "circle-check" : "clock",
+    mutual ? "badge badge--ok" : "badge badge--warn"));
+  statusRow.appendChild(el("span", "chip", "由 " + kindOf(c.kind).label + " 类型匹配"));
+  card.appendChild(statusRow);
+
+  const p = c.parts || {};
+  const bars = el("div", "buddy-block");
+  bars.appendChild(meterRow("兴趣", (Number(p.interest) || 0) / 35, (Number(p.interest) || 0) + "/35"));
+  bars.appendChild(meterRow("作息", (Number(p.schedule) || 0) / 30, (Number(p.schedule) || 0) + "/30"));
+  bars.appendChild(meterRow("性格", (Number(p.traits) || 0) / 20, (Number(p.traits) || 0) + "/20"));
+  bars.appendChild(meterRow("语义", (Number(p.semantic) || 0) / 15, (Number(p.semantic) || 0) + "/15"));
+  card.appendChild(bars);
+  card.appendChild(el("div", "reason", c.reason || "（无评分理由）"));
+
+  const inner = wallById.get(c.post_id);
+  if (inner && inner.profile) {
+    const want = el("p", "buddy-want", inner.profile.wanted || "（未填写期望）");
+    card.appendChild(want);
+    card.appendChild(profileBlock(inner.profile));
+  }
+
+  if (mutual && c.contact_code) {
+    const contact = el("div", "buddy-block");
+    contact.appendChild(el("div", "buddy-block__label", "中转码（双方已同意才会下发）"));
+    contact.appendChild(el("span", "buddy-reveal__code", String(c.contact_code)));
+    card.appendChild(contact);
+  }
+
+  const actions = el("div", "item__actions");
+  const btn = el("button", "btn btn--sm", "表达意愿");
+  btn.type = "button";
+  btn.addEventListener("click", () => openIntentModal(c));
+  actions.appendChild(btn);
+  const copyBtn = el("button", "btn btn--ghost btn--sm", "复制中转码");
+  copyBtn.type = "button";
+  copyBtn.hidden = !(mutual && c.contact_code);
+  copyBtn.addEventListener("click", async () => {
+    const ok = await copyText(String(c.contact_code));
+    toast(ok ? "中转码已复制" : "复制失败，请手动复制", ok ? "ok" : "danger");
+  });
+  actions.appendChild(copyBtn);
+  card.appendChild(actions);
+  return card;
+}
+
+/* ============================================================ 双选揭示：成功视觉 */
+
+function revealPanel(c) {
+  const box = el("div", "buddy-reveal");
+  box.setAttribute("role", "status");
+  const burst = el("span", "buddy-reveal__burst");
+  burst.setAttribute("aria-hidden", "true");
+  box.appendChild(burst);
+
+  const art = document.createElement("img");
+  art.className = "buddy-reveal__art";
+  art.src = "/img/agent-connect.png";
+  art.alt = "";
+  box.appendChild(art);
+
+  const body = el("div", "buddy-reveal__body");
+  body.appendChild(el("p", "buddy-reveal__title", "双方都点头了 · 已互相可见"));
+  const line = el("p", "small muted");
+  line.appendChild(document.createTextNode("你和 "));
+  line.appendChild(el("span", "mono", c.anon_token));
+  line.appendChild(document.createTextNode(" 都表示了同意，这是你们的中转码："));
+  body.appendChild(line);
+  body.appendChild(el("p", "buddy-reveal__code", String(c.contact_code)));
+  const acts = el("div", "buddy-reveal__acts");
+  const copyBtn = el("button", "btn btn--ok btn--sm", "复制中转码");
+  copyBtn.type = "button";
+  copyBtn.addEventListener("click", async () => {
+    const ok = await copyText(String(c.contact_code));
+    toast(ok ? "中转码已复制" : "复制失败，请手动复制", ok ? "ok" : "danger");
+  });
+  const againBtn = el("button", "btn btn--ghost btn--sm", "再找几个搭子");
+  againBtn.type = "button";
+  againBtn.addEventListener("click", openSearchSheet);
+  acts.append(copyBtn, againBtn);
+  body.appendChild(acts);
+  box.appendChild(body);
+  return box;
+}
+
+/** 候选里凡是「已互相可见」且还没庆祝过的，都给出成功视觉 */
+function celebrate(candidates) {
+  const host = $("revealHost");
+  const fresh = (candidates || []).filter(
+    (c) => c.reveal_status === "mutual" && !celebrated.has(c.anon_token),
+  );
+  if (!fresh.length) return;
+  for (const c of fresh) celebrated.add(c.anon_token);
+  host.innerHTML = "";
+  for (const c of fresh) host.appendChild(revealPanel(c));
+  toast("双方都点头了 · 已互相可见", "ok");
+}
+
+/* ============================================================ 列表渲染 */
+
+function renderWall() {
+  const kind = $("kindFilter").value;
+  const rows = kind ? wallPosts.filter((p) => p.kind === kind) : wallPosts;
+  const host = $("listHost");
+  host.innerHTML = "";
+  $("revealHost").innerHTML = "";
+  mode = "wall";
+  $("modeText").textContent = "搭子墙";
+  $("btnBackWall").hidden = true;
+
   if (!rows.length) {
-    showEmpty(box, {
-      icon: "📮",
+    emptyArt(host, {
+      title: kind ? "这个类型下还没有搭子帖" : "搭子墙还没有内容",
+      hint: kind ? "换一个类型，或自己发一条 —— 描述越具体，匹配越准。" : "点左侧功能栏的「发帖」，用一段大白话发第一条。",
+      actionText: "发布搭子帖",
+      onAction: openPublishSheet,
+    });
+    return;
+  }
+  for (const p of rows) host.appendChild(postCard(p));
+}
+
+function renderCandidates(rows) {
+  const host = $("listHost");
+  host.innerHTML = "";
+  mode = "candidates";
+  $("modeText").textContent = "匹配候选（" + rows.length + "）";
+  $("btnBackWall").hidden = false;
+
+  if (!rows.length) {
+    emptyArt(host, {
+      title: "没有评分 ≥ 60 的候选",
+      hint: "可以换个类型，或把描述写得更具体（年级 / 专业大类 / 作息 / 兴趣都写上）。",
+      actionText: "换个条件再找",
+      onAction: openSearchSheet,
+    });
+    return;
+  }
+  for (const c of rows) host.appendChild(candidateCard(c));
+  celebrate(rows);
+}
+
+function refreshStats() {
+  const pending = mineRows.filter((r) => r.reveal_status !== "mutual" && r.my_ok === 1).length;
+  const mutual = mineRows.filter((r) => r.reveal_status === "mutual").length;
+  const set = (id, value, src) => {
+    const box = $(id);
+    box.classList.remove("stat--pending");
+    box.querySelector(".stat__value").textContent = String(value);
+    if (src) box.querySelector(".stat__src").textContent = src;
+  };
+  set("statWall", wallPosts.length, "GET /api/buddies");
+  set("statMine", mineRows.length, "GET /api/buddies/mine");
+  set("statMutual", mutual, "双方都同意");
+  $("factWall").textContent = String(wallPosts.length);
+  $("factPending").textContent = String(pending);
+  $("factMutual").textContent = String(mutual);
+  $("railMineCount").textContent = String(mineRows.length);
+}
+
+async function loadWall() {
+  try {
+    const rows = await api("/api/buddies?limit=100");
+    wallPosts = Array.isArray(rows) ? rows : [];
+    wallById.clear();
+    for (const p of wallPosts) wallById.set(p.post_id, p);
+    refreshStats();
+    if (mode === "wall") renderWall();
+    return wallPosts;
+  } catch (e) {
+    showError("listHost", e, { title: "搭子墙读取失败", onRetry: loadWall });
+    return [];
+  }
+}
+
+/* ============================================================ 我的申请（时间线） */
+
+function mineRowNode(r, index) {
+  const li = el("li", "step");
+  li.appendChild(el("span", "step__num", String(index + 1)));
+  const body = el("div", "step__body");
+  const head = el("div", "buddy-timeline__head");
+  head.appendChild(el("b", "mono", r.anon_token));
+  const mutual = r.reveal_status === "mutual";
+  head.appendChild(badgeWithIcon(mutual ? "已互相可见" : r.my_ok === 1 ? "待对方同意" : "我已拒绝",
+    mutual ? "circle-check" : "clock", mutual ? "badge badge--ok" : r.my_ok === 1 ? "badge badge--warn" : "badge badge--muted"));
+  body.appendChild(head);
+  const meta = el("div", "buddy-timeline__meta");
+  meta.textContent = kindOf(r.kind).label + " · 我的评分 " + r.score + "（表决那一刻估算）· " + fmtTs(r.created_at);
+  body.appendChild(meta);
+  if (mutual) {
+    const line = el("div", "buddy-timeline__meta");
+    line.appendChild(el("span", null, "已互相可见 —— 中转码在匹配候选卡上（打开「找搭子」即可看到）。"));
+    body.appendChild(line);
+  }
+  li.appendChild(body);
+  return li;
+}
+
+function renderMine(host) {
+  const box = host || ($("mineSheetBody"));
+  if (!mineRows.length) {
+    emptyArt(box, {
       title: "还没有发出过意愿",
-      hint: "在候选卡上复制「同意」话术，粘给 WorkBuddy 里的 Agent，让它替你表决。",
+      hint: "打开「找搭子」，在候选卡上点「表达意愿」，把话术粘给 WorkBuddy 里的 Agent。",
+      actionText: "去找搭子",
+      onAction: openSearchSheet,
     });
     return;
   }
   box.innerHTML = "";
-
-  const wrap = el("div", "table-wrap mine-table");
-  const rowsHtml = rows.map((r) =>
-    "<tr><td class='mono'>" + esc(r.anon_token) + "</td><td>" + esc(r.score) + "</td><td>" +
-    (r.reveal_status === "mutual" ? '<span class="badge badge--ok">已互相可见</span>'
-      : r.my_ok === 1 ? '<span class="badge badge--warn">待对方同意</span>'
-      : '<span class="badge badge--muted">我已拒绝</span>') +
-    "</td><td class='nowrap'>" + esc(r.created_at) + "</td></tr>").join("");
-  wrap.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分<br><small>（表决时估算）</small></th>" +
-    "<th>状态</th><th>时间</th></tr></thead><tbody>" + rowsHtml + "</tbody></table>";
-  box.appendChild(wrap);
-
-  const cards = el("div", "mine-cards");
-  for (const r of rows) {
-    const card = el("div", "item");
-    const top = el("div", "item__head");
-    top.appendChild(el("span", "anon", r.anon_token));
-    top.appendChild(statusBadge(r));
-    const sc = el("span", "score");
-    sc.appendChild(el("span", "score__num", String(r.score)));
-    sc.appendChild(el("span", "score__max", "分"));
-    top.appendChild(sc);
-    card.appendChild(top);
-    card.appendChild(el("div", "item__meta", "评分口径：表决时估算｜时间：" + r.created_at));
-    cards.appendChild(card);
-  }
-  box.appendChild(cards);
+  const list = el("ol", "steps buddy-timeline");
+  mineRows.forEach((r, i) => list.appendChild(mineRowNode(r, i)));
+  box.appendChild(list);
+  const tip = el("p", "small muted");
+  tip.textContent = "这里的分数是表决那一刻估算的（表决接口不收画像），与候选卡的分数可能不同；是否揭示只由双选状态机决定，与分数无关。";
+  box.appendChild(tip);
 }
 
 async function loadMine() {
   try {
     const rows = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
-    renderMine(rows);
+    mineRows = Array.isArray(rows) ? rows : [];
+    refreshStats();
+    if (mineSheet && mineSheet.root.classList.contains("is-open")) renderMine();
+    return mineRows;
   } catch (e) {
-    showError("mine", e, { title: "我的申请读取失败", onRetry: loadMine });
+    mineRows = [];
+    refreshStats();
+    if (mineSheet && mineSheet.root.classList.contains("is-open")) showError("mineSheetBody", e, { title: "我的申请读取失败" });
+    return [];
   }
 }
-$("btnMine").addEventListener("click", loadMine);
 
-/* ---------- 启动 ---------- */
+/* ============================================================ 三个功能面板（侧栏 / 弹层） */
+
+/* ---- 发帖 ---- */
+const publishSheet = createSheet({ title: "发帖", iconName: "pencil" });
+{
+  const body = el("div", null);
+  const kindField = el("div", "field");
+  const kindLabel = el("label", null, "类型");
+  kindLabel.setAttribute("for", "pubKind");
+  const pubKind = el("select", null);
+  pubKind.id = "pubKind";
+  for (const k of KINDS) {
+    const opt = document.createElement("option");
+    opt.value = k.v;
+    opt.textContent = k.label;
+    pubKind.appendChild(opt);
+  }
+  kindField.append(kindLabel, pubKind);
+  body.appendChild(kindField);
+
+  const textField = el("div", "field");
+  const textLabel = el("label", null, "用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点");
+  textLabel.setAttribute("for", "pubText");
+  const pubText = document.createElement("textarea");
+  pubText.id = "pubText";
+  pubText.placeholder = "例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放";
+  textField.append(textLabel, pubText);
+  body.appendChild(textField);
+  body.appendChild(el("p", "small muted", "发布身份用左侧功能栏里的「我的匿名昵称」；服务端会把这段话抽成结构化画像，未提及的字段取中性值，不编造兴趣。"));
+
+  const msg = el("div", null);
+  msg.id = "pubMsg";
+  body.appendChild(msg);
+
+  const out = document.createElement("pre");
+  out.id = "pubOut";
+  out.className = "code";
+  out.hidden = true;
+  body.appendChild(out);
+
+  const foot = el("div", "form-actions");
+  const submit = el("button", "btn", "发布");
+  submit.type = "button";
+  submit.addEventListener("click", async () => {
+    const text = pubText.value.trim();
+    if (text.length < 4) { showNotice(msg, "先把需求写清楚一点（至少一句话）。", "danger"); return; }
+    showLoading(msg, "发布中…");
+    try {
+      const data = await api("/api/buddies", {
+        method: "POST",
+        body: { author_handle: getHandle(), kind: pubKind.value, text_profile: text },
+      });
+      msg.innerHTML = "";
+      showNotice(msg, "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
+      out.hidden = false;
+      out.textContent = "抽取出的 11 字段画像：\n" + JSON.stringify(data.profile, null, 2);
+      toast("发布成功，已刷新搭子墙", "ok");
+      await loadWall();
+      renderWall();
+      publishSheet.close();
+    } catch (e) {
+      showError(msg, e, { title: "发布失败" });
+    }
+  });
+  foot.appendChild(submit);
+  publishSheet.body.appendChild(body);
+  publishSheet.foot.appendChild(foot);
+}
+function openPublishSheet() { closeRail(); publishSheet.open(); }
+
+/* ---- 找搭子 ---- */
+const searchSheet = createSheet({ title: "找搭子", iconName: "search" });
+{
+  const body = el("div", null);
+  const grid = el("div", "form-grid form-grid--2");
+  const kindField = el("div", "field");
+  const kindLabel = el("label", null, "类型");
+  kindLabel.setAttribute("for", "searchKind");
+  const searchKind = el("select", null);
+  searchKind.id = "searchKind";
+  for (const k of KINDS) {
+    const opt = document.createElement("option");
+    opt.value = k.v;
+    opt.textContent = k.label;
+    searchKind.appendChild(opt);
+  }
+  kindField.append(kindLabel, searchKind);
+  const topField = el("div", "field");
+  const topLabel = el("label", null, "返回条数（1-20）");
+  topLabel.setAttribute("for", "topK");
+  const topK = document.createElement("input");
+  topK.id = "topK";
+  topK.type = "number";
+  topK.min = "1";
+  topK.max = "20";
+  topK.value = "5";
+  topField.append(topLabel, topK);
+  grid.append(kindField, topField);
+  body.appendChild(grid);
+
+  const textField = el("div", "field");
+  const textLabel = el("label", null, "描述你想要的搭子");
+  textLabel.setAttribute("for", "seekText");
+  const seekText = document.createElement("textarea");
+  seekText.id = "seekText";
+  seekText.placeholder = "例：大二 工科 想找一起刷算法题和摄影的同学，作息偏夜猫，周末有空，周三1-2节有课";
+  textField.append(textLabel, seekText);
+  body.appendChild(textField);
+
+  const msg = el("div", null);
+  msg.id = "searchMsg";
+  body.appendChild(msg);
+
+  const foot = el("div", "form-actions");
+  const submit = el("button", "btn", "开始匹配");
+  submit.type = "button";
+  submit.addEventListener("click", async () => {
+    const text = seekText.value.trim();
+    if (text.length < 2) { showNotice(msg, "先写一句「我想要什么样的搭子」。", "danger"); return; }
+    showLoading(msg, "检索中…");
+    showLoading("listHost", "正在按你的描述计算匹配分…");
+    try {
+      const rows = await api("/api/buddies/search?kind=" + encodeURIComponent(searchKind.value) +
+        "&handle=" + encodeURIComponent(getHandle()) +
+        "&top_k=" + encodeURIComponent(topK.value) +
+        "&text=" + encodeURIComponent(text));
+      msg.innerHTML = "";
+      showNotice(msg, "命中 " + rows.length + " 个候选（仅显示评分 ≥ 60 且未被一票否决的）", "ok");
+      $("listMsg").innerHTML = "";
+      renderCandidates(Array.isArray(rows) ? rows : []);
+      searchSheet.close();
+    } catch (e) {
+      msg.innerHTML = "";
+      showError("listHost", e, { title: "搜索失败" });
+    }
+  });
+  foot.appendChild(submit);
+
+  const wallBtn = el("button", "btn btn--ghost", "只看搭子墙（不评分）");
+  wallBtn.type = "button";
+  wallBtn.addEventListener("click", () => {
+    searchSheet.close();
+    renderWall();
+  });
+  foot.appendChild(wallBtn);
+
+  searchSheet.body.appendChild(body);
+  searchSheet.foot.appendChild(foot);
+}
+function openSearchSheet() { closeRail(); searchSheet.open(); }
+
+/* ---- 我的申请 ---- */
+const mineSheet = createSheet({ title: "我的申请", iconName: "send" });
+{
+  const holder = el("div", null);
+  holder.id = "mineSheetBody";
+  mineSheet.body.appendChild(holder);
+  const foot = el("div", "form-actions");
+  const btn = el("button", "btn btn--ghost", "刷新");
+  btn.type = "button";
+  btn.addEventListener("click", async () => { showLoading(holder, "读取中…"); await loadMine(); renderMine(); });
+  foot.appendChild(btn);
+  mineSheet.foot.appendChild(foot);
+}
+async function openMineSheet() {
+  closeRail();
+  mineSheet.open();
+  showLoading("mineSheetBody", "读取中…");
+  await loadMine();
+  renderMine();
+}
+
+/* ============================================================ 侧栏抽屉（窄屏） */
+
+function openRail() {
+  $("buddyRail").classList.add("is-open");
+  $("railBackdrop").classList.add("is-open");
+  $("btnRail").setAttribute("aria-expanded", "true");
+}
+function closeRail() {
+  $("buddyRail").classList.remove("is-open");
+  $("railBackdrop").classList.remove("is-open");
+  $("btnRail").setAttribute("aria-expanded", "false");
+}
+$("btnRail").addEventListener("click", () => {
+  if ($("buddyRail").classList.contains("is-open")) closeRail();
+  else openRail();
+});
+$("railBackdrop").addEventListener("click", closeRail);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRail(); });
+$("navPublish").addEventListener("click", openPublishSheet);
+$("navSearch").addEventListener("click", openSearchSheet);
+$("navMine").addEventListener("click", openMineSheet);
+$("btnBackWall").addEventListener("click", () => renderWall());
+$("btnRefresh").addEventListener("click", async () => {
+  showLoading("listHost", "刷新中…");
+  await loadWall();
+  await loadMine();
+  renderWall();
+  toast("已刷新", "ok");
+});
+$("kindFilter").addEventListener("change", () => { if (mode === "wall") renderWall(); });
+
+/* ============================================================ 启动 */
+
 (async function boot() {
   paintTokenState();
-  showEmpty("cands", {
-    icon: "🤝",
-    title: "还没有候选",
-    hint: "在上方区块二写一句「我想要什么样的搭子」，点「搜索候选」。",
-  });
+  showLoading("listHost", "正在读取搭子墙…");
   await initDemo();
+  await loadWall();
   await loadMine();
+  renderWall();
+  initReveals();
 })();
 </script>
 </body>
