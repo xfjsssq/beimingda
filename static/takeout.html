@@ -5,80 +5,149 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>代取撮合：看单、接单、跑腿登记</title>
 <!--
-  代取撮合页（M1）—— 2026-10-28 改成「看单为主 · 功能收进按钮」
+  代取撮合页（M1）—— 2026-10-29 第三版：功能收进左侧常驻功能栏，主区只留看板
 
   设计口径（来自用户原话）：
-    · 打开这一页第一屏就是**开放任务看板**，看到顺路的单子直接「接这一单」
-    · 「发布代取」「登记跑腿能力」不占看板的地方，收进右上角 .toolbar 的两个按钮，
-      点开用 createSheet() 弹出侧栏（≤640px 自动变底部面板）
-    · 删掉「先点一个按钮才看得到候选」的独立动作：撮合在看板加载时自动跑，候选直接铺在卡片里
-      （卡片上那行「系统已为你找到 N 位顺路的同学」→ 点开展示 昵称 / score / reason）
+    · 发布这种功能「完全可以弄侧边功能栏」：桌面端常驻在左，手机端收成一个「功能」按键，点开才滑出来
+    · 「整个界面主要还是查看已经发布的任务」：主区只有开放任务卡片列表，别的都收进功能栏
+    · 「避免过多功能都塞在同一个界面」：解释性长文案收进功能栏的「说明」，卡片只留信息层次
+      （楼栋路径大字 + 取件点/倒计时/报酬小字 + 状态徽章 + 一行候选入口）
     · 令牌内置：/config.js 注入 window.__DEMO_TOKEN__，/js/api.js 自动带 X-Demo-Token；
       页面上 ⛔ 没有任何令牌输入框，也不回显令牌
 
   约定：
     · 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/demo.js、/js/ui.js
     · 图标一律 static/vendor/phosphor/icons/*.svg + .icon（⛔ 不用 emoji）
+    · 字阶只用 12/14/16/18/20/24/30/36/48/60，间距只用 0/2/4/8/12/16/24/32/40/48/64/80/96
+      （本页 <style> 里的取值都由单测钉死，见 tests/ui-takeout.test.js）
     · ⛔ 不收姓名 / 学号 / 手机号；⛔ 截图原图不落盘；平台不参与交易、不代收款
 -->
 <link rel="stylesheet" href="/css/app.css" />
 <style>
-  /* 时段行：注意 datetime-local 固有最小宽约 182px，必须 minmax(0,1fr) 才允许收缩 */
+  /* 登记侧栏的时段行：注意 datetime-local 固有最小宽约 182px，必须 minmax(0,1fr) 才允许收缩 */
   .wins .win { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
-    gap:8px; margin-bottom:8px; align-items:end; }
+    gap: var(--sp-75); margin-bottom: var(--sp-75); align-items:end; }
   @media (max-width:640px) {
     /* 窄屏：起始时间独占一行，结束时间 + 删除按钮一行，避免两个 datetime-local 并排溢出 */
     .wins .win { grid-template-columns:minmax(0,1fr) auto; }
     .wins .win .w-start { grid-column:1 / -1; }
   }
 
-  /* ---- 工具栏 ---- */
-  .toolbar select { max-width:200px; width:auto; min-width:0; }
+  /* ---------- 壳：≥1024px 左侧常驻功能栏 + 主区只留看板 ---------- */
+  .shell { display:block; }
+  @media (min-width:1024px) {
+    .shell { display:grid; grid-template-columns: 240px minmax(0,1fr);
+      gap: var(--sp-300); align-items:start; }
+  }
 
-  /* ---- 看板卡片 ---- */
-  .takeout-card__head { display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; }
-  .takeout-card__main { flex:1 1 240px; min-width:0; }
-  .takeout-card__route { margin:0; font-size:16.5px; font-weight:600; line-height:1.35;
-    color:var(--color-primary); overflow-wrap:anywhere; }
-  .takeout-card__side { display:flex; flex-direction:column; gap:8px; align-items:flex-end;
-    margin-left:auto; flex:0 0 auto; }
-  .takeout-card__note { margin:10px 0 0; font-size:13px; line-height:1.7;
-    color:var(--color-muted); overflow-wrap:anywhere; }
-  .takeout-card__cands { margin-top:12px; }
-  .takeout-card__cands .empty-art { padding:14px 12px; }
-  .takeout-card__cands .empty-art img { width:112px; }
-
-  /* 倒计时：紧张 / 过期要有醒目标记（红底加粗 + 警示图标） */
-  .chip--soon { background:var(--color-primary-soft); border-color:var(--color-primary-line);
+  /* ---------- 功能栏（桌面常驻 / 窄屏抽屉） ---------- */
+  .rail { background:var(--color-card); border:1px solid var(--color-line);
+    border-radius:var(--radius-card); box-shadow:var(--shadow-card); padding: var(--sp-200); }
+  .rail__top { display:flex; align-items:center; justify-content:space-between;
+    gap: var(--sp-75); margin-bottom: var(--sp-100); }
+  .rail__title { font-size: 14px; font-weight:600; color:var(--color-primary); }
+  .rail__close { display:none; align-items:center; justify-content:center;
+    width: 32px; height: 32px; border:0; border-radius:var(--radius-sm);
+    background:var(--color-sunken); color:var(--color-muted); cursor:pointer; }
+  .rail__group { display:flex; flex-direction:column; gap: var(--sp-50); }
+  .rail__group + .rail__group { margin-top: var(--sp-100); padding-top: var(--sp-100);
+    border-top:1px dashed var(--color-line); }
+  .rail__group-head { font-size: 12px; color:var(--color-muted); margin-bottom: var(--sp-25); }
+  .rail-item { appearance:none; display:flex; align-items:center; gap: var(--sp-75); width:100%;
+    text-align:left; padding: var(--sp-75) var(--sp-100); border:1px solid transparent;
+    border-radius:var(--radius-md); background:transparent; color:var(--color-text-soft);
+    font-family:inherit; font-size: 14px; cursor:pointer;
+    transition: background var(--dur-color) var(--ease), color var(--dur-color) var(--ease); }
+  .rail-item:hover { background:var(--color-primary-soft); color:var(--color-primary); }
+  .rail-item.is-active { background:var(--color-primary-soft); border-color:var(--color-primary-line);
     color:var(--color-primary); font-weight:600; }
-  .chip--urgent { background:var(--color-danger-soft); border-color:rgba(192,57,43,.3);
-    color:var(--color-danger); font-weight:600; }
+  .rail-item__count { margin-left:auto; font-size: 12px; color:var(--color-muted);
+    font-variant-numeric: tabular-nums; }
+  .rail__label { display:block; font-size: 12px; color:var(--color-muted); margin-bottom: var(--sp-25); }
+  .rail__note { margin-top: var(--sp-100); padding-top: var(--sp-100);
+    border-top:1px dashed var(--color-line); font-size: 12px; color:var(--color-muted); }
+  .rail__note summary { cursor:pointer; font-weight:600; color:var(--color-text-soft); }
+  .rail__note p { margin: var(--sp-75) 0 0; line-height:1.7; }
+  .rail__foot { display:flex; align-items:center; gap: var(--sp-50);
+    margin: var(--sp-100) 0 0; font-size: 12px; color:var(--color-muted); }
 
-  /* ---- 候选行 ---- */
-  .cands-loading { display:flex; align-items:center; gap:9px; font-size:13px; color:var(--color-muted); }
+  @media (min-width:1024px) {
+    /* 常驻：吸顶，跟随长看板一起滚 */
+    .rail { position: sticky; top: calc(var(--sp-700) + var(--sp-200));
+      max-height: calc(100vh - var(--sp-900)); overflow:auto; }
+    .rail-fab, .rail-backdrop { display:none; }
+  }
+  @media (max-width:1023px) {
+    /* 收起：默认在屏幕外，点右下角「功能」从左侧滑入 */
+    .rail { position:fixed; left:0; top:0; height:100%; width: min(280px, 86vw); z-index: 96;
+      border-radius: 0 var(--radius-lg) var(--radius-lg) 0; overflow:auto;
+      transform: translateX(-100%); transition: transform var(--dur-move) var(--ease); }
+    .rail.is-open { transform:none; }
+    .rail__close { display:inline-flex; }
+    .rail-backdrop { position:fixed; inset:0; z-index: 95; background: rgba(12,20,33,.42);
+      opacity:0; pointer-events:none; transition: opacity var(--dur-color) var(--ease); }
+    .rail-backdrop.is-open { opacity:1; pointer-events:auto; }
+    .rail-fab { position:fixed; right: var(--sp-200); bottom: calc(var(--tabbar-h) + var(--sp-200));
+      z-index: 60; display:inline-flex; align-items:center; gap: var(--sp-50);
+      padding: var(--sp-75) var(--sp-200); border:0; border-radius:var(--radius-pill);
+      background:var(--color-primary); color:#fff; font-family:inherit;
+      font-size: 14px; font-weight:600; cursor:pointer; box-shadow:var(--shadow-pop); }
+  }
+
+  /* ---------- 看板区头（主区唯一的一段文字） ---------- */
+  .shell__head { display:flex; align-items:flex-end; justify-content:space-between;
+    gap: var(--sp-100); flex-wrap:wrap; margin-bottom: var(--sp-100); }
+  .shell__head h2 { margin:0; font-size: 18px; }
+  .shell__head .eyebrow { display:block; font-size: 12px; color:var(--color-muted-soft);
+    margin-bottom: var(--sp-25); }
+  .shell__head p { margin: var(--sp-25) 0 0; font-size: 12px; color:var(--color-muted); }
+
+  /* ---------- 任务卡：信息分层次（大字路径 / 小字信息 / 徽章 / 一行候选入口 / 一行操作） ---------- */
+  .tk-card { gap: var(--sp-75); }
+  .tk-card__top { display:flex; align-items:flex-start; justify-content:space-between;
+    gap: var(--sp-75); flex-wrap:wrap; }
+  .tk-card__route { margin:0; font-size: 20px; font-weight:600; line-height:1.35;
+    color:var(--color-primary); overflow-wrap:anywhere; }
+  .tk-card__side { flex:0 0 auto; }
+  .tk-card__meta { display:flex; flex-wrap:wrap; gap: var(--sp-50); }
+  .tk-card__note { margin:0; font-size: 14px; color:var(--color-muted); overflow-wrap:anywhere; }
+  .tk-card__note.is-cut { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tk-card__cands { min-width:0; }
+  .tk-toggle { max-width:100%; }
+  .tk-none, .tk-matching { display:flex; align-items:center; gap: var(--sp-50); margin:0;
+    font-size: 12px; color:var(--color-muted); }
+  .tk-card__foot { display:flex; align-items:center; justify-content:space-between;
+    gap: var(--sp-75); flex-wrap:wrap; padding-top: var(--sp-75);
+    border-top:1px dashed var(--color-line); }
+  .tk-card__id { margin:0; font-family:var(--font-mono); font-size: 12px;
+    color:var(--color-muted-soft); overflow-wrap:anywhere; }
+  .tk-card__action { flex:0 0 auto; }
+
+  /* 候选：一行一个（超出的收进「还有 N 位」） */
+  .cand-list { display:flex; flex-direction:column; gap: var(--sp-75); margin-top: var(--sp-100); }
+  /* 注意：.cand-list 的 display 会盖掉浏览器默认的 [hidden]{display:none}，折叠态必须显式声明 */
+  .cand-list[hidden] { display:none; }
   .cand { border:1px solid var(--color-line); border-radius:var(--radius-md);
-    padding:11px 13px; background:#fff; min-width:0; }
-  .cand + .cand { margin-top:8px; }
+    background:var(--color-sunken); padding: var(--sp-100); min-width:0; }
   .cand.is-dim { opacity:.5; }
-  .cand__line { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  .cand__name { font-weight:600; font-size:14.5px; min-width:0; overflow-wrap:anywhere; }
-  .cand .reason { margin-top:8px; }
-  .cand__meta { margin-top:7px; font-family:var(--font-mono); font-size:11.5px;
-    color:var(--color-muted-soft); overflow-wrap:anywhere; }
-  .task-id { margin:10px 0 0; font-family:var(--font-mono); font-size:11.5px;
-    color:var(--color-muted-soft); overflow-wrap:anywhere; }
+  .cand__line { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap; }
+  .cand__name { font-size: 14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
+  .cand .reason { margin-top: var(--sp-75); }
+  .cand__queue { font-size: 12px; color:var(--color-muted); }
+  .tk-more { align-self:flex-start; }
 
-  /* ---- 侧栏内部零件 ---- */
+  /* 侧栏内部零件 */
   .sheet__foot { flex-wrap:wrap; }
   .sheet__foot .hint { flex:1 1 100%; margin:0; }
   #p-shot { max-width:100%; }
-  #publish-out, #register-out { margin-top:10px; }
+  #publish-out, #register-out { margin-top: var(--sp-100); }
 
-  @media (max-width:640px) {
-    /* 窄屏：主按钮不再挤在右侧，整行铺开，避免横向溢出 */
-    .takeout-card__side { flex-direction:row; align-items:center; justify-content:space-between;
-      width:100%; margin-left:0; flex-wrap:wrap; }
-    .cand__line .score { margin-left:0; }
+  @media (max-width:767px) {
+    /* 窄屏首屏尽量多露卡片：隐掉小标题与页头小字（说明在功能栏里），卡片内边距收紧一档 */
+    .shell__head .eyebrow { display:none; }
+    .page-head .lead { display:none; }
+    .tk-card { padding: var(--sp-100); }
+    .tk-card__route { font-size: 18px; }
   }
 </style>
   <meta name="description" content="按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学，每个候选都带可解释理由。" />
@@ -92,48 +161,86 @@
 <main id="main" class="page page--mid">
   <div class="page-head">
     <h1>代取看板</h1>
-    <p class="lead">打开这一页就是开放任务：看到顺路的单子直接「接这一单」。发布需求、登记跑腿能力收在右上角按钮里，点开才出现，不占看单的地方。</p>
-    <div class="page-head__tags">
-      <span class="badge">打开即看单</span>
-      <span class="badge badge--muted">score ≥ 60 才进候选</span>
-      <span class="badge badge--muted">平台不参与交易、不代收款</span>
-    </div>
+    <p class="lead">看到顺路的单子直接接；发布、登记、我的接单都收在功能栏里。</p>
   </div>
 
-  <!-- ───────────── 工具栏：两个功能按钮 + 筛选/刷新 ───────────── -->
-  <div class="toolbar">
-    <button class="btn" id="btn-open-publish" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/package.svg)" aria-hidden="true"></span>
-      <span>发布代取</span>
-    </button>
-    <button class="btn btn--ghost" id="btn-open-register" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/walk.svg)" aria-hidden="true"></span>
-      <span>登记跑腿能力</span>
-    </button>
-    <span class="toolbar__spacer"></span>
-    <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
-    <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
-      <span>刷新看板</span>
-    </button>
-  </div>
-
-  <!-- ───────────── 开放任务看板（第一屏） ───────────── -->
-  <section class="section">
-    <div class="section-head">
-      <div>
-        <span class="eyebrow">开放任务</span>
-        <h2>待取看板</h2>
-        <p id="board-count">正在读取…</p>
+  <div class="shell">
+    <!-- ───────────── 功能栏：≥1024px 常驻在左；窄屏默认收起，点「功能」滑入 ───────────── -->
+    <aside class="rail" id="rail" aria-label="代取功能栏">
+      <div class="rail__top">
+        <span class="rail__title">代取功能</span>
+        <button class="rail__close" id="rail-close" type="button" aria-label="收起功能栏">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/x.svg)" aria-hidden="true"></span>
+        </button>
       </div>
-      <span class="chip" id="token-chip"></span>
-    </div>
-    <div id="board" class="stack"></div>
-    <p class="hint" id="board-note">
-      匹配结果直接铺在每张卡片里：点开「系统已为你找到 N 位顺路的同学」，就能看到每位候选的
-      score / 100 与 reason 原文（reason: 里的分值相加正好等于 score）。阈值 60，低于 60 分的一律不出现。
-    </p>
-  </section>
+
+      <nav class="rail__group" aria-label="看板视图">
+        <span class="rail__group-head">看板视图</span>
+        <button class="rail-item is-active" id="view-all" type="button" aria-pressed="true">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/layout-grid.svg)" aria-hidden="true"></span>
+          <span>全部开放任务</span>
+          <span class="rail-item__count" id="count-all">0</span>
+        </button>
+        <button class="rail-item" id="view-mine" type="button" aria-pressed="false">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/list-check.svg)" aria-hidden="true"></span>
+          <span>我的接单</span>
+          <span class="rail-item__count" id="count-mine">0</span>
+        </button>
+      </nav>
+
+      <nav class="rail__group" aria-label="功能">
+        <span class="rail__group-head">功能</span>
+        <button class="rail-item" id="btn-open-publish" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/package.svg)" aria-hidden="true"></span>
+          <span>发布代取</span>
+        </button>
+        <button class="rail-item" id="btn-open-register" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/walk.svg)" aria-hidden="true"></span>
+          <span>登记跑腿能力</span>
+        </button>
+      </nav>
+
+      <div class="rail__group">
+        <span class="rail__group-head">筛选</span>
+        <label class="rail__label" for="b-filter">按楼栋看单</label>
+        <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
+      </div>
+
+      <details class="rail__note">
+        <summary>说明</summary>
+        <p>匹配结果直接铺在每张卡片里：点开「系统已为你找到 N 位顺路的同学」，就能看到每位候选的 score / 100
+           与 reason 原文（reason: 里的分值相加正好等于 score）。</p>
+        <p>打分口径：可达性 40 + 时段 30 + 报酬 30，阈值 60，低于 60 分一律不出现；
+           平台单任务同时最多推 3 名，其余先排队。</p>
+        <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+      </details>
+
+      <p class="rail__foot" id="token-chip"></p>
+    </aside>
+
+    <!-- ───────────── 看板：主区只留它 ───────────── -->
+    <section class="shell__main" aria-labelledby="board-title">
+      <div class="shell__head">
+        <div>
+          <span class="eyebrow" id="board-eyebrow">开放任务</span>
+          <h2 id="board-title">待取看板</h2>
+          <p id="board-count">正在读取…</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          <span>刷新</span>
+        </button>
+      </div>
+      <div id="board" class="stack"></div>
+    </section>
+  </div>
+
+  <!-- 窄屏才出现：右下角「功能」按键 + 抽屉遮罩（≥1024px 由 CSS 隐藏） -->
+  <button class="rail-fab" id="rail-open" type="button" aria-label="打开功能栏" aria-expanded="false">
+    <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/layout-grid.svg)" aria-hidden="true"></span>
+    <span>功能</span>
+  </button>
+  <div class="rail-backdrop" id="rail-backdrop"></div>
 </main>
 
 <footer class="site-footer">
@@ -159,13 +266,17 @@ const money = (n) => (Number.isFinite(Number(n)) ? String(Number(n)) : "—");
 
 /* 看板状态（页面自己的视图缓存；⛔ 不落 localStorage、不缓存令牌） */
 const state = {
-  tasks: [],                 // 当前看板上的开放任务
+  tasks: [],                 // 从 /api/tasks 读到的全部开放任务
+  view: "all",               // 看板视图：all = 全部开放任务 / mine = 我的接单
+  mine: new Set(),           // 本会话里我点过接单的 task_id（⛔ 只存内存，刷新即清）
   matches: new Map(),        // task_id → Match[]（含 reason 原文）；null = 撮合失败；undefined = 撮合中
   matchErrors: new Map(),    // task_id → 错误对象
   accepted: new Set(),       // 已经有 accepted 撮合记录的任务（跨 5 分钟去重窗口仍然准）
+  acceptedBy: new Map(),     // task_id → 接单人昵称（同上，来自只读口）
   openSet: new Set(),        // 已展开候选列表的任务
+  moreOpen: new Set(),       // 已展开「还有 N 位」的任务
 };
-const cardRefs = new Map();      // task_id → { card, side, cands }
+const cardRefs = new Map();      // task_id → { card, side, action, cands }
 const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
 const busyMatches = new Set();   // 正在提交的 match_id（防连点）
 let boardLoading = false;
@@ -175,6 +286,9 @@ let boardLoading = false;
    缓存给「刷新」留出余量，避免演示现场连点几次就被限频（429）。 */
 const MATCH_TTL_MS = 20_000;
 const matchCache = new Map();    // task_id → { list, error, at }
+
+/** 候选超过 3 位就折叠：「还有 N 位」 */
+const CAND_SHOWN = 3;
 
 mountNav();
 
@@ -189,7 +303,7 @@ function chip(iconName, text, extraCls = "") {
   return c;
 }
 
-/** 自绘三态块：ui.js 的三态组件自带 emoji 图标，这里统一换成 Phosphor svg */
+/** 自绘三态块：统一用 Phosphor svg */
 function stateBox(kind, { iconName = "info-circle", title, hint, actionText, onAction } = {}) {
   const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
   const ic = el("div", "state__icon");
@@ -208,7 +322,7 @@ function stateBox(kind, { iconName = "info-circle", title, hint, actionText, onA
   return wrap;
 }
 
-/** 空态（用设计系统里的插画 + .empty-art） */
+/** 空态（用设计系统里的插画 + .empty-art）：只在「整个看板没内容」时用，卡片里不用大图 */
 function emptyArt(text, hint, actionText, onAction) {
   const art = el("div", "empty-art");
   const img = el("img");
@@ -235,7 +349,7 @@ function mountNotice(target, kind, text) {
   const p = el("p", "notice" + (kind ? " notice--" + kind : ""));
   p.style.display = "flex";
   p.style.alignItems = "center";
-  p.style.gap = "7px";
+  p.style.gap = "4px";
   p.appendChild(icon(kind === "danger" ? "alert-triangle" : kind === "ok" ? "circle-check" : "info-circle", { size: 16 }));
   p.appendChild(el("span", "", text));
   if (kind === "danger") p.setAttribute("role", "alert");
@@ -349,7 +463,7 @@ async function loadNodes() {
 }
 
 /* =====================================================================
-   侧栏一 · 发布代取（点按钮才出现）
+   侧栏一 · 发布代取（点功能栏才出现）
    ===================================================================== */
 let publishSheet = null;
 
@@ -523,12 +637,13 @@ function buildPublishSheet() {
 }
 
 function openPublish() {
+  closeRail(); // 窄屏：先把抽屉收回去，再弹侧栏，避免两层叠在一起
   if (!publishSheet) publishSheet = buildPublishSheet();
   publishSheet.open();
 }
 
 /* =====================================================================
-   侧栏二 · 登记跑腿能力（点按钮才出现）
+   侧栏二 · 登记跑腿能力（点功能栏才出现）
    ===================================================================== */
 let registerSheet = null;
 
@@ -617,13 +732,69 @@ function buildRegisterSheet() {
 }
 
 function openRegister() {
+  closeRail();
   if (!registerSheet) registerSheet = buildRegisterSheet();
   registerSheet.open();
 }
 
 /* =====================================================================
-   看板：卡片（第一屏就是它）
+   功能栏：桌面常驻 / 窄屏抽屉（默认收起）
    ===================================================================== */
+const railEl = $("#rail");
+const railFab = $("#rail-open");
+const railBackdrop = $("#rail-backdrop");
+
+/** 窄屏（<1024px）才是抽屉形态：桌面是常驻的，不需要开关 */
+function railIsDrawer() {
+  return window.matchMedia("(max-width:1023px)").matches;
+}
+
+function openRail() {
+  railEl.classList.add("is-open");
+  railBackdrop.classList.add("is-open");
+  railFab.setAttribute("aria-expanded", "true");
+  document.body.classList.add("is-locked");
+  $("#rail-close").focus();
+}
+
+function closeRail() {
+  if (!railEl.classList.contains("is-open")) return;
+  railEl.classList.remove("is-open");
+  railBackdrop.classList.remove("is-open");
+  railFab.setAttribute("aria-expanded", "false");
+  // 侧栏（sheet）自己也管 is-locked，别把它顺手解开
+  if (!$(".sheet.is-open")) document.body.classList.remove("is-locked");
+}
+
+/** 视图（全部开放任务 / 我的接单）高亮与文案 */
+function paintViewUI() {
+  const allBtn = $("#view-all");
+  const mineBtn = $("#view-mine");
+  const mine = state.view === "mine";
+  allBtn.classList.toggle("is-active", !mine);
+  allBtn.setAttribute("aria-pressed", mine ? "false" : "true");
+  mineBtn.classList.toggle("is-active", mine);
+  mineBtn.setAttribute("aria-pressed", mine ? "true" : "false");
+  $("#count-all").textContent = String(state.tasks.length);
+  $("#count-mine").textContent = String(state.mine.size);
+  $("#board-title").textContent = mine ? "我的接单" : "待取看板";
+  $("#board-eyebrow").textContent = mine ? "本会话接过" : "开放任务";
+}
+
+function setView(view) {
+  state.view = view === "mine" ? "mine" : "all";
+  paintViewUI();
+  renderBoard();
+  paintBoardCount();
+  if (railIsDrawer()) closeRail();
+}
+
+/* =====================================================================
+   看板：卡片（主区唯一的可见内容）
+   ===================================================================== */
+
+const visibleTasks = () =>
+  state.view === "mine" ? state.tasks.filter((t) => state.mine.has(t.task_id)) : state.tasks;
 
 function pickableOf(list) {
   return (Array.isArray(list) ? list : []).filter((m) => m && m.match_id && m.state === "pushed");
@@ -636,23 +807,54 @@ function taskOf(taskId) {
 function acceptedNameOf(taskId) {
   const list = state.matches.get(taskId);
   const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
-  return hit ? displayName(hit.runner_handle) : "";
+  if (hit) return displayName(hit.runner_handle);
+  // 撮合接口只回 5 分钟窗口内的记录：窗口过期后仍能从只读口拿到接单人，卡片就不会丢掉他
+  return state.acceptedBy.get(taskId) || "";
 }
 
-/** 卡片右侧：未接单 → 主按钮「接这一单」；已接单 → 「已接单 · 进行中」 */
+/** 卡片右上角：状态徽章（已接单 / 可接单 / 暂时没人顺路 / 正在撮合） */
 function paintSide(t) {
   const refs = cardRefs.get(t.task_id);
   if (!refs) return;
   const box = refs.side;
   box.innerHTML = "";
 
+  const list = state.matches.get(t.task_id);
+  const accepted = state.accepted.has(t.task_id);
+  const pickable = pickableOf(list);
+
+  let cls = "badge";
+  let iconName = "clock";
+  let text = "正在撮合…";
+  if (accepted) {
+    cls = "badge badge--ok"; iconName = "circle-check"; text = "已接单 · 进行中";
+  } else if (list === null) {
+    cls = "badge badge--muted"; iconName = "alert-triangle"; text = "撮合没跑通";
+  } else if (list && pickable.length) {
+    iconName = "users"; text = "可接单";
+  } else if (list) {
+    cls = "badge badge--muted"; iconName = "clock"; text = "暂时没人顺路";
+  }
+
+  const b = el("span", cls);
+  b.appendChild(icon(iconName, { size: 14 }));
+  b.appendChild(el("span", "", text));
+  box.appendChild(b);
+}
+
+/** 卡片操作位：未接单 → 主按钮「接这一单」；已接单 → 接单人 */
+function paintAction(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.action;
+  box.innerHTML = "";
+
   if (state.accepted.has(t.task_id)) {
-    const b = el("span", "badge badge--ok");
-    b.appendChild(icon("circle-check", { size: 14 }));
-    b.appendChild(el("span", "", "已接单 · 进行中"));
-    box.appendChild(b);
     const who = acceptedNameOf(t.task_id);
-    if (who) box.appendChild(el("span", "hint small", "接单人：" + who));
+    const c = el("span", "chip chip--brand");
+    c.appendChild(icon("circle-check", { size: 14 }));
+    c.appendChild(el("span", "", who ? "接单人 " + who : "已接单"));
+    box.appendChild(c);
     return;
   }
 
@@ -668,18 +870,20 @@ function paintSide(t) {
     btn.title = list === undefined
       ? "系统正在找顺路的同学…"
       : list === null
-        ? "撮合接口暂时不可用，先点「刷新看板」重试"
+        ? "撮合接口暂时不可用，先点「刷新」重试"
         : "暂时没人顺路，等有同学登记跑腿能力后再来";
   } else {
     btn.title = "由当前最高分候选接单；想选别人就展开候选列表";
     btn.addEventListener("click", () => acceptMatch(t.task_id, pickable[0].match_id));
   }
   box.appendChild(btn);
-  if (pickable.length) box.appendChild(el("span", "hint small", "默认由最高分候选接单"));
 }
 
+/** 候选一行一个：昵称 / score / 动作 + reason 原文 */
 function candRow(t, m) {
   const row = el("div", "cand");
+  row.title = "match_id " + (m.match_id || "—") + "｜state " + m.state; // 核验用，不占版面
+
   const line = el("div", "cand__line");
   line.appendChild(el("span", "cand__name", displayName(m.runner_handle || "匿名")));
 
@@ -688,42 +892,51 @@ function candRow(t, m) {
   sc.appendChild(el("span", "score__max", "/ 100"));
   line.appendChild(sc);
 
-  if (state.accepted.has(t.task_id)) {
-    if (m.state === "accepted") {
+  const accepted = state.accepted.has(t.task_id);
+  const usable = Boolean(m.match_id) && m.state === "pushed";
+  const taker = acceptedNameOf(t.task_id);
+
+  if (accepted) {
+    // 接过单的那位单独标出来（按昵称对齐，去重窗口过期也认得出来），其余候选置灰
+    const isTaker = m.state === "accepted" || (Boolean(taker) && displayName(m.runner_handle || "匿名") === taker);
+    if (isTaker) {
       const b = el("span", "badge badge--ok");
       b.appendChild(icon("circle-check", { size: 14 }));
       b.appendChild(el("span", "", "已接单"));
       line.appendChild(b);
     } else {
-      row.classList.add("is-dim"); // 同任务其它候选置灰
+      row.classList.add("is-dim");
       const b = el("button", "btn btn--quiet btn--sm", "已有同学接单");
       b.type = "button";
       b.disabled = true;
       line.appendChild(b);
     }
-  } else {
+  } else if (usable) {
     const b = el("button", "btn btn--ok btn--sm");
     b.type = "button";
     b.appendChild(icon("check", { size: 14 }));
     b.appendChild(el("span", "", "选 TA 接单"));
-    const usable = Boolean(m.match_id) && m.state === "pushed";
-    if (usable) {
-      b.addEventListener("click", () => acceptMatch(t.task_id, m.match_id));
-    } else {
-      b.disabled = true;
-      b.title = "这条撮合记录当前状态是 " + m.state + "，不能再接";
-    }
+    b.addEventListener("click", () => acceptMatch(t.task_id, m.match_id));
+    line.appendChild(b);
+  } else if (!m.match_id) {
+    // 契约 §2：单任务同时最多推 3 名，超出部分只展示不落库 → 先排队
+    const q = el("span", "cand__queue");
+    q.appendChild(icon("clock", { size: 14 }));
+    q.appendChild(el("span", "", "排队中（同时最多推 3 名）"));
+    line.appendChild(q);
+  } else {
+    const b = el("button", "btn btn--quiet btn--sm", "不可接（" + m.state + "）");
+    b.type = "button";
+    b.disabled = true;
     line.appendChild(b);
   }
 
   row.appendChild(line);
-  row.appendChild(el("div", "reason", "reason: " + m.reason));
-  row.appendChild(el("div", "cand__meta",
-    "match_id " + (m.match_id || "—") + "｜state " + m.state));
+  row.appendChild(el("p", "reason", "reason: " + m.reason));
   return row;
 }
 
-/** 卡片下半部分：撮合中 / 暂无人顺路 / 候选列表（默认折叠） */
+/** 卡片下半部分：撮合中 / 暂时没人顺路 / 候选入口（默认折叠）→ 一行一个候选 + 「还有 N 位」 */
 function paintCands(t) {
   const refs = cardRefs.get(t.task_id);
   if (!refs) return;
@@ -732,10 +945,10 @@ function paintCands(t) {
   const list = state.matches.get(t.task_id);
 
   if (list === undefined) {
-    const row = el("div", "cands-loading");
-    row.appendChild(el("span", "spinner"));
-    row.appendChild(el("span", "", "系统正在为你找顺路的同学…"));
-    box.appendChild(row);
+    const p = el("p", "tk-matching");
+    p.appendChild(icon("users", { size: 14 }));
+    p.appendChild(el("span", "", "正在为你找顺路的同学…"));
+    box.appendChild(p);
     return;
   }
 
@@ -750,6 +963,7 @@ function paintCands(t) {
         state.matchErrors.delete(t.task_id);
         matchCache.delete(t.task_id);
         paintCands(t);
+        paintAction(t);
         paintSide(t);
         void runMatch(t, { force: true });
       },
@@ -758,12 +972,16 @@ function paintCands(t) {
   }
 
   if (!list.length) {
-    box.appendChild(emptyArt("暂时没人顺路", "引擎只推 score ≥ 60 的候选人；等有同学登记跑腿能力后这里会自动出现。"));
+    const p = el("p", "tk-none");
+    p.appendChild(icon("users", { size: 14 }));
+    p.appendChild(el("span", "", "暂时没人顺路"));
+    p.appendChild(el("span", "faint", "（等有同学登记跑腿能力后自动出现）"));
+    box.appendChild(p);
     return;
   }
 
   const open = state.openSet.has(t.task_id);
-  const toggle = el("button", "btn btn--light btn--sm");
+  const toggle = el("button", "btn btn--light btn--sm tk-toggle");
   toggle.type = "button";
   toggle.setAttribute("aria-expanded", open ? "true" : "false");
   toggle.appendChild(icon("users", { size: 16 }));
@@ -772,9 +990,33 @@ function paintCands(t) {
   toggle.appendChild(chev);
 
   const panel = el("div", "cand-list");
-  panel.style.marginTop = "10px";
   panel.hidden = !open;
-  list.forEach((m) => panel.appendChild(candRow(t, m)));
+  const shown = list.slice(0, CAND_SHOWN);
+  const rest = list.slice(CAND_SHOWN);
+  shown.forEach((m) => panel.appendChild(candRow(t, m)));
+
+  if (rest.length) {
+    const moreOpen = state.moreOpen.has(t.task_id);
+    const moreBox = el("div", "cand-list");
+    moreBox.style.marginTop = "0";
+    moreBox.hidden = !moreOpen;
+    rest.forEach((m) => moreBox.appendChild(candRow(t, m)));
+    const moreBtn = el("button", "btn btn--quiet btn--sm tk-more");
+    moreBtn.type = "button";
+    moreBtn.setAttribute("aria-expanded", moreOpen ? "true" : "false");
+    const mChev = icon(moreOpen ? "chevron-down" : "chevron-right", { size: 14 });
+    moreBtn.append(mChev, el("span", "", (moreOpen ? "收起" : "还有 " + rest.length + " 位顺路的同学")));
+    moreBtn.addEventListener("click", () => {
+      const next = !state.moreOpen.has(t.task_id);
+      if (next) state.moreOpen.add(t.task_id); else state.moreOpen.delete(t.task_id);
+      moreBox.hidden = !next;
+      moreBtn.setAttribute("aria-expanded", next ? "true" : "false");
+      mChev.style.setProperty("--icon",
+        "url(/vendor/phosphor/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
+      moreBtn.lastChild.textContent = next ? "收起" : "还有 " + rest.length + " 位顺路的同学";
+    });
+    panel.append(moreBox, moreBtn);
+  }
 
   toggle.addEventListener("click", () => {
     const next = !state.openSet.has(t.task_id);
@@ -789,46 +1031,49 @@ function paintCands(t) {
 }
 
 function repaintCard(t) {
-  paintCands(t);
   paintSide(t);
+  paintAction(t);
+  paintCands(t);
 }
 
 function buildCard(t) {
-  const card = el("article", "card takeout-card");
+  const card = el("article", "card tk-card");
 
-  const head = el("div", "takeout-card__head");
-  const tile = el("span", "icon-tile icon-tile--dorm");
-  tile.setAttribute("aria-hidden", "true");
-  tile.appendChild(icon("route", { size: 24 }));
-  head.appendChild(tile);
+  // 第 1 层：路径大字 + 状态徽章
+  const top = el("div", "tk-card__top");
+  top.appendChild(el("h3", "tk-card__route", t.from_building + " → " + t.to_building));
+  const side = el("div", "tk-card__side");
+  top.appendChild(side);
+  card.appendChild(top);
 
-  const main = el("div", "takeout-card__main");
-  main.appendChild(el("h3", "takeout-card__route", t.from_building + " → " + t.to_building));
-
-  const chips = el("div", "chip-row");
-  chips.style.marginTop = "8px";
-  chips.appendChild(chip("truck-delivery", "取件点：" + t.station));
+  // 第 2 层：取件点 / 倒计时 / 报酬 小字
+  const meta = el("div", "tk-card__meta");
+  meta.appendChild(chip("truck-delivery", t.station));
   const cd = countdownChip(t);
-  chips.appendChild(cd);
+  meta.appendChild(cd);
   countdownRefs.set(t.task_id, cd);
-  chips.appendChild(chip("bolt", money(t.reward_min) + "–" + money(t.reward_max) + " 元", "chip--brand"));
-  main.appendChild(chips);
-  head.appendChild(main);
+  meta.appendChild(chip("bolt", money(t.reward_min) + "–" + money(t.reward_max) + " 元", "chip--brand"));
+  card.appendChild(meta);
 
-  const side = el("div", "takeout-card__side");
-  head.appendChild(side);
-  card.appendChild(head);
+  // 第 3 层：备注（一行，超出省略；完整内容在 title 里）
+  const note = el("p", "tk-card__note" + (t.note ? " is-cut" : ""));
+  note.textContent = t.note ? "备注：" + t.note : "备注：无";
+  if (t.note) note.title = t.note;
+  card.appendChild(note);
 
-  card.appendChild(el("p", "takeout-card__note",
-    t.note ? "备注：" + t.note : "备注：无（取件点 " + t.station + "）"));
-
-  const cands = el("div", "takeout-card__cands");
+  // 第 4 层：候选入口（默认折叠）
+  const cands = el("div", "tk-card__cands");
   card.appendChild(cands);
 
-  card.appendChild(el("p", "task-id",
+  // 第 5 层：task_id / 发布者 + 主按钮
+  const foot = el("div", "tk-card__foot");
+  foot.appendChild(el("p", "tk-card__id",
     "task_id " + t.task_id + "｜发布者 " + displayName(t.owner_handle || "匿名")));
+  const action = el("div", "tk-card__action");
+  foot.appendChild(action);
+  card.appendChild(foot);
 
-  cardRefs.set(t.task_id, { card, side, cands });
+  cardRefs.set(t.task_id, { card, side, action, cands });
   repaintCard(t);
   return card;
 }
@@ -841,24 +1086,35 @@ function renderBoard() {
   box.setAttribute("role", "status");
   box.setAttribute("aria-live", "polite");
 
-  if (!state.tasks.length) {
+  const list = visibleTasks();
+  if (!list.length) {
     const f = $("#b-filter").value;
-    box.appendChild(emptyArt(
-      "暂时没有开放任务",
-      f ? "「" + f + "」当前没有 open 的单子，换一个楼栋看看。" : "点右上角「发布代取」发一条，或用 ?demo=1 打开灌入演示数据。",
-      "发布代取",
-      openPublish,
-    ));
+    if (state.view === "mine") {
+      box.appendChild(emptyArt(
+        "你还没接过单",
+        "回「全部开放任务」找一张顺路的卡片，点「接这一单」。本页只记在当前会话里，⛔ 不写进服务器。",
+        "看全部开放任务",
+        () => setView("all"),
+      ));
+    } else {
+      box.appendChild(emptyArt(
+        "暂时没有开放任务",
+        f ? "「" + f + "」当前没有 open 的单子，换一个楼栋看看。" : "点左侧「发布代取」发一条，或用 ?demo=1 打开灌入演示数据。",
+        "发布代取",
+        openPublish,
+      ));
+    }
     return;
   }
-  for (const t of state.tasks) box.appendChild(buildCard(t));
+  for (const t of list) box.appendChild(buildCard(t));
 }
 
 /* =====================================================================
    撮合 + 接单
    ===================================================================== */
 
-/** 逐张卡片触发撮合（并发 3；20 秒内用缓存，避免把单 IP 60 次/分钟的限频打满） */
+/** 逐张卡片触发撮合（并发 3；20 秒内用缓存，避免把单 IP 60 次/分钟的限频打满）
+    top_k=10：契约 §2 只落库 3 条，但接口能把 60 分以上的候选都列出来，超出部分标「排队中」 */
 async function runMatch(t, { force = false } = {}) {
   const cached = matchCache.get(t.task_id);
   if (!force && cached && Date.now() - cached.at < MATCH_TTL_MS) {
@@ -872,7 +1128,7 @@ async function runMatch(t, { force = false } = {}) {
   try {
     const list = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/match", {
       method: "POST",
-      body: {},
+      body: { top_k: 10 },
     });
     const value = Array.isArray(list) ? list : [];
     state.matches.set(t.task_id, value);
@@ -892,9 +1148,18 @@ function countAccepted() {
 
 function paintBoardCount() {
   const n = state.tasks.length;
-  $("#board-count").textContent = n
-    ? "开放任务 " + n + " 条（只含 open 且未过期）｜已接单 " + countAccepted() + " 条"
-    : "当前没有开放任务";
+  const el0 = $("#board-count");
+  if (!el0) return;
+  if (state.view === "mine") {
+    el0.textContent = state.mine.size
+      ? "本会话接过 " + state.mine.size + " 单（只记在当前页面会话）"
+      : "还没有接单记录";
+  } else {
+    el0.textContent = n
+      ? "开放任务 " + n + " 条（只含 open 且未过期）｜已接单 " + countAccepted() + " 条"
+      : "当前没有开放任务";
+  }
+  paintViewUI();
 }
 
 async function mapLimit(items, limit, fn) {
@@ -908,17 +1173,16 @@ async function mapLimit(items, limit, fn) {
   await Promise.all(workers);
 }
 
-/** 读一次最近撮合记录，把「已经接了」的任务标出来（比 5 分钟去重窗口更稳） */
+/** 读一次最近撮合记录，把「已经接了」的任务 + 接单人标出来（比 5 分钟去重窗口更稳） */
 async function refreshAccepted() {
   try {
     const recent = await api("/api/matches?limit=50");
-    state.accepted = new Set(
-      (Array.isArray(recent) ? recent : [])
-        .filter((m) => m && m.state === "accepted")
-        .map((m) => m.task_id),
-    );
+    const list = (Array.isArray(recent) ? recent : []).filter((m) => m && m.state === "accepted");
+    state.accepted = new Set(list.map((m) => m.task_id));
+    state.acceptedBy = new Map(list.map((m) => [m.task_id, displayName(m.runner_handle || "")]));
   } catch {
     state.accepted = new Set();
+    state.acceptedBy = new Map();
   }
 }
 
@@ -978,9 +1242,11 @@ async function acceptMatch(taskId, matchId) {
       state.matches.set(taskId, list.map((m) => (m && m.match_id === r.match_id ? { ...m, state: r.state } : m)));
     }
     state.accepted.add(taskId);
+    state.mine.add(taskId); // 「我的接单」视图用
     const who = acceptedNameOf(taskId);
     toast("已接单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
     paintBoardCount();
+    if (state.view === "mine") renderBoard(); // 视图里可能刚好多出一条
   } catch (e) {
     toast(errorText(e), "danger");
     // 多半是别人先接走了（SCHEMA_REJECTED）：把这一单的最新状态重新取回来
@@ -989,12 +1255,13 @@ async function acceptMatch(taskId, matchId) {
       state.matches.delete(taskId);
       await refreshAccepted();
       paintCands(t);
+      paintAction(t);
       paintSide(t);
       void runMatch(t, { force: true });
     }
   } finally {
     busyMatches.delete(matchId);
-    for (const t of state.tasks) repaintCard(t);
+    for (const t of visibleTasks()) repaintCard(t);
   }
 }
 
@@ -1019,6 +1286,17 @@ $("#btn-open-publish").addEventListener("click", openPublish);
 $("#btn-open-register").addEventListener("click", openRegister);
 $("#btn-reload").addEventListener("click", () => loadBoard());
 $("#b-filter").addEventListener("change", () => loadBoard());
+$("#view-all").addEventListener("click", () => setView("all"));
+$("#view-mine").addEventListener("click", () => setView("mine"));
+railFab.addEventListener("click", openRail);
+$("#rail-close").addEventListener("click", closeRail);
+railBackdrop.addEventListener("click", closeRail);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRail(); });
+// 从窄屏拉到桌面：抽屉状态要收回去（桌面是常驻，不存在「开着」）
+const railMq = window.matchMedia("(min-width:1024px)");
+(railMq.addEventListener ? railMq.addEventListener.bind(railMq) : railMq.addListener.bind(railMq))("change", (e) => {
+  if (e.matches) closeRail();
+});
 
 async function boot() {
   paintTokenChip();
