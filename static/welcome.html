@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>迎新导览 · 北名大小助手</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="stylesheet" href="/vendor/pannellum/pannellum.css" />
+  <style>
+    /* 本页只保留「地图 / 全景 / 高德视图」特有样式，其余全走 /css/app.css */
+    :root {
+      --pri: var(--color-primary); --ok: var(--color-accent); --warn: var(--color-danger);
+      --card: #FFFFFF; --line: var(--color-line); --muted: var(--color-muted);
+    }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0 12px; }
+    .chip { border: 1px solid var(--line); background: #fff; color: var(--muted);
+      padding: 6px 12px; border-radius: 999px; font-size: 13px; cursor: pointer; }
+    .chip[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: #fff; }
+    .layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+    .map-card { background: var(--card); border-radius: 12px; padding: 10px;
+      box-shadow: 0 1px 3px rgba(16,24,40,.08); }
+    .map-wrap { position: relative; width: 100%; overflow: hidden; border-radius: 8px; }
+    .map-wrap img.base { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+    .marker { position: absolute; transform: translate(-50%, -100%); cursor: pointer;
+      background: none; border: 0; padding: 0; line-height: 1; }
+    .marker .dot { display: block; width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); }
+    .marker .tag { display: block; margin-top: 3px; font-size: 11px; background: rgba(255,255,255,.92);
+      border: 1px solid var(--line); border-radius: 6px; padding: 1px 5px; white-space: nowrap; }
+    .marker[data-cat="dorm"] .dot     { background: #1F4E8C; }
+    .marker[data-cat="canteen"] .dot  { background: #E08C1B; }
+    .marker[data-cat="teaching"] .dot { background: #2E8B76; }
+    .marker[data-cat="gate"] .dot     { background: #7A5AF8; }
+    .marker[data-cat="service"] .dot  { background: #C0392B; }
+    .marker[aria-current="true"] .dot { outline: 3px solid rgba(31,78,140,.35); }
+    .marker[hidden] { display: none; }
+    .source { margin: 8px 2px 0; font-size: 12px; color: var(--muted); }
+    .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 16px;
+      box-shadow: 0 1px 3px rgba(16,24,40,.08); position: sticky; top: calc(var(--header-h) + 12px); }
+    .panel h2 { margin: 0 0 6px; font-size: 17px; }
+    .badge { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px;
+      background: rgba(31,78,140,.1); color: var(--pri); margin-right: 6px; }
+    .badge.pano-on  { background: rgba(46,139,118,.14); color: var(--ok); }
+    .badge.pano-off { background: rgba(192,57,43,.12); color: var(--warn); }
+    .panel p.desc { font-size: 14px; line-height: 1.65; color: #333; }
+    .notice { font-size: 13px; background: #FFF8E6; border: 1px solid #F0DFAC; color: #6B5A18;
+      border-radius: 8px; padding: 8px 10px; margin: 10px 0 0; }
+    button.primary { background: var(--pri); color: #fff; border: 0; border-radius: 8px;
+      padding: 9px 14px; font-size: 14px; cursor: pointer; }
+    #panoOverlay { position: fixed; inset: 0; background: #000; display: none; z-index: 50; }
+    #panoOverlay.on { display: block; }
+    #pano { width: 100%; height: 100%; }
+    .pano-bar { position: absolute; top: 10px; left: 10px; right: 10px; z-index: 2;
+      display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+    .pano-bar .title { color: #fff; font-size: 15px; background: rgba(0,0,0,.45);
+      padding: 6px 12px; border-radius: 8px; }
+    .pano-bar button { background: rgba(0,0,0,.55); color: #fff; border: 1px solid rgba(255,255,255,.35);
+      border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+    /* ---- 高德地图辅助入口（需联网；底图仍是离线可用的截图） ---- */
+    .map-tools { display: flex; gap: 8px; align-items: center; justify-content: flex-end;
+      flex-wrap: wrap; margin: 0 2px 8px; }
+    .map-tools .hint { font-size: 12px; color: var(--muted); margin-right: auto; }
+    .ghost { background: #fff; color: var(--pri); border: 1px solid var(--pri); border-radius: 8px;
+      padding: 6px 12px; font-size: 13px; cursor: pointer; }
+    .ghost:hover { background: rgba(31,78,140,.06); }
+    .ghost[aria-pressed="true"] { background: var(--pri); border-color: var(--pri); color: #fff; }
+    .ghost:disabled { opacity: .5; cursor: not-allowed; }
+    #amapWrap { position: relative; }
+    #amapCanvas { width: 100%; height: 460px; border-radius: 8px; overflow: hidden; background: #10161f; }
+    .amap-tip { position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 3;
+      background: rgba(12,18,28,.82); color: #fff; font-size: 12px; line-height: 1.6;
+      padding: 8px 10px; border-radius: 8px; }
+    .amap-marker { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4); cursor: pointer; }
+    .amap-marker.dorm { background: #1F4E8C; }
+    .amap-marker.canteen { background: #E08C1B; }
+    .amap-marker.teaching { background: #2E8B76; }
+    .amap-marker.gate { background: #7A5AF8; }
+    .amap-marker.service { background: #C0392B; }
+    @media (max-width: 768px) { #amapCanvas { height: 340px; } }
+    #amapOverlay { position: fixed; inset: 0; background: rgba(12,18,28,.9); display: none; z-index: 55; }
+    #amapOverlay.on { display: block; }
+    .amap-shell { position: absolute; inset: 22px; background: #0f1720; border-radius: 12px; overflow: hidden; }
+    #amapFrame, #amapFrame iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .amap-bar { position: relative; z-index: 2; display: flex; justify-content: space-between;
+      align-items: center; gap: 10px; padding: 8px 12px; background: #16202e; color: #fff; font-size: 13px; }
+    .amap-bar button { background: rgba(255,255,255,.14); color: #fff; border: 1px solid rgba(255,255,255,.35);
+      border-radius: 8px; padding: 5px 12px; cursor: pointer; }
+    @media (max-width: 768px) { .amap-shell { inset: 8px; } }
+    /* 标签避让：同排会压字的点位，第二个标签改到圆点上方（由 JS 按坐标与字宽判定） */
+    .marker--alt .tag { position: absolute; bottom: 27px; left: 50%;
+      transform: translateX(-50%); margin-top: 0; box-shadow: 0 1px 4px rgba(16,24,40,.12); }
+    @media (max-width: 768px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { position: static; }
+      .marker .tag { display: none; }
+      .marker .dot { width: 18px; height: 18px; }
+      /* 窄屏默认只留圆点，但当前选中的点位仍显示名字 */
+      .marker[aria-current="true"] .tag { display: block; }
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+  <div class="page-head">
+    <h1>迎新导览 · 校园地图</h1>
+    <p class="lead">点击地图上的标记，可以先看看那里长什么样 —— 宿舍楼、食堂、教学楼、校门、快递驿站都在这里。</p>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip" data-cat="" aria-pressed="true">全部</button>
+    <button class="chip" data-cat="dorm">宿舍楼</button>
+    <button class="chip" data-cat="canteen">食堂</button>
+    <button class="chip" data-cat="teaching">教学与自习</button>
+    <button class="chip" data-cat="gate">校门</button>
+    <button class="chip" data-cat="service">服务设施</button>
+  </div>
+
+  <div class="layout">
+    <div class="map-card">
+      <div class="map-tools">
+        <span class="hint" id="amapHint"></span>
+        <!-- 底图切换：截图底图（离线兜底）/ 高德卫星图（JS API，可拖动缩放 + 我们自己的点位） -->
+        <button class="ghost" id="useShot" type="button" aria-pressed="true">截图底图（离线可用）</button>
+        <button class="ghost" id="useAmap" type="button" aria-pressed="false">高德卫星图（可拖动）</button>
+        <button class="ghost" id="openAmap" type="button" hidden>查看真实卫星图（iframe）</button>
+      </div>
+      <div class="map-wrap" id="mapWrap">
+        <img class="base" id="baseImg" src="/map/campus-map.jpg" alt="校园楼宇编号示意图底图" />
+        <!-- 标记由 JS 按 /map/map-bg.json 的百分比坐标渲染 -->
+      </div>
+      <div class="map-wrap" id="amapWrap" hidden>
+        <div id="amapCanvas"></div>
+        <div class="amap-tip" id="amapTip" hidden></div>
+      </div>
+      <p class="source" id="source"></p>
+    </div>
+
+    <aside class="panel" id="panel">
+      <h2>选一个地点</h2>
+      <p class="desc">左侧地图上的每个彩色圆点都是一个位置。点一下，这里会显示它的位置说明；
+        如果有 360° 实景，会出现「查看 360° 实景」按钮。</p>
+      <p id="summary" class="desc" style="color:var(--muted);font-size:13px"></p>
+    </aside>
+  </div>
+</main>
+
+<div id="panoOverlay">
+  <div class="pano-bar">
+    <span class="title" id="panoTitle">360° 实景</span>
+    <button id="panoClose" type="button">关闭</button>
+  </div>
+  <div id="pano"></div>
+</div>
+
+<div id="amapOverlay">
+  <div class="amap-shell">
+    <div class="amap-bar">
+      <span>高德地图 · 真实卫星图（iframe 嵌入，可拖动 / 缩放）—— 本视图需要联网</span>
+      <button id="amapClose" type="button">关闭</button>
+    </div>
+    <!-- iframe 在点击按钮时才创建：不点不请求，断网时本页照常可用 -->
+    <div id="amapFrame"></div>
+  </div>
+</div>
+
+<script src="/vendor/pannellum/pannellum.js"></script>
+<script src="/config.js"></script>
+<script type="module">
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import { esc } from "/js/ui.js";
+
+const $ = (s) => document.querySelector(s);
+const CAT_LABEL = { dorm: "宿舍楼", canteen: "食堂", teaching: "教学与自习", gate: "校门", service: "服务设施" };
+
+mountNav();
+initDemo();
+
+let NODES = [];
+let BG = { image: "/map/campus-map.jpg", points: {}, attribution: "" };
+let MANIFEST = { default: { firstScene: "", sceneFadeDuration: 800 }, scenes: {} };
+let filter = "";
+
+async function getJson(url, fallback) {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return fallback;
+    return await r.json();
+  } catch { return fallback; }
+}
+
+/**
+ * 取 /api/* 的数据并**解掉统一信封** `{ok,data,error}`（contracts/core.md）。
+ * ⚠️ 曾经这里直接 `Array.isArray(nodes) ? nodes : []`，而接口返回的是信封对象 →
+ *    NODES 恒为空数组 → 地图上一个点位都不画、右侧还谎报"节点未就绪"。
+ * 现在：数组直接用；信封且 ok:true 用 .data；其余一律回退，绝不猜。
+ */
+async function getApiData(url, fallback) {
+  const body = await getJson(url, null);
+  if (Array.isArray(body)) return body;                       // 兼容裸数组
+  if (body && body.ok === true && body.data != null) return body.data;
+  return fallback;
+}
+
+function catLabel(c) { return CAT_LABEL[c] || c; }
+
+/* ---------- 坐标校准模式（?calibrate=1） ----------
+   ⚠️ 本项目**不猜点位坐标**：底图上每个点的百分比坐标必须由人对着真实校园图点出来。
+   用法：/welcome?calibrate=1 → 在右下角列表选一个点位 → 在底图上点它的真实位置
+        → 页面给出可直接粘贴进 static/map/map-bg.json 的 JSON 片段（同时就地移动标记）。
+   ⛔ 校准结果只在本页内存里生效，不会自动写文件；请把 JSON 粘回 map-bg.json 再刷新。 */
+function setupCalibrate() {
+  if (new URLSearchParams(location.search).get("calibrate") !== "1") return;
+  let cur = NODES[0]?.id ?? "";
+  const box = document.createElement("div");
+  box.id = "calibBox";
+  box.style.cssText =
+    "position:fixed;right:12px;bottom:12px;z-index:80;max-width:360px;background:#0f172a;color:#e2e8f0;" +
+    "border-radius:10px;padding:12px 14px;font:12px/1.6 Consolas,monospace;box-shadow:0 6px 24px rgba(0,0,0,.35)";
+  const labelOf = (id) => (NODES.find((n) => n.id === id)?.label ?? id) + "（" + id + "）";
+  box.innerHTML =
+    '<div style="font-weight:700;margin-bottom:6px">坐标校准模式</div>' +
+    '<div style="opacity:.85;margin-bottom:8px">选点位 → 在底图上点它的真实位置。结果粘回 <b>static/map/map-bg.json</b> 的 points。</div>' +
+    '<select id="calibSel" style="width:100%;padding:6px;border-radius:6px;margin-bottom:8px">' +
+    NODES.map((n) => `<option value="${esc(n.id)}">${esc(n.label)}（${esc(n.id)}）</option>`).join("") +
+    "</select>" +
+    '<pre id="calibOut" style="margin:0;background:#111c2e;padding:8px;border-radius:6px;white-space:pre-wrap;word-break:break-all">点一下底图开始</pre>';
+  document.body.appendChild(box);
+  const sel = box.querySelector("#calibSel");
+  const out = box.querySelector("#calibOut");
+  sel.value = cur;
+  sel.addEventListener("change", () => { cur = sel.value; });
+
+  $("#mapWrap").addEventListener("click", (e) => {
+    const img = $("#baseImg");
+    if (!img || e.target.closest(".marker")) return;            // 别把点击标记当成校准
+    const r = img.getBoundingClientRect();
+    if (!r.width || !r.height) return;
+    const x = +(((e.clientX - r.left) / r.width) * 100).toFixed(1);
+    const y = +(((e.clientY - r.top) / r.height) * 100).toFixed(1);
+    if (x < 0 || x > 100 || y < 0 || y > 100) return;
+    BG.points[cur] = { x_pct: x, y_pct: y };
+    renderMarkers();
+    const json = `"${cur}": { "x_pct": ${x}, "y_pct": ${y} }`;
+    out.textContent = labelOf(cur) + "\n" + json;
+    try { navigator.clipboard?.writeText(json); out.textContent += "\n（已复制）"; } catch {}
+  });
+}
+
+/* 标签避让：宿舍区（dorm-3/12/15）与食堂区（canteen-1/2）点位密集，标签原来互相压字。
+   做法：按 y 分成「同排」（纵向差 <6%），排内按 x 排序，用两条车道（标签在点下方 / 上方），
+   按字数估算标签宽度并与前标签右缘比较，放不下就换车道。⛔ 不改动任何点位坐标。 */
+function avoidLabelOverlap() {
+  const wrap = $("#mapWrap");
+  const width = wrap.clientWidth || 0;
+  const items = [...wrap.querySelectorAll(".marker")].filter((m) => !m.hidden);
+  for (const m of items) m.classList.remove("marker--alt");
+  if (!width || items.length < 2) return;
+  const rows = [];
+  for (const m of items) {
+    const x = parseFloat(m.style.left), y = parseFloat(m.style.top);
+    let row = rows.find((r) => Math.abs(r.y - y) < 6);
+    if (!row) { row = { y, list: [] }; rows.push(row); }
+    row.list.push({ m, x });
+  }
+  for (const row of rows) {
+    row.list.sort((a, b) => a.x - b.x);
+    const laneEnd = [-Infinity, -Infinity]; // 0 = 标签在点下方，1 = 标签在点上方
+    for (const it of row.list) {
+      const tag = it.m.querySelector(".tag");
+      const chars = (tag ? tag.textContent : "").length;
+      const half = ((chars * 11 + 14) / 2 / width) * 100; // 标签半宽（百分比）
+      let lane = it.x - half < laneEnd[0] ? 1 : 0;
+      if (it.x - half < laneEnd[lane]) lane = lane === 0 ? 1 : 0;
+      if (lane === 1) it.m.classList.add("marker--alt");
+      laneEnd[lane] = it.x + half;
+    }
+  }
+}
+
+function renderMarkers() {
+  const wrap = $("#mapWrap");
+  wrap.querySelectorAll(".marker").forEach((el) => el.remove());
+  for (const n of NODES) {
+    const p = BG.points[n.id];
+    if (!p) continue;                                   // 未标坐标的节点不显示（不猜位置）
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "marker";
+    btn.dataset.id = n.id;
+    btn.dataset.cat = n.category;
+    btn.style.left = p.x_pct + "%";
+    btn.style.top = p.y_pct + "%";
+    const hasPano = Boolean(n.pano_url) && Boolean(MANIFEST.scenes[n.id]);
+    btn.innerHTML = '<span class="dot"></span><span class="tag">' + esc(n.label) +
+      (hasPano ? ' · 实景' : '') + '</span>';
+    btn.setAttribute("aria-label", n.label + "（" + catLabel(n.category) + "）");
+    btn.hidden = Boolean(filter) && n.category !== filter;
+    btn.addEventListener("click", () => selectNode(n.id));
+    wrap.appendChild(btn);
+  }
+  avoidLabelOverlap();
+}
+
+function selectNode(id) {
+  const n = NODES.find((x) => x.id === id);
+  if (!n) return;
+  document.querySelectorAll(".marker").forEach((el) => {
+    el.setAttribute("aria-current", el.dataset.id === id ? "true" : "false");
+  });
+  const hasPano = Boolean(n.pano_url) && Boolean(MANIFEST.scenes[n.id]);
+  $("#panel").innerHTML = [
+    '<h2>' + esc(n.label) + '</h2>',
+    '<div><span class="badge">' + esc(catLabel(n.category)) + '</span>' +
+      '<span class="badge ' + (hasPano ? "pano-on" : "pano-off") + '">' +
+      (hasPano ? "有 360° 实景" : "暂无实景") + '</span></div>',
+    '<p class="desc">' + esc(n.desc || "（暂无位置描述）") + '</p>',
+    hasPano
+      ? '<button class="btn" id="openPano" type="button">查看 360° 实景</button>'
+      : '<p class="notice notice--warn">该点暂无实景，以下是位置描述 —— 我们不会拿别的图糊弄你。</p>'
+  ].join("");
+  const open = $("#openPano");
+  if (open) open.addEventListener("click", () => openPano(id));
+}
+
+function openPano(sceneId) {
+  const sceneIds = Object.keys(MANIFEST.scenes);
+  if (!sceneIds.length) return;
+  const first = MANIFEST.scenes[sceneId] ? sceneId : sceneIds[0];
+  $("#panoTitle").textContent = (MANIFEST.scenes[first] && MANIFEST.scenes[first].title) || "360° 实景";
+  $("#panoOverlay").classList.add("on");
+  pannellum.viewer("pano", {
+    default: { firstScene: first, sceneFadeDuration: MANIFEST.default.sceneFadeDuration || 800 },
+    scenes: MANIFEST.scenes,
+    autoLoad: true,
+    showControls: true
+  });
+}
+
+$("#panoClose").addEventListener("click", () => {
+  const c = $("#pano");
+  c.innerHTML = "";                                     // 关掉 viewer，释放资源
+  $("#panoOverlay").classList.remove("on");
+});
+
+$("#amapClose").addEventListener("click", () => {
+  $("#amapFrame").innerHTML = "";                       // 释放 iframe，停止地图资源加载
+  $("#amapOverlay").classList.remove("on");
+});
+
+$("#chips").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  filter = chip.dataset.cat || "";
+  document.querySelectorAll(".chip").forEach((c) =>
+    c.setAttribute("aria-pressed", c === chip ? "true" : "false"));
+  renderMarkers();
+});
+
+/* ---------- 底图切换：截图底图（离线兜底）↔ 高德卫星图（JS API，可拖动缩放 + 我们的点位） ----------
+   key 由 /config.js 注入（window.__AMAP_KEY__），⛔ 页面不硬编码；
+   加载失败 / 无 key / 坐标未录 → 自动留在截图底图并给出可操作提示（路演断网也不会白屏）。 */
+const amapState = { sdk: null, map: null, active: false };
+
+function amapConfig() { return (BG && BG.jsapi) || {}; }
+
+function setBasePressed(which) {
+  $("#useShot").setAttribute("aria-pressed", which === "shot" ? "true" : "false");
+  $("#useAmap").setAttribute("aria-pressed", which === "amap" ? "true" : "false");
+}
+
+function amapTip(text) {
+  const el = $("#amapTip");
+  el.hidden = !text;
+  el.textContent = text || "";
+}
+
+function loadAmapSdk() {
+  if (amapState.sdk) return amapState.sdk;
+  amapState.sdk = new Promise((resolve, reject) => {
+    const cfg = amapConfig();
+    const key = window.__AMAP_KEY__ || cfg.key || "";
+    const sec = window.__AMAP_SECURITY_CODE__ || "";
+    if (!key) return reject(new Error("NO_KEY"));
+    const tpl = cfg.sdk_url_template;
+    if (!tpl) return reject(new Error("NO_SDK_URL"));   // ⛔ SDK 地址只从 /map/map-bg.json 读，不硬编码
+    if (sec) window._AMapSecurityConfig = { securityJsCode: sec };
+    const s = document.createElement("script");
+    s.src = tpl.replace("{key}", key);
+    s.async = true;
+    const timer = setTimeout(() => reject(new Error("TIMEOUT")), 12000);
+    s.onload = () => { clearTimeout(timer); window.AMap ? resolve(window.AMap) : reject(new Error("NO_AMAP")); };
+    s.onerror = () => { clearTimeout(timer); reject(new Error("LOAD_FAIL")); };
+    document.head.appendChild(s);
+  });
+  return amapState.sdk;
+}
+
+function coordsOf(n) {
+  const lat = Number(n.lat), lng = Number(n.lng);
+  return lat && lng ? [lng, lat] : null;      // ⛔ 坐标缺失就不画，绝不猜位置
+}
+
+async function useAmapBase() {
+  const cfg = amapConfig();
+  try {
+    amapTip("正在加载高德地图…");
+    const AMap = await loadAmapSdk();
+    if (!amapState.map) {
+      amapState.map = new AMap.Map("amapCanvas", {
+        zoom: cfg.zoom || 16,
+        center: [cfg.center ? cfg.center.lng : 116.397, cfg.center ? cfg.center.lat : 39.909],
+        viewMode: "2D",
+        mapStyle: cfg.map_style || undefined,
+      });
+      if (!cfg.disable_satellite_layer) {
+        amapState.map.add(new AMap.TileLayer.Satellite());
+        if (!cfg.disable_roadnet_layer) amapState.map.add(new AMap.TileLayer.RoadNet());
+      }
+    }
+    renderAmapMarkers(AMap);
+    $("#mapWrap").hidden = true;
+    $("#amapWrap").hidden = false;
+    setBasePressed("amap");
+    amapState.active = true;
+    const n = NODES.filter((x) => coordsOf(x)).length;
+    amapTip(n
+      ? "高德卫星图（GCJ-02）· 已落 " + n + " 个点位 · 点圆点看详情" + (n < NODES.length ? "；其余 " + (NODES.length - n) + " 个点位坐标待录入" : "")
+      : "高德卫星图已加载，但 map_nodes 的 lat/lng 还是占位 0 —— 点位坐标待录入（用 /tools/pick.html 点选后写进 config/map-nodes.json）");
+  } catch (e) {
+    const why = e.message === "NO_KEY" ? "未配置高德 key（环境变量 AMAP_JS_KEY）"
+      : e.message === "NO_SDK_URL" ? "缺少 SDK 地址配置（/map/map-bg.json 的 jsapi.sdk_url_template）"
+      : e.message === "TIMEOUT" ? "加载超时（网络不可达？）"
+      : "加载失败（域名白名单不含当前域名？）";
+    amapTip("已留在截图底图：" + why);
+    setBasePressed("shot");
+    amapState.active = false;
+  }
+}
+
+function renderAmapMarkers(AMap) {
+  if (!amapState.map) return;
+  amapState.map.clearMap();
+  for (const n of NODES) {
+    const pos = coordsOf(n);
+    if (!pos) continue;
+    const marker = new AMap.Marker({
+      position: pos,
+      offset: new AMap.Pixel(-11, -11),
+      content: '<div class="amap-marker ' + n.category + '" title="' + n.label + '"></div>',
+    });
+    marker.on("click", () => selectNode(n.id));
+    amapState.map.add(marker);
+  }
+}
+
+function useShotBase() {
+  $("#mapWrap").hidden = false;
+  $("#amapWrap").hidden = true;
+  setBasePressed("shot");
+  amapState.active = false;
+  amapTip("");
+}
+
+/* ---------- 高德「看真实卫星图」辅助入口（无需 key 的 iframe 版，作为无 key 时的降级） ---------- */
+function setupAmap() {
+  const cfg = BG.amap;
+  if (!cfg || cfg.enabled === false || !cfg.center) return;
+  const hasJsKey = Boolean(window.__AMAP_KEY__);
+  const iframeBtn = $("#openAmap");
+  if (!hasJsKey) {
+    iframeBtn.hidden = false;                 // 没有 JS API key 时才用 iframe 兜底
+    $("#amapHint").textContent = "标点位用截图底图（离线可用）；想看真实卫星图 →";
+    iframeBtn.addEventListener("click", () => {
+      const tpl = cfg.embed_url_template;
+      if (!tpl) return;                       // ⛔ 地址与坐标只从 /map/map-bg.json 读，不硬编码
+      const url = tpl
+        .replace("{lng}", cfg.center.lng).replace("{lat}", cfg.center.lat)
+        .replace("{zoom}", cfg.zoom || 17).replace("{maptype}", cfg.maptype || "satellite");
+      $("#amapFrame").innerHTML =
+        '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
+        'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+      $("#amapOverlay").classList.add("on");
+    });
+  }
+  // JS API 开关
+  const switchCfg = BG.jsapi || {};
+  $("#useShot").addEventListener("click", useShotBase); // 截图底图永远可切回（即使 JS API 被禁用）
+  if (switchCfg.enabled === false) { $("#useAmap").disabled = true; return; }
+  $("#useAmap").addEventListener("click", useAmapBase);
+  setBasePressed("shot");
+}
+
+(async function init() {
+  const [nodes, bg, manifest] = await Promise.all([
+    getApiData("/api/map/nodes", []),          // ⚠️ 走信封解包，不能再直接当数组
+    getJson("/map/map-bg.json", BG),
+    getJson("/pano/manifest.json", MANIFEST)
+  ]);
+  NODES = Array.isArray(nodes) ? nodes : [];
+  BG = Object.assign(BG, bg || {});
+  MANIFEST = Object.assign(MANIFEST, manifest || {});
+  if (BG.image) $("#baseImg").src = BG.image;
+  setupAmap();
+  $("#source").textContent = (BG.attribution || "底图为示意截图，非在线地图服务") +
+    " · 共 " + NODES.length + " 个点位，其中 " +
+    NODES.filter((n) => n.pano_url && MANIFEST.scenes[n.id]).length + " 个已拍摄 360° 实景";
+  renderMarkers();
+  window.addEventListener("resize", avoidLabelOverlap); // 底图变宽 / 变窄后重算标签车道
+  setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
+  $("#summary").textContent = NODES.length
+    ? "点位类别：" + [...new Set(NODES.map((n) => catLabel(n.category)))].join(" / ")
+    : "节点数据未加载（后端 /api/map/nodes 未就绪？先跑 npm run seed）";
+})();
+</script>
+</body>
+</html>

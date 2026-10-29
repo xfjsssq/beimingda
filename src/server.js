@@ -30,7 +30,11 @@ function loadDotEnv() {
     if (!m) continue;
     const key = m[1];
     let val = m[2];
-    if (/^".*"$/.test(val) || /^'.*'$/.test(val)) val = val.slice(1, -1);
+    if (/^".*"$/.test(val) || /^'.*'$/.test(val)) {
+      val = val.slice(1, -1);                       // 带引号：原样取值，不剥注释
+    } else {
+      val = val.replace(/\s+#.*$/, "").trim();      // 不带引号：剥掉行尾 ` # 注释`，避免把说明当成密钥
+    }
     if (process.env[key] === undefined) process.env[key] = val;
   }
 }
@@ -48,11 +52,26 @@ export function createApp() {
   app.use(express.json({ limit: "2mb" }));
   app.use(express.urlencoded({ extended: false, limit: "256kb" }));
 
-  // 前端配置注入：TILE_PROVIDER_KEY 等只在这里透出，⛔ 页面里不许硬编码
+  // favicon：浏览器会固定请求 /favicon.ico，重定向到我们自己的 SVG 图标。
+  //   不加的话每页 console 都会有一条 404 噪音（独立验证员在真机走查里报过）。
+  app.get("/favicon.ico", (req, res) => res.redirect(301, "/favicon.svg"));
+
+  // 前端配置注入：地图 key 等只在这里透出，⛔ 页面里不许硬编码
+  //   ⚠️ __DEMO_TOKEN__ 是「演示令牌」，按 contracts/core.md §4 它本就是公开给评委的
+  //      （只读 + 限频 + 短周期轮换，泄露无风险）。注入它只为让页面上的写接口
+  //      （发布代取任务 / 发搭子帖）零操作可用；⛔ 页面不许把它回显到界面上。
+  //   ⚠️ __AMAP_KEY__ 是高德 Web端(JS API) key：域名白名单填 knowingly.dpdns.org，
+  //      演示域名 demo.knowingly.dpdns.org 作为其子域已实测通过；未配置时前端自动回退截图底图。
+  //      若控制台启用了「安全密钥」，把 AMAP_SECURITY_CODE 一起配上（实测本项目可留空）。
   app.get("/config.js", (req, res) => {
+    const amapKey = process.env.AMAP_JS_KEY || "";
+    const amapSec = process.env.AMAP_SECURITY_CODE || "";
     res.type("application/javascript").send(
       `window.__TILE_KEY__=${JSON.stringify(process.env.TILE_PROVIDER_KEY || "")};` +
         `window.__SITE_DOMAIN__=${JSON.stringify(process.env.SITE_DOMAIN || "")};` +
+        `window.__DEMO_TOKEN__=${JSON.stringify(process.env.DEMO_TOKEN || "")};` +
+        `window.__AMAP_KEY__=${JSON.stringify(amapKey)};` +
+        `window.__AMAP_SECURITY_CODE__=${JSON.stringify(amapSec)};` +
         `window.__APP_VERSION__=${JSON.stringify(process.env.npm_package_version || "0.1.0")};\n`,
     );
   });

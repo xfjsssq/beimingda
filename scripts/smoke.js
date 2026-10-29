@@ -7,7 +7,7 @@
  * 覆盖：
  *   1. GET /api/health 返回统一信封
  *   2. POST /mcp initialize 返回协议版本
- *   3. POST /mcp tools/list（骨架阶段应为空数组）
+ *   3. POST /mcp tools/list（工具数量随模块合入增长，M1 5 / M2 3 / M3 2 / M4 4 = 14）
  *   4. POST /mcp 错 token → 401
  *   5. 静态页与 /config.js 可访问
  *   6. schema.sql 的表清单与契约一致
@@ -71,10 +71,11 @@ try {
 
   // 3. tools/list
   const list = await callMcp({ jsonrpc: "2.0", id: 2, method: "tools/list" }).then((r) => r.json());
+  const toolNames = (list?.result?.tools ?? []).map((t) => t.name);
   check(
-    "POST /mcp tools/list 返回数组（骨架阶段 0 个工具）",
+    "POST /mcp tools/list 返回工具数组（数量随模块合入增长，M1 5 / M2 3 / M3 2 / M4 4 = 14）",
     Array.isArray(list?.result?.tools),
-    `${list?.result?.tools?.length ?? "?"} 个工具`,
+    `${toolNames.length} 个工具：${toolNames.join(",") || "（暂无）"}`,
   );
 
   // 4. 错 token

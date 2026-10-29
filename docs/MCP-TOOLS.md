@@ -35,6 +35,10 @@
 
 **所有工具 `inputSchema.additionalProperties` 必须为 `false`** —— 多传一个字段即 `SCHEMA_REJECTED`。
 
+> **当前接入状态（2026-10-27，四模块全部合入 main 后实测）**：`tools/list` 返回 **14 个**
+> （M1 5 + M2 3 + M3 2 + M4 4）。
+> 这条状态的机检入口：`npm run verify`（会自动发现已注册工具并逐个真调）。
+
 ### M1 · 代取撮合（5 个）｜分支 `feat/m1-takeout`
 
 | 工具 | 作用 | 关键约束 |
@@ -109,13 +113,21 @@
 ## 自检
 
 ```bash
+npm test && npm run smoke        # 骨架级：信封 / 鉴权 / 表清单 / 无硬编码密钥
+npm run verify                   # 模块级集成：自动发现工具真调 + 6 页面 + 路由 + CDN 红线
+```
+
+> ⚠️ 本机默认 3000 端口被无关常驻进程占用，本地自测请显式指定端口：`PORT=3080 npm start`。
+> 下列示例按 3080 写；部署到演示域名时用 443（Cloudflare 隧道终止 TLS）。
+
+```bash
 # 能力描述（需 token）
-curl -s -X POST http://127.0.0.1:3000/mcp \
+curl -s -X POST http://127.0.0.1:3080/mcp \
   -H "Authorization: Bearer $DEMO_TOKEN" -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 
 # 无 token 应 401
-curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:3000/mcp \
+curl -s -o /dev/null -w "%{http_code}\n" -X POST http://127.0.0.1:3080/mcp \
   -H "Content-Type: application/json" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
 ```
