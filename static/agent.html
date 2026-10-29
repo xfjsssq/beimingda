@@ -59,12 +59,6 @@
       margin: 18px 0 8px; font-size: 13.5px; font-weight: 600; color: var(--color-primary);
     }
 
-    /* ---- 三步走：图标步骤 ---- */
-    .icon-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
-    .icon-steps li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--color-text-soft); line-height: 1.6; }
-    .icon-steps .icon-tile { width: 34px; height: 34px; border-radius: 10px; }
-    .icon-steps b { color: var(--color-text); }
-
     /* ---- 手动接入：折叠步骤卡 ---- */
     .step__body { flex: 1 1 auto; min-width: 0; }
     .fold { width: 100%; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-sunken); }
@@ -78,6 +72,9 @@
     .fold[open] .fold__chev { transform: rotate(180deg); }
     .fold__body { padding: 0 12px 12px 42px; font-size: 13px; color: var(--color-muted); line-height: 1.7; }
     .fold__body code.inline { font-size: 12.5px; }
+    /* app.css 里 .step__body b 是块级（老版步骤卡用）；折叠卡里要行内，
+       否则「点一次<b>信任</b>」会把后半句顶到下一行，一步就变成三行 */
+    .fold__body b { display: inline; color: var(--color-text); margin-bottom: 0; }
 
     /* ---- 使用示例 ---- */
     .dialog-item__text { margin: 0; overflow-wrap: anywhere; }
@@ -212,7 +209,6 @@
           <div>
             <span class="eyebrow">区块二 · 一键配置</span>
             <h2 id="block2-title">复制这段 JSON，Agent 就接上了</h2>
-            <p>URL 跟随你正在访问的站点，页面里没有写死任何域名；令牌一律是占位符。</p>
           </div>
           <span class="badge badge--muted" id="mode-badge">跟随当前站点</span>
         </div>
@@ -220,7 +216,7 @@
         <div class="cfg-grid">
           <div>
             <h3 class="mini-title" style="margin-top:0">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>端点与环境
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>端点
             </h3>
             <p class="section__note" style="margin-top:0">
               端点：<code class="inline" id="mcp-url">读取中…</code><br />
@@ -234,14 +230,12 @@
             <p class="section__note" id="mode-note"></p>
 
             <h3 class="mini-title">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/wand.svg)"></span>三步走
-            </h3>
-            <ol class="icon-steps" id="quick-steps"></ol>
-
-            <h3 class="mini-title">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span>令牌怎么算
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span>拿到真令牌之后
             </h3>
             <ul class="hint-list" id="token-notes"></ul>
+            <p class="section__note" style="margin-top:6px">
+              数据与隐私口径见 <a href="#p-compliance" data-goto="p-compliance">「合规声明」</a>。
+            </p>
           </div>
 
           <div>
@@ -258,10 +252,6 @@
               </button>
               <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
             </div>
-            <p class="section__note">
-              复制出来的就是上面这段原文（合法 JSON，两空格缩进）；下载得到的
-              <code class="inline">mcp.json</code> 只是本地文件，不会上传任何内容。
-            </p>
           </div>
         </div>
       </div>
@@ -284,33 +274,9 @@
         <ol class="steps" id="setup-steps"></ol>
 
         <p class="section__note">
-          第 4 步的「信任」只需要点一次；之后 <code class="inline">beimingda</code>
-          会一直挂在你的连接器列表里。换机器时，把同一份 JSON 再粘一次即可，服务端不用改任何东西。
+          「信任」只需点一次；之后 <code class="inline">beimingda</code> 会一直挂在连接器列表里，
+          换机器时把同一份 JSON 再粘一次即可。
         </p>
-
-        <ul class="rules" style="margin-top:14px">
-          <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/info-circle.svg)"></span></span>
-            <div>
-              <b>文件不存在就先新建</b>
-              <p>目录 <code class="inline">~/.workbuddy/</code> 可能还没有 <code class="inline">mcp.json</code>，直接新建一个空文件即可；内容只有 <code class="inline">mcpServers</code> 一个键。</p>
-            </div>
-          </li>
-          <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/book.svg)"></span></span>
-            <div>
-              <b>已有别的连接器也不冲突</b>
-              <p>文件里已经有 <code class="inline">mcpServers</code> 时，只需要把 <code class="inline">beimingda</code> 这一项放进那个对象，别把原有的覆盖掉。</p>
-            </div>
-          </li>
-          <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span></span>
-            <div>
-              <b>改完必重启</b>
-              <p>WorkBuddy 只在启动时读一次配置；改完没重启，工具栏里不会出现 <code class="inline">beimingda</code>。</p>
-            </div>
-          </li>
-        </ul>
       </div>
     </section>
 
@@ -321,7 +287,6 @@
           <div>
             <span class="eyebrow">区块四 · 使用示例</span>
             <h2 id="block4-title">接好之后，这样说就行</h2>
-            <p>每条都标了它落到哪个模块、由哪个 MCP 工具接住。</p>
           </div>
           <span class="chip chip--brand">
             <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>5 条 · 覆盖 4 个模块
@@ -331,8 +296,7 @@
         <ul class="dialog-list" id="dialogues"></ul>
 
         <p class="section__note">
-          每条都能直接复制到 WorkBuddy 里；覆盖代取发布、跑腿登记、搭子、导览、日程四个模块。
-          示例对话全部来自 <code class="inline">contracts/frontend.md</code>，与演示数据一致。
+          示例文案与 <code class="inline">contracts/frontend.md §3</code> 一字不差。
         </p>
       </div>
     </section>
@@ -344,7 +308,6 @@
           <div>
             <span class="eyebrow">区块五 · MCP 工具</span>
             <h2 id="block5-title">14 个工具，按模块分组</h2>
-            <p>清单来自 <code class="inline">docs/MCP-TOOLS.md</code>，并且会拿服务端的实时结果核对一遍。</p>
           </div>
           <button class="btn btn--quiet btn--sm" type="button" id="recheck-btn">
             <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span>重新核对
@@ -364,7 +327,6 @@
         <p class="section__note">
           每个工具的参数都设了 <code class="inline">additionalProperties: false</code>
           —— 多传一个字段就直接 <code class="inline">SCHEMA_REJECTED</code>，不给模型瞎编参数的机会。
-          绿点表示服务端确实有这个名字，红点表示清单与服务端不一致（会就地写出来，不静默）。
         </p>
       </div>
     </section>
@@ -606,15 +568,7 @@
       });
     });
 
-    /* 浏览器前进 / 后退（或手改地址栏 hash）也要跟着切栏：
-       刷新时 mountTabs 自己会读 hash，这里只补「同文档导航」那一种 */
-    window.addEventListener("hashchange", () => {
-      const id = location.hash.slice(1);
-      if (!id || !tabs) return;
-      const hit = tabs.tabs.some((t) => t.dataset.panel === id);
-      const on = tabs.tabs.find((t) => t.getAttribute("aria-selected") === "true");
-      if (hit && (!on || on.dataset.panel !== id)) tabs.select(id);
-    });
+    /* 浏览器前进 / 后退（hash 变化）由共享层 mountTabs 自己监听（ui.js 内置），这里不用再写一遍 */
 
     /* ===================================================================
        4) 分栏 1 · 一键配置
@@ -652,36 +606,12 @@
       });
     });
 
+    /* 令牌这里只讲「拿到之后怎么替换」这条操作性的事：
+       限频 / 占位符 / 不外传这些口径统一放在「合规声明」分栏，别处不再重复一遍 */
     const notesEl = $("#token-notes");
-    for (const note of TOKEN_NOTES) {
-      const li = document.createElement("li");
-      li.innerHTML = note; // 常量文案（本模块自带），非用户输入
-      notesEl.appendChild(li);
-    }
-
-    /* 三步走小步骤图（图标步骤，不再挤在正文里） */
-    const QUICK_STEPS = [
-      { iconName: "copy", title: "复制这段 JSON", note: "点右侧「复制配置」，剪贴板里就是可直接粘的合法 JSON" },
-      { iconName: "plug-connected", title: "粘进 mcp.json 的 mcpServers", note: "文件位置 ~/.workbuddy/mcp.json（没有就新建）" },
-      { iconName: "shield-check", title: "重启 WorkBuddy 并信任一次", note: "连接器列表里找到 beimingda，点一次信任" },
-    ];
-    const quickEl = $("#quick-steps");
-    QUICK_STEPS.forEach((s, i) => {
-      const li = document.createElement("li");
-      const tile = document.createElement("span");
-      tile.className = "icon-tile";
-      tile.setAttribute("aria-hidden", "true");
-      tile.appendChild(phIcon(s.iconName, 18));
-      const body = document.createElement("div");
-      const b = document.createElement("b");
-      b.textContent = i + 1 + ". " + s.title;
-      const note = document.createElement("span");
-      note.className = "quick-step__note";
-      note.textContent = s.note;
-      body.append(b, note);
-      li.append(tile, body);
-      quickEl.appendChild(li);
-    });
+    const noteLi = document.createElement("li");
+    noteLi.innerHTML = TOKEN_NOTES[TOKEN_NOTES.length - 1]; // 常量文案（本模块自带），非用户输入
+    notesEl.appendChild(noteLi);
 
     /* ===================================================================
        5) 分栏 2 · 手动接入（四步折叠成步骤卡）
