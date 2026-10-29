@@ -17,6 +17,12 @@
       border: 1px solid var(--color-line);
       border-radius: var(--radius-md);
       background: #fff;
+      box-shadow: var(--shadow-card);
+      /* 「今天」那一列的颜色从这两个变量派生，不在页面里写死一堆 hex */
+      --today-hue: 215;
+      --today-bg: hsl(var(--today-hue) 62% 97%);
+      --today-bg-strong: hsl(var(--today-hue) 58% 93%);
+      --today-fg: hsl(var(--today-hue) 55% 38%);
     }
     #gridWrap table.course-grid {
       border-collapse: collapse;
@@ -42,17 +48,33 @@
       z-index: 3;
     }
     #gridWrap tbody th {
-      background: #fff;
+      background: var(--color-sunken);
       color: var(--color-muted);
-      font-size: 12px;
+      font-size: var(--size-xs);
       font-weight: 600;
       white-space: nowrap;
+      text-align: center;
     }
+    /* 今天那一列：表头带「今天」标，整列浅底（颜色都来自上面的 CSS 变量） */
+    #gridWrap th.is-today {
+      background: var(--today-bg-strong);
+      color: var(--today-fg);
+    }
+    #gridWrap th.is-today::after {
+      content: "今天";
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.4;
+      color: var(--today-fg);
+    }
+    #gridWrap td.is-today { background: var(--today-bg); }
+    #gridWrap td.is-today.is-clickable:hover { background: var(--today-bg-strong); }
     /* 首列冻结：横滑时「第几节」始终可见 */
     #gridWrap tr > *:first-child {
       position: sticky;
       left: 0;
-      background: #fff;
+      background: var(--color-sunken);
       z-index: 1;
       box-shadow: 1px 0 0 var(--color-line);
     }
@@ -61,23 +83,37 @@
       z-index: 4;
     }
     #gridWrap td { height: 44px; }
+    /* 每门课一个色相（JS 按课程名哈希取 0~5）：底色 / 左边线 / 字色全由 --h 派生 */
     .slot {
-      background: var(--color-primary-soft);
-      border-left: 3px solid var(--color-primary);
-      padding: 3px 6px;
-      border-radius: 5px;
-      font-size: 12px;
+      --h: 215;
+      --slot-bg: hsl(var(--h) 62% 95%);
+      --slot-line: hsl(var(--h) 52% 42%);
+      --slot-fg: hsl(var(--h) 45% 26%);
+      background: var(--slot-bg);
+      border-left: 3px solid var(--slot-line);
+      color: var(--slot-fg);
+      padding: var(--sp-25) var(--sp-50);
+      border-radius: var(--r-sm);
+      font-size: var(--size-xs);
       line-height: 1.45;
     }
+    .slot--h0 { --h: 215; } /* 品牌蓝 */
+    .slot--h1 { --h: 168; } /* 青绿 */
+    .slot--h2 { --h: 32; }  /* 琥珀 */
+    .slot--h3 { --h: 268; } /* 紫 */
+    .slot--h4 { --h: 348; } /* 玫红 */
+    .slot--h5 { --h: 196; } /* 天蓝 */
     .slot .room { font-size: 11px; color: var(--color-muted); }
-    .slot.cont { opacity: .55; border-left-color: var(--color-line-strong); }
-    .slot + .slot { margin-top: 3px; }
+    .slot.cont { opacity: .5; }
+    .slot + .slot { margin-top: var(--sp-25); }
+    /* 概览里的文字型统计（最早 / 最晚那一节）不要 30px 的大字 */
+    .stat--text .stat__value { font-size: var(--size-lg); letter-spacing: 0; }
     /* 对话示例：窄屏自动折行，不靠横向滚动 */
     #dlgBlock { white-space: pre-wrap; word-break: break-word; }
     @media (max-width: 640px) {
       #gridWrap table.course-grid { min-width: 540px; }
       #gridWrap td { height: 40px; }
-      .slot { font-size: 11px; padding: 2px 4px; }
+      .slot { font-size: 11px; }
       /* 窄屏：区块标题里的补充说明换行，别把「一周课表」挤成断字两行 */
       .section__title { flex-wrap: wrap; }
       .section__title small { flex: 1 1 100%; }
@@ -100,6 +136,9 @@
       <span class="small" id="whoText">演示身份：同学A</span>
     </span>
     <span class="toolbar__spacer"></span>
+    <button class="btn btn--ghost btn--sm" id="overviewBtn" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/chart-bar.svg)" aria-hidden="true"></span>本周概览
+    </button>
     <button class="btn btn--ghost btn--sm" id="importBtn" type="button">
       <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/calendar-event.svg)" aria-hidden="true"></span>导入课表
     </button>
@@ -121,7 +160,7 @@
   </section>
 
   <!-- 合规说明（一句话）+ 脱敏审计：原来那一大块收成一行按钮 -->
-  <section class="section" aria-labelledby="auditTitle">
+  <section class="section reveal" aria-labelledby="auditTitle">
     <h2 class="section__title" id="auditTitle">
       <span class="section__index">2</span>合规与脱敏审计
       <small>只记字段名，不记任何字段值</small>
@@ -155,7 +194,7 @@
 import { api, mcpRpc } from "/js/api.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo } from "/js/demo.js";
-import { el, icon, showLoading, createSheet, openModal, toast, copyText } from "/js/ui.js";
+import { el, icon, showLoading, createSheet, openModal, toast, copyText, initReveals } from "/js/ui.js";
 
 /* =============================================================================
    页面重做要点（2026-10-28）
@@ -167,6 +206,24 @@ import { el, icon, showLoading, createSheet, openModal, toast, copyText } from "
    ============================================================================= */
 
 const WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+
+/* 课程色板：按课程名哈希取 0~5，具体颜色由页面 CSS 变量派生（.slot--h0 … .slot--h5），
+   一门课的色相永远稳定 —— 刷新、改教室、换周次都不会变色 */
+const SLOT_HUES = 6;
+function hueIndex(name) {
+  const s = String(name || "").trim();
+  if (!s) return 0;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100003;
+  return h % SLOT_HUES;
+}
+
+/** 今天是周几（1=周一 … 7=周日），与 WEEK_LABELS / weekday 字段同一套编号 */
+function todayWeekday() {
+  const d = new Date().getDay();
+  return d === 0 ? 7 : d;
+}
+const TODAY = todayWeekday();
 /* 与契约的 1~14 对齐：早期 MAX_PERIOD=10 会让 11-14 节的课「写进去了但课表不显示」 */
 const MAX_PERIOD = 14;
 /* 身份内置：页面不再要求任何人输名字；?handle=xxx 只用于自测/演示切换 */
@@ -250,6 +307,7 @@ function cellNode(weekday, period, list) {
   td.dataset.p = String(period);
   td.tabIndex = 0;
   td.setAttribute("role", "button");
+  if (weekday === TODAY) td.classList.add("is-today");
 
   const where = WEEK_LABELS[weekday - 1] + " 第" + period + "节";
   const main = list.filter((it) => num(it.period_start) === period)[0] || list[0] || null;
@@ -257,7 +315,7 @@ function cellNode(weekday, period, list) {
   if (main) {
     list.forEach((it) => {
       const started = num(it.period_start) === period;
-      const slot = el("div", "slot" + (started ? "" : " cont"));
+      const slot = el("div", "slot slot--h" + hueIndex(it.title) + (started ? "" : " cont"));
       if (started) {
         slot.appendChild(document.createTextNode(String(it.title || "")));
         if (it.room) {
@@ -281,10 +339,38 @@ function cellNode(weekday, period, list) {
   return td;
 }
 
+/** 空课表：用本站空态插画 + 一个入口（走对话导入），而不是一行灰字 */
+function renderEmptyGrid(wrap) {
+  const box = el("div", "empty-art");
+  const img = document.createElement("img");
+  img.src = "/img/empty-state.png";
+  img.alt = "空课表示意插画";
+  img.width = 333;
+  img.height = 400;
+  img.loading = "lazy";
+  box.appendChild(img);
+  box.appendChild(el("p", "state__title", "这一周还没有课"));
+  box.appendChild(el("p", "", "点任意格子就能加第一节课；整张课表建议让 Agent 在对话里导入。"));
+  const btn = el("button", "btn btn--ghost btn--sm");
+  btn.type = "button";
+  btn.appendChild(icon("message-chatbot", { size: 16 }));
+  btn.appendChild(document.createTextNode("怎么让 Agent 导入"));
+  btn.addEventListener("click", () => openSheetOnly(openImportSheet));
+  box.appendChild(btn);
+  wrap.appendChild(box);
+}
+
 function renderGrid() {
   const wrap = byId("gridWrap");
   wrap.removeAttribute("aria-busy");
   wrap.innerHTML = "";
+
+  if (!state.items.length) {
+    renderEmptyGrid(wrap);
+    byId("gridNote").textContent =
+      "这张课表还是空的 · 点任意格子就能加第一节课，也可以点右上角「导入课表」，让 Agent 在对话里导入整张课表。";
+    return;
+  }
 
   const cells = {};
   state.items.forEach((it) => {
@@ -303,9 +389,13 @@ function renderGrid() {
   const corner = el("th", "", "节次");
   corner.setAttribute("scope", "col");
   headRow.appendChild(corner);
-  WEEK_LABELS.forEach((w) => {
+  WEEK_LABELS.forEach((w, idx) => {
     const th = el("th", "", w);
     th.setAttribute("scope", "col");
+    if (idx + 1 === TODAY) {
+      th.classList.add("is-today");
+      th.setAttribute("aria-label", w + "（今天）");
+    }
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -324,9 +414,8 @@ function renderGrid() {
   wrap.appendChild(table);
 
   const count = state.items.length;
-  byId("gridNote").textContent = count
-    ? "共 " + count + " 节课 · 点课程格子改这节课，点空格子加一节课（只存 周几 / 起止节次 / 课程名 / 教室 / 周次 / 提前提醒）。"
-    : "这张课表还是空的 · 点任意格子就能加第一节课，也可以点右上角「导入课表」，让 Agent 在对话里导入整张课表。";
+  byId("gridNote").textContent =
+    "共 " + count + " 节课 · 点课程格子改这节课，点空格子加一节课（只存 周几 / 起止节次 / 课程名 / 教室 / 周次 / 提前提醒）。";
 }
 
 async function load() {
@@ -743,6 +832,52 @@ function openAuditSheet() {
   return sheet;
 }
 
+/* ------------------------------------------------------------------ 侧栏 4：本周概览（几节课 / 最早一节 / 最晚一节） */
+function openOverviewSheet() {
+  const sheet = createSheet({ title: "本周概览", iconName: "chart-bar" });
+  const body = sheet.body;
+
+  if (!state.items.length) {
+    stateBox(body, "", "calendar-event", "这周还没有课",
+      "点课表格子加一节，或者点右上角「导入课表」，让 Agent 在对话里导入整张课表。");
+  } else {
+    const items = state.items.slice();
+    const dayOf = (it) => num(it.weekday);
+    const earliest = items.slice().sort((a, b) => dayOf(a) - dayOf(b) || num(a.period_start) - num(b.period_start))[0];
+    const latest = items.slice().sort((a, b) => dayOf(b) - dayOf(a) || num(b.period_end) - num(a.period_end))[0];
+    const periods = items.reduce((n, it) => n + Math.max(1, num(it.period_end) - num(it.period_start) + 1), 0);
+    const days = new Set(items.map(dayOf)).size;
+    const reminded = items.filter((it) => it.remind_before !== null && it.remind_before !== undefined).length;
+
+    const grid = el("div", "grid grid--stats");
+    const stat = (label, value, unit, text) => {
+      const box = el("div", "stat" + (text ? " stat--text" : ""));
+      box.appendChild(el("p", "stat__label", label));
+      const v = el("div", "stat__value", value);
+      if (unit) v.appendChild(el("span", "stat__unit", unit));
+      box.appendChild(v);
+      return box;
+    };
+    const where = (it, periodKey) => WEEK_LABELS[dayOf(it) - 1] + " 第 " + num(it[periodKey]) + " 节";
+
+    grid.appendChild(stat("本周课程", String(items.length), "门"));
+    grid.appendChild(stat("最早一节", where(earliest, "period_start"), null, true));
+    grid.appendChild(stat("最晚一节", where(latest, "period_end"), null, true));
+    grid.appendChild(stat("有课天数", String(days), "天"));
+    grid.appendChild(stat("覆盖节次", String(periods), "节"));
+    grid.appendChild(stat("已设提醒", String(reminded), "门"));
+    body.appendChild(grid);
+    body.appendChild(el("p", "section__note", "统计只按你当前的课表数据算，不联网、不上传。"));
+  }
+
+  const close = el("button", "btn btn--quiet", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  sheet.foot.appendChild(close);
+  sheet.open();
+  return sheet;
+}
+
 /* ------------------------------------------------------------------ 启动 */
 mountNav();
 byId("whoText").textContent = "演示身份：" + HANDLE;
@@ -754,6 +889,7 @@ function openSheetOnly(open) {
   return activeSheet;
 }
 
+byId("overviewBtn").addEventListener("click", () => openSheetOnly(openOverviewSheet));
 byId("importBtn").addEventListener("click", () => openSheetOnly(openImportSheet));
 byId("remindBtn").addEventListener("click", () => openSheetOnly(openRemindSheet));
 byId("auditBtn").addEventListener("click", () => openSheetOnly(openAuditSheet));
@@ -772,6 +908,7 @@ gridWrap.addEventListener("keydown", (e) => {
 });
 
 (async function start() {
+  initReveals(); // 滚动揭示：只动 transform/opacity；prefers-reduced-motion 下直接显示
   try {
     await initDemo(); // ?demo=1：演示模式徽章 + 幂等灌一次演示数据
   } catch {

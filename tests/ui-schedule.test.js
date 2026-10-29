@@ -350,3 +350,76 @@ test("行为：MCP 端点鉴权（页面通过 api.js 拿令牌，不硬编码�
   });
   assert.equal(noToken.status, 401, "没有令牌时 MCP 必须 401（页面靠 /config.js 注入的令牌）");
 });
+
+/* =====================================================================
+   C. 视觉元素补齐（2026-10-29 需求：课表页「太单调」
+      补外框 / 节次列 / 今天列高亮 / 课程配色 / 空态插画 / 本周概览）
+   ===================================================================== */
+
+test("静态：每门课按课程名哈希取一组协调色，颜色走 CSS 变量（不写死一堆 hex）", () => {
+  assert.match(PAGE, /function hueIndex\(/, "缺课程名哈希函数");
+  assert.match(PAGE, /"slot slot--h" \+ hueIndex\(it\.title\)/, "课程块必须带 .slot--h{0..5}");
+  for (let i = 0; i < 6; i++) {
+    assert.match(PAGE, new RegExp(`\\.slot--h${i}\\s*\\{\\s*--h:\\s*\\d+;`), `缺色相类 .slot--h${i}`);
+  }
+  // 底色 / 边线 / 字色都由 --h 派生
+  assert.match(PAGE, /--slot-bg:\s*hsl\(var\(--h\)/);
+  assert.match(PAGE, /background:\s*var\(--slot-bg\)/);
+  assert.match(PAGE, /border-left:\s*3px solid var\(--slot-line\)/);
+  // 那一组样式里不许出现硬编码颜色
+  const slotBlock = /\.slot\s*\{[\s\S]*?\.slot--h5[^}]*\}/.exec(PAGE);
+  assert.ok(slotBlock, "找不到课程配色那一组样式");
+  assert.ok(!/#[0-9a-fA-F]{3,6}\b/.test(slotBlock[0]), "课程配色不该写死 hex，请走 CSS 变量 / hsl()");
+});
+
+test("静态：课表外框 + 节次列 + 今天那一列高亮", () => {
+  assert.match(PAGE, /#gridWrap\s*\{[\s\S]{0,320}?box-shadow:\s*var\(--shadow-card\)/, "课表要有外框（卡片投影）");
+  assert.match(PAGE, /#gridWrap tbody th\s*\{[\s\S]{0,220}?text-align:\s*center/, "节次列居中");
+  assert.match(PAGE, /th\.is-today::after\s*\{[\s\S]{0,140}?content:\s*"今天"/, "今天的列表头要有「今天」标");
+  assert.match(PAGE, /td\.is-today\s*\{\s*background:\s*var\(--today-bg\)/, "今天那一列要有底色");
+  assert.match(PAGE, /--today-hue:\s*215/, "今天列的颜色也要从变量派生");
+  assert.match(PAGE, /function todayWeekday\(/, "缺「今天是周几」的换算（周日=0 要映射成 7）");
+  assert.match(PAGE, /weekday === TODAY/, "渲染格子时要给今天那一列打标记");
+});
+
+test("静态：空课表用 /img/empty-state.png 组合空态（不是一行灰字）", () => {
+  assert.match(PAGE, /if \(!state\.items\.length\)\s*\{\s*renderEmptyGrid/, "空课表时要走空态分支");
+  assert.match(PAGE, /function renderEmptyGrid\(/);
+  assert.match(PAGE, /"empty-art"/);
+  assert.match(PAGE, /\/img\/empty-state\.png/);
+  // 插画尺寸由共享层样式控制，页面不另写一份
+  assert.match(read("static/css/app.css"), /\.empty-art img\s*\{/);
+  // 空态里的入口仍走「对话导入」侧栏，不是上传
+  assert.match(PAGE, /怎么让 Agent 导入/);
+  assert.ok(!/type\s*=\s*["']file["']/.test(PAGE), "空态里也不许冒出上传控件");
+});
+
+test("静态：侧栏「本周概览」给出几节课 / 最早一节 / 最晚一节", () => {
+  assert.match(PAGE, /id="overviewBtn"/);
+  assert.match(PAGE, /chart-bar\.svg/, "概览入口用 chart-bar 图标");
+  assert.match(PAGE, /function openOverviewSheet\(/);
+  assert.match(PAGE, /createSheet\(\{\s*title:\s*"本周概览"/);
+  for (const label of ["本周课程", "最早一节", "最晚一节", "有课天数"]) {
+    assert.ok(PAGE.includes(label), `概览缺统计项「${label}」`);
+  }
+  // 统计块复用 app.css 的 .stat / .grid--stats，不自己造一份
+  assert.match(PAGE, /"grid grid--stats"/);
+  assert.match(PAGE, /"stat__value"/);
+  assert.match(PAGE, /"stat__label"/);
+  assert.ok(!/\.stat\s*\{|\.grid--stats\s*\{/.test(PAGE), "统计块样式归 app.css，页面不要另写一份");
+  assert.match(PAGE, /byId\("overviewBtn"\)\.addEventListener/);
+});
+
+test("静态：字号 / 间距 / 圆角只用设计令牌，滚动揭示走共享层 initReveals", () => {
+  assert.match(PAGE, /var\(--size-xs\)/);
+  assert.match(PAGE, /var\(--sp-25\)/);
+  assert.match(PAGE, /var\(--r-sm\)/);
+  assert.match(PAGE, /initReveals\(\)/);
+  assert.match(PAGE, /class="section reveal"/);
+  // 既有约定不变：只有一行 .toolbar、两个区块、入口都在工具栏里
+  assert.equal((PAGE.match(/class="toolbar"/g) || []).length, 1);
+  assert.ok(!/section__index">3</.test(PAGE), "页面区块仍是两段");
+  for (const id of ["overviewBtn", "importBtn", "remindBtn"]) {
+    assert.ok(PAGE.includes(`id="${id}"`), `工具栏缺入口 ${id}`);
+  }
+});
