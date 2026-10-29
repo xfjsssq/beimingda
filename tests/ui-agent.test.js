@@ -89,16 +89,16 @@ test("/agent：顶部只留 hero + 一条极简三步概览（3 个 icon-tile）
 });
 
 /* ------------------------------------------------------------------ 3. 图标：不许再有 emoji / 外链 */
-test("/agent：图标全部来自本地 vendor/tabler（emoji 清零，图标文件真实存在）", () => {
+test("/agent：图标全部来自本地 vendor/phosphor（emoji 清零，图标文件真实存在）", () => {
   // 只抓「当图标用的 emoji / dingbats」，不误伤中文排版里的箭头与全角符号
   const emoji = /[\u{1F000}-\u{1FAFF}\u{2049}\u{203C}\u{2600}-\u{27BF}\u{2A00}-\u{2BFF}\u{FE0F}]/u;
-  assert.ok(!emoji.test(html), "页面里不允许出现 emoji 图标，请用 .icon + vendor/tabler/icons");
+  assert.ok(!emoji.test(html), "页面里不允许出现 emoji 图标，请用 .icon + vendor/phosphor/icons");
 
-  const names = [...html.matchAll(/--icon:url\(\/vendor\/tabler\/icons\/([a-z0-9-]+)\.svg\)/g)].map((m) => m[1]);
-  assert.ok(names.length >= 10, `页面用到的 tabler 图标太少（${names.length} 处），像是没接图标系统`);
+  const names = [...html.matchAll(/--icon:url\(\/vendor\/phosphor\/icons\/([a-z0-9-]+)\.svg\)/g)].map((m) => m[1]);
+  assert.ok(names.length >= 10, `页面用到的 phosphor 图标太少（${names.length} 处），像是没接图标系统`);
   for (const n of names) {
     assert.ok(
-      fs.existsSync(path.join(ROOT, "static/vendor/tabler/icons", `${n}.svg`)),
+      fs.existsSync(path.join(ROOT, "static/vendor/phosphor/icons", `${n}.svg`)),
       `图标文件不存在：${n}.svg`,
     );
   }

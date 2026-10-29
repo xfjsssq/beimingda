@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>代取看板 · 北名大小助手</title>
+<title>代取撮合：看单、接单、跑腿登记</title>
 <!--
   代取撮合页（M1）—— 2026-10-28 改成「看单为主 · 功能收进按钮」
 
@@ -18,7 +18,7 @@
 
   约定：
     · 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/demo.js、/js/ui.js
-    · 图标一律 static/vendor/tabler/icons/*.svg + .icon（⛔ 不用 emoji）
+    · 图标一律 static/vendor/phosphor/icons/*.svg + .icon（⛔ 不用 emoji）
     · ⛔ 不收姓名 / 学号 / 手机号；⛔ 截图原图不落盘；平台不参与交易、不代收款
 -->
 <link rel="stylesheet" href="/css/app.css" />
@@ -81,9 +81,15 @@
     .cand__line .score { margin-left:0; }
   }
 </style>
+  <meta name="description" content="按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学，每个候选都带可解释理由。" />
+  <meta property="og:title" content="代取撮合：看单、接单、跑腿登记" />
+  <meta property="og:description" content="按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学，每个候选都带可解释理由。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main class="page page--mid">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main id="main" class="page page--mid">
   <div class="page-head">
     <h1>代取看板</h1>
     <p class="lead">打开这一页就是开放任务：看到顺路的单子直接「接这一单」。发布需求、登记跑腿能力收在右上角按钮里，点开才出现，不占看单的地方。</p>
@@ -97,17 +103,17 @@
   <!-- ───────────── 工具栏：两个功能按钮 + 筛选/刷新 ───────────── -->
   <div class="toolbar">
     <button class="btn" id="btn-open-publish" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/package.svg)" aria-hidden="true"></span>
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/package.svg)" aria-hidden="true"></span>
       <span>发布代取</span>
     </button>
     <button class="btn btn--ghost" id="btn-open-register" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/walk.svg)" aria-hidden="true"></span>
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/walk.svg)" aria-hidden="true"></span>
       <span>登记跑腿能力</span>
     </button>
     <span class="toolbar__spacer"></span>
     <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
     <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/refresh.svg)" aria-hidden="true"></span>
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
       <span>刷新看板</span>
     </button>
   </div>
@@ -134,6 +140,11 @@
   <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
   <p>本页不需要你填任何令牌：写接口令牌已由服务端配置（<code class="inline">/config.js</code> 注入，前端自动带上）。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
 </footer>
 
 <script src="/config.js"></script>
@@ -168,7 +179,7 @@ const matchCache = new Map();    // task_id → { list, error, at }
 mountNav();
 
 /* =====================================================================
-   通用小零件（图标一律走 .icon + Tabler svg，⛔ 不用 emoji）
+   通用小零件（图标一律走 .icon + Phosphor svg，⛔ 不用 emoji）
    ===================================================================== */
 
 function chip(iconName, text, extraCls = "") {
@@ -178,7 +189,7 @@ function chip(iconName, text, extraCls = "") {
   return c;
 }
 
-/** 自绘三态块：ui.js 的三态组件自带 emoji 图标，这里统一换成 Tabler svg */
+/** 自绘三态块：ui.js 的三态组件自带 emoji 图标，这里统一换成 Phosphor svg */
 function stateBox(kind, { iconName = "info-circle", title, hint, actionText, onAction } = {}) {
   const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
   const ic = el("div", "state__icon");
@@ -216,7 +227,7 @@ function emptyArt(text, hint, actionText, onAction) {
   return art;
 }
 
-/** 行内提示条（带 Tabler 图标） */
+/** 行内提示条（带 Phosphor 图标） */
 function mountNotice(target, kind, text) {
   const box = typeof target === "string" ? $(target) : target;
   if (!box) return;
@@ -771,7 +782,7 @@ function paintCands(t) {
     panel.hidden = !next;
     toggle.setAttribute("aria-expanded", next ? "true" : "false");
     chev.style.setProperty("--icon",
-      "url(/vendor/tabler/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
+      "url(/vendor/phosphor/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
   });
 
   box.append(toggle, panel);

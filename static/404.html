@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-CN" data-page="404">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="没有找到这个页面。回到首页或看看四个功能。" />
+  <meta name="robots" content="noindex" />
+  <title>没有这个页面 · 北名大小助手</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main class="page" id="main">
+  <section class="section" style="padding-top:40px">
+    <div class="card" style="text-align:center;padding:40px 24px">
+      <img src="/img/empty-state.png" alt="" style="width:168px;max-width:56%;height:auto" />
+      <h1 style="font-size:30px;margin:16px 0 8px">没有这个页面</h1>
+      <p class="muted" style="max-width:680px;margin:0 auto 24px">
+        链接可能写错了，或者这个功能还没上线。下面几个入口都能到你要的地方。
+      </p>
+      <p class="chip-row" style="justify-content:center">
+        <a class="btn" href="/">回到首页</a>
+        <a class="btn btn--ghost" href="/takeout">代取看板</a>
+        <a class="btn btn--ghost" href="/welcome">迎新导览</a>
+        <a class="btn btn--ghost" href="/agent">接入 Agent</a>
+      </p>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div style="max-width:var(--page-max);margin:0 auto;padding:0 16px">
+    <nav class="site-footer__legal" aria-label="法律与来源">
+      <a href="/agent#p-compliance">隐私与合规说明</a>
+      <a href="/legal.html">许可与素材来源</a>
+    </nav>
+  </div>
+</footer>
+<script src="/config.js"></script>
+<script type="module">
+  import { mountNav } from "/js/nav.js";
+  mountNav();
+</script>
+</body>
+</html>

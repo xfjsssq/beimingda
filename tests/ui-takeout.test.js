@@ -8,7 +8,7 @@
  *      · 第一屏是开放任务看板；发布 / 登记收进 .toolbar 两个按钮 + createSheet 侧栏
  *      · 「查看匹配」这个独立动作必须消失；候选直接铺在卡片里（含 score / reason）
  *      · 页面上没有任何令牌输入框（令牌由服务端注入，前端自动带 X-Demo-Token）
- *      · 图标一律 vendor/tabler svg，⛔ 无 emoji；上传控件只剩一处
+ *      · 图标一律 vendor/phosphor svg，⛔ 无 emoji；上传控件只剩一处
  *   2) service `setMatchState`：状态机与错误码
  *   3) HTTP `POST /api/matches/:id/accept` / `:id/decline`：鉴权、状态迁移、重复操作被拒
  *
@@ -112,8 +112,8 @@ test("/takeout：页面上没有任何令牌输入框，「演示令牌」文案
   assert.match(PAGE, /已由服务端配置/);
 });
 
-test("/takeout：图标走 vendor/tabler svg、⛔ 无 emoji、⛔ 无外链", () => {
-  assert.match(PAGE, /\/vendor\/tabler\/icons\//, "图标必须用本地 Tabler svg");
+test("/takeout：图标走 vendor/phosphor svg、⛔ 无 emoji、⛔ 无外链", () => {
+  assert.match(PAGE, /\/vendor\/phosphor\/icons\//, "图标必须用本地 Phosphor svg");
   assert.match(PAGE, /class="icon icon--/);
   // 图标位一律 .icon + svg：把旧版用过的符号 emoji 逐个钉死
   for (const bad of ["📦", "🎯", "✅", "⚠️", "❌", "🗂️", "🔎"]) {

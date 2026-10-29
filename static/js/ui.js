@@ -71,9 +71,13 @@ function stateNode(kind, { icon, title, hint, actionText, onAction }) {
 
 /** 加载中：旋转指示 + 一句说明（不阻塞页面其它部分） */
 export function showLoading(target, text = "正在读取…") {
+  // B9：加载态用"跟真实布局同形的骨架屏"，不用转圈
   const wrap = el("div", "state state--loading");
-  wrap.appendChild(el("div", "spinner"));
+  const sk = el("div", "skeleton");
+  sk.appendChild(el("i")); sk.appendChild(el("i")); sk.appendChild(el("i"));
+  wrap.appendChild(sk);
   wrap.setAttribute("role", "status");
+  wrap.setAttribute("aria-label", text);
   wrap.appendChild(el("p", "state__hint", text));
   return mount(target, wrap);
 }
@@ -180,6 +184,8 @@ export default {
   copyText,
   mountTabs,
   createSheet,
+  initReveals,
+  initTagline,
   openModal,
   toast,
 };
@@ -191,7 +197,7 @@ export default {
    ============================================================================= */
 
 /** 图标元素：用 CSS mask 着色，随父级文字颜色变化（一个 svg 文件适配所有场景） */
-/** 已本地化的图标名（static/vendor/tabler/icons/*.svg）。列表外的名字一律当普通文字渲染，兼容旧调用。 */
+/** 已本地化的图标名（static/vendor/phosphor/icons/*.svg）。列表外的名字一律当普通文字渲染，兼容旧调用。 */
 export const ICON_NAMES = new Set([
   "package","users","map-pin","calendar-event","robot","plug-connected","list-check","wand",
   "message-chatbot","tools","shield-check","copy","check","x","chevron-right","chevron-down",
@@ -210,7 +216,7 @@ export function decorIcon(name, size = 28) {
 }
 export function icon(name, { size = 18, cls = "" } = {}) {
   const n = el("span", "icon icon--" + size + (cls ? " " + cls : ""));
-  n.style.setProperty("--icon", `url(/vendor/tabler/icons/${name}.svg)`);
+  n.style.setProperty("--icon", `url(/vendor/phosphor/icons/${name}.svg)`);
   n.setAttribute("aria-hidden", "true");
   return n;
 }
@@ -388,4 +394,56 @@ export function toast(text, kind = "") {
   wrap.appendChild(n);
   setTimeout(() => { n.style.opacity = "0"; n.style.transition = "opacity .25s"; setTimeout(() => n.remove(), 260); }, 2600);
   return n;
+}
+
+
+/* =============================================================================
+   B7 滚动揭示 + B11 标语逐词激活（2026-10-29）
+   规范：只动 transform/opacity；用 IntersectionObserver，⛔ 不用未节流的 scroll 监听；
+        每个区块只播一次；prefers-reduced-motion 下退化成直接显示。
+   ============================================================================= */
+
+/** 给所有 .reveal 区块挂观察器：进入视口 32px 后升起并淡入，只播一次 */
+export function initReveals(root = document) {
+  const items = [...root.querySelectorAll(".reveal")];
+  if (!items.length) return 0;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !("IntersectionObserver" in window)) {
+    items.forEach((n) => n.classList.add("is-in"));
+    return items.length;
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("is-in");
+      io.unobserve(e.target);          // 只播一次，回滚时不重播
+    }
+  }, { rootMargin: "0px 0px -32px 0px", threshold: 0.08 });
+  items.forEach((n) => io.observe(n));
+  return items.length;
+}
+
+/**
+ * B11 标语揭示：文本里用 `|` 分隔"词"，逐词从 30% 灰升到正文色。
+ * 用法：<p class="tagline-text" data-words="取快递|找搭子|认路|记 DDL">…</p>
+ */
+export function initTagline(root = document) {
+  const nodes = [...root.querySelectorAll("[data-words]")];
+  if (!nodes.length) return 0;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  for (const n of nodes) {
+    const words = String(n.dataset.words || "").split("|").filter(Boolean);
+    n.textContent = "";
+    const spans = words.map((w) => {
+      const s = el("span", "w", w);
+      n.appendChild(s);
+      return s;
+    });
+    if (reduce || !("IntersectionObserver" in window)) { spans.forEach((s) => s.classList.add("on")); continue; }
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("on"); io.unobserve(e.target); }
+    }, { rootMargin: "0px 0px -45% 0px", threshold: 0 });
+    spans.forEach((s) => io.observe(s));
+  }
+  return nodes.length;
 }

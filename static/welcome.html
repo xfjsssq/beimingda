@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>迎新导览 · 北名大小助手</title>
+  <title>迎新导览：校园地图与 3D 街景</title>
   <link rel="stylesheet" href="/css/app.css" />
   <link rel="stylesheet" href="/vendor/pannellum/pannellum.css" />
   <style>
@@ -138,9 +138,15 @@
     .street-fallback .card { max-width: 460px; text-align: center; }
     .street-fallback img { width: 168px; max-width: 60%; height: auto; margin-bottom: 6px; }
   </style>
+  <meta name="description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
+  <meta property="og:title" content="迎新导览：校园地图与 3D 街景" />
+  <meta property="og:description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main class="page">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main class="page" id="main">
   <div class="page-head">
     <h1>迎新导览 · 校园地图</h1>
     <p class="lead">点击地图上的标记，可以先看看那里长什么样 —— 宿舍楼、食堂、教学楼、校门、快递驿站都在这里。</p>
@@ -169,21 +175,21 @@
         <div class="map-hud">
           <div class="segmented" id="viewSeg" role="group" aria-label="地图视图切换">
             <button class="segmented__btn" id="vShot" data-view="shot" type="button" aria-pressed="true">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/map.svg)"></span>示意图
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/map.svg)"></span>示意图
             </button>
             <button class="segmented__btn" id="vSat" data-view="sat" type="button" aria-pressed="false">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/sun.svg)"></span>卫星图
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sun.svg)"></span>卫星图
             </button>
             <button class="segmented__btn" id="vStreet" data-view="street" type="button" aria-pressed="false">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/walk.svg)"></span>3D 街景
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/walk.svg)"></span>3D 街景
             </button>
           </div>
           <div class="map-hud__row">
             <button class="map-hud__btn" id="openList" type="button">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/list-check.svg)"></span>点位列表
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>点位列表
             </button>
             <button class="map-hud__btn" id="openAmap" type="button" hidden>
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/external-link.svg)"></span>在线地图
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/external-link.svg)"></span>在线地图
             </button>
           </div>
         </div>
@@ -389,7 +395,7 @@ function selectNode(id) {
     '<p class="desc">' + esc(n.desc || "（暂无位置描述）") + '</p>',
     scene
       ? '<button class="btn" id="openStreet" type="button">' +
-        '<span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/walk.svg)"></span> 进入 3D 街景</button>'
+        '<span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/walk.svg)"></span> 进入 3D 街景</button>'
       : (hasScenes
           ? '<p class="notice notice--warn">该点暂无实景，以下是位置描述 —— 我们不会拿别的图糊弄你。' +
             '已拍好的点位可以在地图右上角「3D 街景」里看。</p>'
@@ -557,7 +563,7 @@ function setupMapHud() {
       row.style.justifyContent = "flex-start";
       const hasPano = Boolean(sceneOf(n));
       row.innerHTML =
-        '<span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/map-pin.svg)"></span>' +
+        '<span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/map-pin.svg)"></span>' +
         '<span class="label">' + n.label + "</span>" +
         '<span class="chip" style="margin-left:auto">' + catLabel(n.category) +
         (hasPano ? " · 有实景" : " · 暂无实景") + "</span>";
@@ -709,5 +715,15 @@ function closeStreet() {
     : "节点数据未加载（后端 /api/map/nodes 未就绪？先跑 npm run seed）";
 })();
 </script>
+<footer class="site-footer" style="margin-top:32px">
+  <div style="max-width:var(--page-max);margin:0 auto;padding:0 16px">
+  <p class="muted">底图为学校公开的《校园楼宇编号示意图》，实景为手机实拍素材；本页不依赖任何外部 CDN。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+  </div>
+</footer>
 </body>
 </html>

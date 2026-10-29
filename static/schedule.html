@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>日程与提醒 · 北名大小助手</title>
+  <title>日程与提醒：点课表格子就能改</title>
   <link rel="stylesheet" href="/css/app.css" />
   <style>
     /* 本页只保留「周课表网格」特有样式；其余全走 /css/app.css
@@ -83,22 +83,28 @@
       .section__title small { flex: 1 1 100%; }
     }
   </style>
+  <meta name="description" content="只收星期、节次、课程名、教室、周次五个匿名字段，脱敏审计只记字段名不记值。" />
+  <meta property="og:title" content="日程与提醒：点课表格子就能改" />
+  <meta property="og:description" content="只收星期、节次、课程名、教室、周次五个匿名字段，脱敏审计只记字段名不记值。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main class="page">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main class="page" id="main">
 
   <!-- 顶栏只有一行：左侧内置演示身份，右侧两个入口（导入指引 / 提醒设置） -->
   <div class="toolbar">
     <span class="chip" id="whoChip" title="身份内置，不需要输入任何名字">
-      <span class="icon icon--14" style="--icon:url(/vendor/tabler/icons/user.svg)" aria-hidden="true"></span>
+      <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/user.svg)" aria-hidden="true"></span>
       <span class="small" id="whoText">演示身份：同学A</span>
     </span>
     <span class="toolbar__spacer"></span>
     <button class="btn btn--ghost btn--sm" id="importBtn" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/calendar-event.svg)" aria-hidden="true"></span>导入课表
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/calendar-event.svg)" aria-hidden="true"></span>导入课表
     </button>
     <button class="btn btn--ghost btn--sm" id="remindBtn" type="button">
-      <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/clock.svg)" aria-hidden="true"></span>提醒设置
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clock.svg)" aria-hidden="true"></span>提醒设置
     </button>
   </div>
 
@@ -122,7 +128,7 @@
     </h2>
     <div class="row">
       <button class="btn btn--quiet btn--sm" id="auditBtn" type="button">
-        <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/shield-check.svg)" aria-hidden="true"></span>查看脱敏审计记录
+        <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)" aria-hidden="true"></span>查看脱敏审计记录
       </button>
       <span class="hint">打开后只列出被丢弃的<b>字段名</b>，任何字段值都不记录、不展示。</span>
     </div>
@@ -137,6 +143,11 @@
 <footer class="site-footer">
   <p>北名大小助手 · 第一届「银移杯」赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
   <p>本页不接收课表文件，也不收集姓名 / 学号 / 手机号。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
 </footer>
 
 <script src="/config.js"></script>
@@ -152,7 +163,7 @@ import { el, icon, showLoading, createSheet, openModal, toast, copyText } from "
      2. 首屏就是课表；顶部只留一行 .toolbar（导入课表 / 提醒设置 两个入口）
      3. 底部那一整块加课表单删掉 -> 改成点课表格子直接编辑（新增 / 修改 / 删除）
      4. 脱敏审计收成一行按钮，明细进侧栏（createSheet）
-     5. 图标一律 .icon + /vendor/tabler/icons/*.svg（无 emoji、无外链）
+     5. 图标一律 .icon + /vendor/phosphor/icons/*.svg（无 emoji、无外链）
    ============================================================================= */
 
 const WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
@@ -207,7 +218,7 @@ function bodyOf(v) {
   return body;
 }
 
-/* ------------------------------------------------------------------ 三态（自带 tabler 图标，不用 emoji） */
+/* ------------------------------------------------------------------ 三态（自带 phosphor 图标，不用 emoji） */
 function stateBox(target, kind, iconName, title, hint, actionText, onAction) {
   const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
   if (iconName) {

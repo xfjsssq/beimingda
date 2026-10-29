@@ -313,7 +313,7 @@ function linkHTML(page, activeId) {
   return (
     `<a class="nav-link" href="${page.href}" data-nav="${page.id}"` +
     ` title="${page.desc}"${active ? ' aria-current="page"' : ""}>` +
-    `<span class="icon icon--18 nav-link__icon" aria-hidden="true" style="--icon:url(/vendor/tabler/icons/${page.iconName || "home"}.svg)"></span>` +
+    `<span class="icon icon--18 nav-link__icon" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/${page.iconName || "home"}.svg)"></span>` +
     `<span class="nav-link__label">${page.label}</span>` +
     `</a>`
   );
@@ -374,6 +374,11 @@ export function mountNav(opts = {}) {
   }
 
   try {
+    // B7/B11：滚动揭示 + 标语逐词（走共享层，六个页面共用，各页不用改）
+    import("/js/ui.js")
+      .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); })
+      .catch(() => {});   // 环境不支持 IntersectionObserver 时静默降级
+
     document.dispatchEvent(new CustomEvent(NAV_READY_EVENT, { detail: { activeId } }));
   } catch {
     /* 老浏览器不支持 CustomEvent 构造：忽略，不影响导航可用 */

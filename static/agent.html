@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="北名大小助手 · MCP 接入页（分栏式）：一键配置 / 手动接入 / 使用示例 / MCP 工具 / 合规声明 —— 把平台能力通过远程 Streamable HTTP MCP 开放给 WorkBuddy。" />
-  <title>接入 Agent · 把整个平台交给一句话 · 北名大小助手</title>
+  <title>接入 Agent：把整个平台交给一句话</title>
   <link rel="stylesheet" href="/css/app.css" />
   <style>
     /* ===================================================================
@@ -115,10 +115,15 @@
       .quick-steps { grid-template-columns: 1fr; }
     }
   </style>
+  <meta property="og:title" content="接入 Agent：把整个平台交给一句话" />
+  <meta property="og:description" content="远程 Streamable HTTP MCP，零配置接入 WorkBuddy；复制一段 JSON 就能用 14 个工具操控平台。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-  <!-- 页头导航由 /js/nav.js 注入 -->
-  <main class="page">
+  <a class="skip-link" href="#main">跳到主要内容</a>
+<!-- 页头导航由 /js/nav.js 注入 -->
+  <main class="page" id="main">
 
     <!-- ============ 区块一 · Hero（左文右图） ============ -->
     <section class="hero hero--split" aria-labelledby="block1-title">
@@ -133,10 +138,10 @@
         </p>
         <div class="hero__actions">
           <a class="btn btn--light" href="#p-oneclick" data-goto="p-oneclick">
-            <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/bolt.svg)"></span>一键配置
+            <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/bolt.svg)"></span>一键配置
           </a>
           <a class="btn btn--outline" href="#p-examples" data-goto="p-examples">
-            <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/message-chatbot.svg)"></span>看看能怎么说
+            <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>看看能怎么说
           </a>
         </div>
         <div class="hero__tags">
@@ -154,21 +159,21 @@
     <!-- ============ 顶部极简概览 · 三步接入 ============ -->
     <section class="quick-steps" aria-label="三步接入概览">
       <div class="quick-step">
-        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/copy.svg)"></span></span>
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span></span>
         <div>
           <b>复制配置</b>
           <span class="quick-step__note">一段合法 JSON，令牌是 <code class="inline">&lt;DEMO_TOKEN&gt;</code> 占位符</span>
         </div>
       </div>
       <div class="quick-step">
-        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/plug-connected.svg)"></span></span>
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span></span>
         <div>
           <b>粘进 mcp.json</b>
           <span class="quick-step__note">放进 <code class="inline">~/.workbuddy/mcp.json</code> 的 <code class="inline">mcpServers</code></span>
         </div>
       </div>
       <div class="quick-step">
-        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/shield-check.svg)"></span></span>
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></span>
         <div>
           <b>重启 + 信任一次</b>
           <span class="quick-step__note">连接器列表里找到 <code class="inline">beimingda</code> 点一次信任</span>
@@ -180,23 +185,23 @@
     <div class="tabs" id="agentTabs" role="tablist" aria-label="Agent 接入分栏">
       <button class="tab" type="button" role="tab" id="tab-oneclick" aria-controls="p-oneclick"
               aria-selected="true" data-panel="p-oneclick">
-        <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/bolt.svg)"></span>一键配置
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/bolt.svg)"></span>一键配置
       </button>
       <button class="tab" type="button" role="tab" id="tab-manual" aria-controls="p-manual"
               aria-selected="false" data-panel="p-manual">
-        <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/pencil.svg)"></span>手动接入
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/pencil.svg)"></span>手动接入
       </button>
       <button class="tab" type="button" role="tab" id="tab-examples" aria-controls="p-examples"
               aria-selected="false" data-panel="p-examples">
-        <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/message-chatbot.svg)"></span>使用示例
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>使用示例
       </button>
       <button class="tab" type="button" role="tab" id="tab-tools" aria-controls="p-tools"
               aria-selected="false" data-panel="p-tools">
-        <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/list-check.svg)"></span>MCP 工具
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>MCP 工具
       </button>
       <button class="tab" type="button" role="tab" id="tab-compliance" aria-controls="p-compliance"
               aria-selected="false" data-panel="p-compliance">
-        <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/shield-check.svg)"></span>合规声明
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span>合规声明
       </button>
     </div>
 
@@ -215,7 +220,7 @@
         <div class="cfg-grid">
           <div>
             <h3 class="mini-title" style="margin-top:0">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/plug-connected.svg)"></span>端点与环境
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>端点与环境
             </h3>
             <p class="section__note" style="margin-top:0">
               端点：<code class="inline" id="mcp-url">读取中…</code><br />
@@ -229,27 +234,27 @@
             <p class="section__note" id="mode-note"></p>
 
             <h3 class="mini-title">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/wand.svg)"></span>三步走
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/wand.svg)"></span>三步走
             </h3>
             <ol class="icon-steps" id="quick-steps"></ol>
 
             <h3 class="mini-title">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/key.svg)"></span>令牌怎么算
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span>令牌怎么算
             </h3>
             <ul class="hint-list" id="token-notes"></ul>
           </div>
 
           <div>
             <h3 class="mini-title" style="margin-top:0">
-              <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/clipboard-text.svg)"></span>直接复制 / 下载
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span>直接复制 / 下载
             </h3>
             <pre class="code" id="mcp-json" style="margin-top:0" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
             <div class="copy-row">
               <button class="btn" type="button" id="copy-btn">
-                <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/copy.svg)"></span>复制配置
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span>复制配置
               </button>
               <button class="btn btn--ghost btn--sm" type="button" id="download-btn">
-                <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/check.svg)"></span>下载 mcp.json
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/check.svg)"></span>下载 mcp.json
               </button>
               <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
             </div>
@@ -272,7 +277,7 @@
             <p>配置文件在哪、粘到哪一行、什么时候重启 —— 点开哪一步看哪一步。</p>
           </div>
           <span class="chip chip--brand">
-            <span class="icon icon--14" style="--icon:url(/vendor/tabler/icons/list-check.svg)"></span>四步
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>四步
           </span>
         </div>
 
@@ -285,21 +290,21 @@
 
         <ul class="rules" style="margin-top:14px">
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/info-circle.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/info-circle.svg)"></span></span>
             <div>
               <b>文件不存在就先新建</b>
               <p>目录 <code class="inline">~/.workbuddy/</code> 可能还没有 <code class="inline">mcp.json</code>，直接新建一个空文件即可；内容只有 <code class="inline">mcpServers</code> 一个键。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/book.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/book.svg)"></span></span>
             <div>
               <b>已有别的连接器也不冲突</b>
               <p>文件里已经有 <code class="inline">mcpServers</code> 时，只需要把 <code class="inline">beimingda</code> 这一项放进那个对象，别把原有的覆盖掉。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/refresh.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span></span>
             <div>
               <b>改完必重启</b>
               <p>WorkBuddy 只在启动时读一次配置；改完没重启，工具栏里不会出现 <code class="inline">beimingda</code>。</p>
@@ -319,7 +324,7 @@
             <p>每条都标了它落到哪个模块、由哪个 MCP 工具接住。</p>
           </div>
           <span class="chip chip--brand">
-            <span class="icon icon--14" style="--icon:url(/vendor/tabler/icons/message-chatbot.svg)"></span>5 条 · 覆盖 4 个模块
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>5 条 · 覆盖 4 个模块
           </span>
         </div>
 
@@ -342,12 +347,12 @@
             <p>清单来自 <code class="inline">docs/MCP-TOOLS.md</code>，并且会拿服务端的实时结果核对一遍。</p>
           </div>
           <button class="btn btn--quiet btn--sm" type="button" id="recheck-btn">
-            <span class="icon icon--16" style="--icon:url(/vendor/tabler/icons/refresh.svg)"></span>重新核对
+            <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span>重新核对
           </button>
         </div>
 
         <div class="toolbar">
-          <span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/plug-connected.svg)"></span>
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>
           <span id="tools-live">核对中…</span>
           <span class="toolbar__spacer"></span>
           <span class="chip" id="tools-claim-chip">页面宣称 14</span>
@@ -373,7 +378,7 @@
             <h2 id="block6-title">这一页敢给你看的东西</h2>
           </div>
           <span class="chip chip--brand">
-            <span class="icon icon--14" style="--icon:url(/vendor/tabler/icons/shield-check.svg)"></span>五条硬约束
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span>五条硬约束
           </span>
         </div>
 
@@ -381,35 +386,35 @@
 
         <ul class="rules">
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/user.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/user.svg)"></span></span>
             <div>
               <b>不收集身份信息</b>
               <p>姓名、学号、手机号、身份证、学生证照片、校园网账号口令，一个都不收；姓名在演示模式下显示为「同学A / 同学B」。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/building-community.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/building-community.svg)"></span></span>
             <div>
               <b>不接学校内部系统</b>
               <p>不接入、不登录、不抓取教务 / 图书馆 / 一卡通等任何校内系统；地图点位与任务全部来自本站自己的演示数据。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/lock.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/lock.svg)"></span></span>
             <div>
               <b>没有课表上传入口</b>
               <p>课表只接受 6 个白名单匿名字段的结构化写入，页面上刻意不做「上传课表文件」的控件 —— 这是设计出来的，不是漏了。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/shield-check.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></span>
             <div>
               <b>脱敏审计只记字段名</b>
               <p>截图解析等入口逐字段扫描黑名单：命中就<b>丢弃该字段</b>，并在 <code class="inline">scrub_audit</code> 里留一条记录 —— 记录里只有字段名，绝不记值。</p>
             </div>
           </li>
           <li class="rule">
-            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/tabler/icons/key.svg)"></span></span>
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span></span>
             <div>
               <b>令牌口径说清楚</b>
               <p>页面上只出现占位符 <code class="inline">&lt;DEMO_TOKEN&gt;</code>；真值只存在于服务端环境变量，限频 + 短周期轮换，只能操作演示数据，泄露无风险。</p>
@@ -430,7 +435,12 @@
   <footer class="site-footer">
     <p>北名大小助手 · 第一届「银移杯」校园 AI Agent 创新大赛 赛道 17 智慧校园 Agent 创意赛道</p>
     <p>本页不依赖任何外部 CDN：样式与脚本都是本站文件，断网也能打开。</p>
-  </footer>
+  <nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
 
   <script src="/config.js"></script>
   <script type="module">
@@ -457,7 +467,7 @@
     const stateEl = $("#copy-state");
 
     /* ================= 小工具：图标（用共享层的 CSS mask 图标系统） ================= */
-    const tablerIcon = (name, size = 18) => icon(name, { size });
+    const phIcon = (name, size = 18) => icon(name, { size });
 
     /* ===================================================================
        1) 端点与配置：模式可切换，但默认跟随当前站点
@@ -661,7 +671,7 @@
       const tile = document.createElement("span");
       tile.className = "icon-tile";
       tile.setAttribute("aria-hidden", "true");
-      tile.appendChild(tablerIcon(s.iconName, 18));
+      tile.appendChild(phIcon(s.iconName, 18));
       const body = document.createElement("div");
       const b = document.createElement("b");
       b.textContent = i + 1 + ". " + s.title;
@@ -694,11 +704,11 @@
       if (i === 0) fold.open = true; // 第一步默认展开，其余收起来
 
       const sum = document.createElement("summary");
-      sum.appendChild(tablerIcon(STEP_ICONS[i] || "info-circle", 18));
+      sum.appendChild(phIcon(STEP_ICONS[i] || "info-circle", 18));
       const title = document.createElement("span");
       title.textContent = s.title;
       sum.appendChild(title);
-      const chev = tablerIcon("chevron-down", 16);
+      const chev = phIcon("chevron-down", 16);
       chev.classList.add("fold__chev");
       sum.appendChild(chev);
 
@@ -739,7 +749,7 @@
 
       const modChip = document.createElement("span");
       modChip.className = "chip";
-      const modIcon = tablerIcon("package", 14);
+      const modIcon = phIcon("package", 14);
       modChip.append(modIcon, document.createTextNode(d.module));
 
       meta.appendChild(modChip);
@@ -751,7 +761,7 @@
       for (const t of tools) {
         const chip = document.createElement("span");
         chip.className = "chip chip--brand";
-        chip.appendChild(tablerIcon("plug-connected", 14));
+        chip.appendChild(phIcon("plug-connected", 14));
         const nameEl = document.createElement("span");
         nameEl.style.fontFamily = "var(--font-mono)";
         nameEl.textContent = t;
@@ -764,7 +774,7 @@
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn btn--quiet btn--sm";
-      btn.appendChild(tablerIcon("copy", 16));
+      btn.appendChild(phIcon("copy", 16));
       btn.appendChild(document.createTextNode("复制这句"));
       btn.addEventListener("click", () => copyWithFeedback(btn, d.text, "示例对话"));
 

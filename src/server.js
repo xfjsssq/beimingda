@@ -95,7 +95,12 @@ export function createApp() {
   app.use(express.static(STATIC_DIR, { extensions: ["html"] }));
   app.use("/pano", express.static(path.join(ROOT, "pano")));
 
+  // 404：接口/ MCP 仍然回统一信封；浏览器请求给一个品牌化的 404 页面（B10 交付项）
   app.use((req, res) => {
+    const wantsHtml = !req.path.startsWith("/api") && !req.path.startsWith("/mcp") &&
+      String(req.get("accept") || "").includes("text/html");
+    const file404 = path.join(STATIC_DIR, "404.html");
+    if (wantsHtml && fs.existsSync(file404)) return res.status(404).sendFile(file404);
     res
       .status(404)
       .json({ ok: false, data: null, error: { code: "NOT_FOUND", message: "not found" } });

@@ -6,7 +6,7 @@
  *   2. 首屏就是课表；顶部只留一行 .toolbar（导入课表 / 提醒设置 两个入口，都走 createSheet）
  *   3. 删掉底部「手动添加课程」整块 → 改成点课表格子直接编辑（openModal）
  *   4. 脱敏审计收成一行按钮「查看脱敏审计记录」，明细进侧栏，且只显示字段名
- *   5. 图标全部走 /vendor/tabler/icons/*.svg（⛔ 不用 emoji）
+ *   5. 图标全部走 /vendor/phosphor/icons/*.svg（⛔ 不用 emoji）
  *
  * 本文件只做两件事：
  *   A. 静态守卫：把上面几条约定钉死（改坏立刻红）
@@ -98,24 +98,24 @@ test("静态：脱敏审计收成一行按钮，明细进侧栏，且只展示�
   assert.match(PAGE, /只记字段名/);
 });
 
-test("静态：图标全部走 tabler svg（本地文件，且都用 .icon 写法），⛔ 不用 emoji", () => {
+test("静态：图标全部走 Phosphor svg（本地文件，且都用 .icon 写法），⛔ 不用 emoji", () => {
   // 静态 HTML 里的 style="--icon:url(...)" 与 JS 里的 icon("名字")（含三元写法）都要覆盖
   const refs = [
-    ...[...PAGE.matchAll(/\/vendor\/tabler\/icons\/([a-z0-9-]+)\.svg/g)].map((m) => m[1]),
+    ...[...PAGE.matchAll(/\/vendor\/phosphor\/icons\/([a-z0-9-]+)\.svg/g)].map((m) => m[1]),
     ...[...PAGE.matchAll(/\bicon\(\s*([^,]*?),/g)].flatMap((m) =>
       [...m[1].matchAll(/"([a-z0-9-]+)"/g)].map((x) => x[1]),
     ),
   ];
   const required = ["user", "calendar-event", "clock", "shield-check", "plus", "pencil", "trash", "copy", "alert-triangle", "clipboard-text"];
-  assert.ok(refs.length >= 5, `页面应使用多个 tabler 图标，实际 ${refs.length} 个`);
+  assert.ok(refs.length >= 5, `页面应使用多个 phosphor 图标，实际 ${refs.length} 个`);
   for (const name of new Set([...refs, ...required])) {
     assert.ok(
-      fs.existsSync(path.join(ROOT, "static", "vendor", "tabler", "icons", `${name}.svg`)),
-      `图标文件不存在：static/vendor/tabler/icons/${name}.svg`,
+      fs.existsSync(path.join(ROOT, "static", "vendor", "phosphor", "icons", `${name}.svg`)),
+      `图标文件不存在：static/vendor/phosphor/icons/${name}.svg`,
     );
     assert.ok(PAGE.includes(name), `页面没有用到图标 ${name}`);
   }
-  // ui.js 的三态组件内置 emoji 图标，本页刻意不用它们（改用自带 tabler 图标的 stateBox）
+  // ui.js 的三态组件内置 emoji 图标，本页刻意不用它们（改用自带 phosphor 图标的 stateBox）
   assert.doesNotMatch(PAGE, /showEmpty\(|showError\(|showSuccess\(/, "别用内置 emoji 图标的三态组件");
   const emoji = PAGE.match(/[\u{1F300}-\u{1FAFF}\u{2190}-\u{21FF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}]/u);
   assert.equal(emoji, null, `页面里出现了 emoji：${emoji && emoji[0]}`);

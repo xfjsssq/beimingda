@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>搭子墙 · 北名大小助手</title>
+  <title>搭子匹配：匿名画像与双选揭示</title>
   <!--
     契约：contracts/m2-buddy.md §6（4 个区块）
     样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/ui.js
@@ -24,9 +24,15 @@
       .mine-cards { display:block; }
     }
   </style>
+  <meta name="description" content="一段大白话变成匿名画像，双方都点头才互相可见联系方式，单方面看不到。" />
+  <meta property="og:title" content="搭子匹配：匿名画像与双选揭示" />
+  <meta property="og:description" content="一段大白话变成匿名画像，双方都点头才互相可见联系方式，单方面看不到。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main class="page page--mid">
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main id="main" class="page page--mid">
   <div class="page-head">
     <h1>搭子墙</h1>
     <p class="lead">学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。</p>
@@ -135,6 +141,11 @@
 <footer class="site-footer">
   <p>北名大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
   <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
 </footer>
 
 <script src="/config.js"></script>
