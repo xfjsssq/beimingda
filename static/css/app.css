@@ -2360,7 +2360,12 @@ body > * { position: relative; z-index: 1; }
   background: linear-gradient(90deg, var(--color-primary), var(--color-accent) 60%, transparent);
   opacity: 0.5; pointer-events: none;
 }
-.btn { background: linear-gradient(180deg, color-mix(in srgb, var(--btn-flat) 88%, white) 0%, var(--btn-flat) 100%); }
+/* ⚠️ 只给"主按钮"上渐变：不带修饰类的 .btn。
+   写成裸 .btn 会盖掉 .btn--light / --ghost / --quiet 的背景色 → 白底按钮变成品牌底 + 品牌色文字 = 文字看不见（2026-10-29 踩过） */
+.btn:not(.btn--ghost):not(.btn--light):not(.btn--quiet):not(.btn--ok):not(.btn--danger) {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--btn-flat) 88%, white) 0%, var(--btn-flat) 100%);
+  color: #fff;
+}
 .chip[aria-pressed="true"] { background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 88%, white) 0%, var(--color-primary) 100%); }
 .segmented__btn[aria-pressed="true"] { background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 90%, white) 0%, var(--color-primary) 100%); }
 /* 统计条 / 数字用渐变文字强调（技能 B5 允许的文字渐变用法） */
