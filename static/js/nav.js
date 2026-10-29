@@ -324,7 +324,7 @@ export function navHTML(activeId) {
   return (
     `<div class="site-header__inner">` +
     `<a class="brand" href="/">` +
-    `<span class="brand__mark" aria-hidden="true">北</span>` +
+    `<img class="brand__logo" src="/img/school-logo.png" alt="北方民族大学校徽" width="28" height="25" />` +
     `<span class="brand__text">北名大小助手</span>` +
     `<span class="brand__tag">赛道 17</span>` +
     `</a>` +
@@ -362,6 +362,17 @@ export function mountNav(opts = {}) {
     document.body.insertBefore(host, document.body.firstChild);
   }
 
+  // 点「品牌」或「当前页」不再重复加载（用户反馈：点了没反应才对，不该重新弹一下）
+  host.querySelectorAll("a[href]").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      try {
+        const target = new URL(a.getAttribute("href"), location.href).pathname.replace(/\/+$/, "") || "/";
+        const here = location.pathname.replace(/\/+$/, "") || "/";
+        if (target === here) { e.preventDefault(); a.blur(); }
+      } catch { /* 非普通路径：交给浏览器 */ }
+    });
+  });
+
   // 当前页高亮后再兜一层：非 JS 场景（直接在 HTML 里写死链接）也不会错
   host.querySelectorAll(".nav-link").forEach((a) => {
     if (a.dataset.nav === activeId) a.setAttribute("aria-current", "page");
@@ -375,6 +386,8 @@ export function mountNav(opts = {}) {
 
   try {
     // B7/B11：滚动揭示 + 标语逐词（走共享层，六个页面共用，各页不用改）
+    // 右上角调色盘（色调 / 圆角 / 背景），选择存 localStorage
+    import("/js/theme.js").then((t) => t.initTheme?.()).catch(() => {});
     import("/js/ui.js")
       .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); })
       .catch(() => {});   // 环境不支持 IntersectionObserver 时静默降级

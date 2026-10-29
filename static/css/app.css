@@ -2152,13 +2152,141 @@ p, li, .card__desc, .lead { text-wrap: pretty; }
 
 /* ---------- B10：跳到主要内容（键盘用户） ---------- */
 .skip-link {
-  position: absolute; left: 50%; transform: translateX(-50%) translateY(-120%);
-  background: var(--color-primary); color: #fff; padding: 8px 16px; border-radius: 0 0 8px 8px;
-  font-size: 14px; text-decoration: none; z-index: 100; transition: transform var(--dur-color) var(--ease);
+  position: fixed; top: 8px; left: 8px; z-index: 200;
+  background: var(--color-primary); color: #fff; padding: 8px 12px; border-radius: 8px;
+  font-size: 14px; text-decoration: none;
+  clip-path: inset(50%);                    /* 不聚焦时完全隐形，不挡导航 */
+  transition: clip-path var(--dur-color) var(--ease);
 }
-.skip-link:focus { transform: translateX(-50%) translateY(0); }
+.skip-link:focus, .skip-link:focus-visible { clip-path: none; }
 
 /* ---------- B10：页脚法律与来源链接 ---------- */
 .site-footer__legal { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; }
 .site-footer__legal a { color: var(--color-muted); text-decoration: none; }
 .site-footer__legal a:hover { color: var(--color-primary); text-decoration: underline; }
+
+/* ---------- 品牌校徽 ---------- */
+.brand__logo { width: 28px; height: auto; display: block; flex: 0 0 auto; }
+
+/* ---------- 蓝底 callout 里的文字提亮（原来是暗灰，观感差） ---------- */
+.section--callout, .section--callout .section__title { color: #fff; }
+.section--callout p, .section--callout li, .section--callout .muted { color: rgba(255, 255, 255, 0.88); }
+.section--callout a { color: #fff; text-decoration: underline; text-decoration-color: rgba(255,255,255,.5); }
+.section--callout code.inline, .section--callout .kbd { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.28); }
+.section--callout .btn--light { background: #fff; color: var(--color-primary); }
+
+/* ---------- B11 标语：字号收到 36px，行宽放开到 880px，避免大字号挤成难看的断行 ---------- */
+.tagline { padding: 64px 0 48px; }
+.tagline p { font-size: 36px; line-height: 1.3; max-width: 880px; }
+.tagline .w { margin-inline-end: 8px; }
+@media (max-width: 768px) { .tagline p { font-size: 24px; } }
+
+/* ---------- 地图：整幅布局 + 缩放控件（滑块方便手机端） ---------- */
+.layout--full { display: block; }
+.layout--full .map-card { width: 100%; }
+.map-wrap { touch-action: pan-y; }
+.map-zoom {
+  position: absolute; left: 10px; bottom: 10px; z-index: 7;
+  display: flex; align-items: center; gap: 8px;
+  background: rgba(255, 255, 255, 0.94); border: 1px solid rgba(31, 78, 140, 0.18);
+  border-radius: 9999px; padding: 4px 10px; box-shadow: 0 3px 12px rgba(16, 24, 40, 0.16);
+  backdrop-filter: blur(6px);
+}
+.map-zoom__btn {
+  width: 28px; height: 28px; border: 0; border-radius: 9999px; cursor: pointer;
+  background: var(--color-primary-soft); color: var(--color-primary); font-size: 18px; line-height: 1;
+}
+.map-zoom__btn:hover { background: rgba(31, 78, 140, 0.18); }
+.map-zoom__range { width: 120px; accent-color: var(--color-primary); cursor: pointer; }
+.map-zoom__val { font-size: 12px; color: var(--color-muted); min-width: 40px; text-align: right; }
+@media (max-width: 640px) {
+  .map-zoom { left: 8px; right: 8px; bottom: 8px; justify-content: space-between; }
+  .map-zoom__range { width: auto; flex: 1 1 auto; }
+}
+
+/* =============================================================================
+   ★ 主题与氛围系统（2026-10-29）—— 右上角调色盘，用户自己调色调 / 圆角 / 背景
+     只覆盖 CSS 变量，不动结构；⛔ 背景纹理是本站本地图片，不引外链
+   ============================================================================= */
+:root {
+  --radius-card: var(--r-lg, 12px);
+  --bg-image: url("/img/bg-campus-soft.jpg");
+  --bg-texture-opacity: 0.5;
+}
+/* ---- 色调预设 ---- */
+html[data-theme="teal"] {
+  --color-primary: #0e7c7b; --color-primary-dark: #0a5f5e; --color-primary-soft: rgba(14, 124, 123, 0.1);
+  --color-primary-line: rgba(14, 124, 123, 0.24); --color-accent: #2e8b76;
+  --brand-flat: #0e7c7b; --btn-flat: #0e7c7b;
+}
+html[data-theme="amber"] {
+  --color-primary: #c05621; --color-primary-dark: #9c3f12; --color-primary-soft: rgba(192, 86, 33, 0.1);
+  --color-primary-line: rgba(192, 86, 33, 0.26); --color-accent: #e08c1b;
+  --brand-flat: #b4531f; --btn-flat: #c05621;
+}
+html[data-theme="violet"] {
+  --color-primary: #6a4df0; --color-primary-dark: #5338d6; --color-primary-soft: rgba(106, 77, 240, 0.1);
+  --color-primary-line: rgba(106, 77, 240, 0.24); --color-accent: #8b5cf6;
+  --brand-flat: #5b45d6; --btn-flat: #6a4df0;
+}
+html[data-theme="morandi"] {
+  --color-primary: #6b7280; --color-primary-dark: #4b5563; --color-primary-soft: rgba(107, 114, 128, 0.1);
+  --color-primary-line: rgba(107, 114, 128, 0.24); --color-accent: #7c8b76;
+  --brand-flat: #5f6672; --btn-flat: #6b7280;
+}
+/* ---- 圆角预设 ---- */
+html[data-radius="sm"] { --radius-card: 6px; --radius-lg: 8px; --radius-md: 6px; --radius-sm: 4px; --r-lg: 8px; --r-xl: 12px; --r-2xl: 16px; }
+html[data-radius="md"] { --radius-card: 12px; --r-lg: 12px; --r-xl: 16px; --r-2xl: 24px; }
+html[data-radius="lg"] { --radius-card: 20px; --radius-lg: 20px; --radius-md: 16px; --radius-sm: 12px; --r-lg: 20px; --r-xl: 24px; --r-2xl: 32px; }
+/* ---- 背景：纯色 / 校园纹理 ---- */
+html[data-bg="plain"] body { background-image: none; }
+html[data-bg="texture"] body {
+  background-image: var(--bg-image);
+  background-repeat: repeat;
+  background-size: 640px 640px;
+  background-attachment: fixed;
+}
+html[data-bg="texture"] .page { position: relative; }
+/* 纹理上压一层浅色，保证正文对比度（规范 B4：文字必须压得住背景） */
+html[data-bg="texture"] body::before {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background: rgba(247, 249, 252, var(--bg-texture-opacity));
+}
+body > * { position: relative; z-index: 1; }
+
+/* ---- 调色盘（右上角，floating） ---- */
+.palette { position: fixed; top: 12px; right: 16px; z-index: 45; }
+.palette__toggle {
+  width: 40px; height: 40px; border-radius: 9999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.86); border: 1px solid rgba(31, 78, 140, 0.16);
+  color: var(--color-primary); box-shadow: 0 8px 24px -12px rgba(16, 24, 40, 0.32);
+  backdrop-filter: blur(10px); transition: background var(--dur-color) var(--ease), transform 200ms var(--ease);
+}
+.palette__toggle:hover { background: #fff; }
+.palette__toggle:active { transform: scale(0.94); }
+.palette__panel {
+  position: absolute; top: 48px; right: 0; width: 268px; padding: 16px;
+  background: rgba(255, 255, 255, 0.96); border: 1px solid var(--color-primary-line);
+  border-radius: var(--radius-card); box-shadow: var(--shadow-lift);
+  backdrop-filter: blur(14px);
+}
+.palette__panel[hidden] { display: none; }
+.palette__head { margin: 0 0 12px; font-size: 14px; font-weight: 600; color: var(--color-text); }
+.palette__row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.palette__label { font-size: 12px; color: var(--color-muted); flex: 0 0 32px; }
+.palette__opts { display: flex; gap: 8px; flex-wrap: wrap; }
+.palette__opt {
+  min-width: 32px; height: 28px; padding: 0 8px; cursor: pointer; font-family: inherit;
+  border: 1px solid var(--color-primary-line); border-radius: 9999px; background: #fff;
+  color: var(--color-text); font-size: 12px;
+  transition: border-color var(--dur-color) var(--ease), background var(--dur-color) var(--ease);
+}
+.palette__opt.is-on { border-color: var(--color-primary); box-shadow: 0 0 0 2px var(--color-primary-soft); }
+.palette__opt.palette__dot { min-width: 24px; height: 24px; padding: 0; border-radius: 9999px; }
+.palette__reset {
+  width: 100%; height: 32px; margin-top: 4px; cursor: pointer; font-family: inherit;
+  background: var(--color-primary-soft); color: var(--color-primary);
+  border: 1px solid var(--color-primary-line); border-radius: var(--radius-card); font-size: 13px;
+}
+@media (max-width: 768px) { .palette { top: 8px; right: 8px; } .palette__panel { width: 248px; } }

@@ -158,9 +158,10 @@
     <button class="chip" data-cat="teaching">教学与自习</button>
     <button class="chip" data-cat="gate">校门</button>
     <button class="chip" data-cat="service">服务设施</button>
+    <button class="chip" id="chip3d" data-cat="__3d">3D 实景</button>
   </div>
 
-  <div class="layout">
+  <div class="layout layout--full">
     <div class="map-card">
       <!-- ⭐ 地图 + 浮在地图上的功能按键（视图切换 / 点位列表 / 在线地图） -->
       <div class="map-stage" id="mapStage">
@@ -172,7 +173,15 @@
           <div id="amapCanvas"></div>
         </div>
 
-        <div class="map-hud">
+        <div class="map-zoom" role="group" aria-label="地图缩放">
+        <button class="map-zoom__btn" id="zoomOut" type="button" aria-label="缩小">−</button>
+        <input class="map-zoom__range" id="zoomRange" type="range" min="100" max="320" value="100"
+               step="5" aria-label="缩放比例" />
+        <button class="map-zoom__btn" id="zoomIn" type="button" aria-label="放大">+</button>
+        <span class="map-zoom__val" id="zoomVal">100%</span>
+      </div>
+
+      <div class="map-hud">
           <div class="segmented" id="viewSeg" role="group" aria-label="地图视图切换">
             <button class="segmented__btn" id="vShot" data-view="shot" type="button" aria-pressed="true">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/map.svg)"></span>示意图
@@ -188,8 +197,8 @@
             <button class="map-hud__btn" id="openList" type="button">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>点位列表
             </button>
-            <button class="map-hud__btn" id="openAmap" type="button" hidden>
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/external-link.svg)"></span>在线地图
+            <button class="map-hud__btn" id="openAmap" type="button">
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sun.svg)"></span>卫星图
             </button>
           </div>
         </div>
@@ -200,11 +209,6 @@
       <p class="source" id="source"></p>
     </div>
 
-    <aside class="panel" id="panel">
-      <h2>选一个地点</h2>
-      <p class="desc">地图上每个圆点都是一个位置。点一下看它的说明；有实景的点位可以直接<b>进入 3D 街景</b>走一圈。</p>
-      <p id="summary" class="desc" style="color:var(--muted);font-size:13px"></p>
-    </aside>
   </div>
 </main>
 
@@ -371,7 +375,7 @@ function renderMarkers() {
     btn.innerHTML = '<span class="dot"></span><span class="tag">' + esc(n.label) +
       (hasPano ? ' · 实景' : '') + '</span>';
     btn.setAttribute("aria-label", n.label + "（" + catLabel(n.category) + "）");
-    btn.hidden = Boolean(filter) && n.category !== filter;
+    btn.hidden = filter === "__3d" ? !sceneOf(n) : (Boolean(filter) && n.category !== filter);
     btn.addEventListener("click", () => selectNode(n.id));
     wrap.appendChild(btn);
   }
@@ -386,23 +390,8 @@ function selectNode(id) {
     el.setAttribute("aria-current", el.dataset.id === id ? "true" : "false");
   });
   const scene = sceneOf(n);
-  const hasScenes = Object.keys(MANIFEST.scenes || {}).length > 0;
-  $("#panel").innerHTML = [
-    '<h2>' + esc(n.label) + '</h2>',
-    '<div><span class="badge">' + esc(catLabel(n.category)) + '</span>' +
-      '<span class="badge ' + (scene ? "pano-on" : "pano-off") + '">' +
-      (scene ? "有 360° 实景" : "暂无实景") + '</span></div>',
-    '<p class="desc">' + esc(n.desc || "（暂无位置描述）") + '</p>',
-    scene
-      ? '<button class="btn" id="openStreet" type="button">' +
-        '<span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/walk.svg)"></span> 进入 3D 街景</button>'
-      : (hasScenes
-          ? '<p class="notice notice--warn">该点暂无实景，以下是位置描述 —— 我们不会拿别的图糊弄你。' +
-            '已拍好的点位可以在地图右上角「3D 街景」里看。</p>'
-          : '<p class="notice notice--warn">实景素材还在路上：点右上角「3D 街景」可以看到查看器与占位说明。</p>')
-  ].join("");
-  const open = $("#openStreet");
-  if (open) open.addEventListener("click", () => enterStreet(id));
+  if (scene) return enterStreet(id);                    // 有实景：直接进 3D 街景
+  toast("「" + n.label + "」暂无 360 实景素材，不拿别的图冒充实景", "danger");
 }
 
 /** 搜索栏/地图上的旧入口保留：直接进 3D 街景查看器 */
@@ -419,9 +408,17 @@ $("#amapClose").addEventListener("click", () => {
 $("#chips").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
-  filter = chip.dataset.cat || "";
+  const cat = chip.dataset.cat || "";
   document.querySelectorAll(".chip").forEach((c) =>
     c.setAttribute("aria-pressed", c === chip ? "true" : "false"));
+  // ⭐ "3D 实景"是一栏分类：选中它就只显示有实景的点位，并直接打开街景查看器
+  if (cat === "__3d") {
+    filter = "__3d";
+    renderMarkers();
+    enterStreet();
+    return;
+  }
+  filter = cat;
   renderMarkers();
 });
 
@@ -647,6 +644,10 @@ function openStreetScene(sceneId) {
       scenes,
       autoLoad: true,
       showControls: true,
+      // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
+      minPitch: -18, maxPitch: 18, pitch: 0,
+      hfov: 100, minHfov: 60, maxHfov: 120,
+      compass: false,
     });
   } catch (e) {
     streetViewer = null;
@@ -692,6 +693,62 @@ function closeStreet() {
   $("#panoOverlay").classList.remove("on");
 }
 
+
+/* ---------- 示意图底图缩放与平移（滑块 / 滚轮 / 拖动 / 双指） ---------- */
+const zoomState = { z: 1, x: 0, y: 0, dragging: false, sx: 0, sy: 0 };
+function applyZoom() {
+  const wrap = $("#mapWrap");
+  if (!wrap) return;
+  wrap.style.transformOrigin = "0 0";
+  wrap.style.transform = "translate(" + zoomState.x + "px," + zoomState.y + "px) scale(" + zoomState.z + ")";
+  // 标记反向缩放，避免放大后图标变得巨大
+  wrap.querySelectorAll(".marker").forEach((m) => {
+    m.style.transform = "translate(-50%, -100%) scale(" + (1 / zoomState.z) + ")";
+  });
+  const val = $("#zoomVal");
+  if (val) val.textContent = Math.round(zoomState.z * 100) + "%";
+  const rng = $("#zoomRange");
+  if (rng) rng.value = String(Math.round(zoomState.z * 100));
+}
+function setZoom(z, cx, cy) {
+  const next = Math.min(3.2, Math.max(1, z));
+  const wrap = $("#mapWrap");
+  if (cx != null && wrap) {                     // 以光标为中心缩放
+    const r = wrap.getBoundingClientRect();
+    const k = next / zoomState.z;
+    zoomState.x -= (cx - r.left) * (k - 1);
+    zoomState.y -= (cy - r.top) * (k - 1);
+  }
+  zoomState.z = next;
+  if (next === 1) { zoomState.x = 0; zoomState.y = 0; }
+  applyZoom();
+}
+function setupMapZoom() {
+  const wrap = $("#mapWrap");
+  const rng = $("#zoomRange");
+  if (!wrap) return;
+  $("#zoomIn")?.addEventListener("click", () => setZoom(zoomState.z + 0.3));
+  $("#zoomOut")?.addEventListener("click", () => setZoom(zoomState.z - 0.3));
+  rng?.addEventListener("input", () => setZoom(Number(rng.value) / 100));
+  wrap.addEventListener("wheel", (e) => {                 // 滚轮缩放（桌面）
+    if (!e.ctrlKey && zoomState.z === 1) return;          // 未放大时不抢页面滚动
+    e.preventDefault();
+    setZoom(zoomState.z + (e.deltaY < 0 ? 0.15 : -0.15), e.clientX, e.clientY);
+  }, { passive: false });
+  wrap.addEventListener("pointerdown", (e) => {           // 拖动平移（放大后才有意义）
+    if (zoomState.z <= 1 || e.target.closest(".marker") || e.target.closest(".map-hud")) return;
+    zoomState.dragging = true; zoomState.sx = e.clientX - zoomState.x; zoomState.sy = e.clientY - zoomState.y;
+    wrap.setPointerCapture?.(e.pointerId);
+  });
+  wrap.addEventListener("pointermove", (e) => {
+    if (!zoomState.dragging) return;
+    zoomState.x = e.clientX - zoomState.sx; zoomState.y = e.clientY - zoomState.sy;
+    applyZoom();
+  });
+  wrap.addEventListener("pointerup", () => { zoomState.dragging = false; });
+  wrap.addEventListener("pointercancel", () => { zoomState.dragging = false; });
+}
+
 (async function init() {
   const [nodes, bg, manifest] = await Promise.all([
     getApiData("/api/map/nodes", []),          // ⚠️ 走信封解包，不能再直接当数组
@@ -702,7 +759,23 @@ function closeStreet() {
   BG = Object.assign(BG, bg || {});
   MANIFEST = Object.assign(MANIFEST, manifest || {});
   if (BG.image) $("#baseImg").src = BG.image;
+
+  // ⭐ 人工标注（/tools/annotate.html 导出后放到 static/map/annotations.json 即生效，无需改代码）
+  const anno = await getJson("/map/annotations.json", null);
+  if (anno && Array.isArray(anno.points)) {
+    for (const p of anno.points) {
+      const id = p.id || ("anno-" + Math.random().toString(36).slice(2, 8));
+      if (BG.points && typeof p.x_pct === "number") BG.points[id] = { x_pct: p.x_pct, y_pct: p.y_pct };
+      if (!NODES.some((n) => n.id === id)) {
+        NODES.push({
+          id, label: p.note || "人工标注", category: p.category || "service",
+          color: p.color || "", desc: p.note || "", lat: 0, lng: 0,
+        });
+      }
+    }
+  }
   setupMapHud();
+  setupMapZoom();
   // ⚠️ 口径：有实景 = 该节点能通过 pano_url 关联到 manifest 里的场景（不是拿节点 id 去猜场景 id）
   const panoCount = NODES.filter((n) => Boolean(sceneOf(n))).length;
   $("#source").textContent = (BG.attribution || "底图为示意截图，非在线地图服务") +
@@ -710,9 +783,9 @@ function closeStreet() {
   renderMarkers();
   window.addEventListener("resize", avoidLabelOverlap); // 底图变宽 / 变窄后重算标签车道
   setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
-  $("#summary").textContent = NODES.length
-    ? "点位类别：" + [...new Set(NODES.map((n) => catLabel(n.category)))].join(" / ")
-    : "节点数据未加载（后端 /api/map/nodes 未就绪？先跑 npm run seed）";
+  // 面板已下线：类别概览并进底图来源那一行
+  const cats = [...new Set(NODES.map((n) => catLabel(n.category)))].join(" / ");
+  $("#source").textContent += cats ? "　·　类别：" + cats : "";
 })();
 </script>
 <footer class="site-footer" style="margin-top:32px">

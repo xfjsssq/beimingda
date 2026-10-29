@@ -199,12 +199,7 @@ export default {
 /** 图标元素：用 CSS mask 着色，随父级文字颜色变化（一个 svg 文件适配所有场景） */
 /** 已本地化的图标名（static/vendor/phosphor/icons/*.svg）。列表外的名字一律当普通文字渲染，兼容旧调用。 */
 export const ICON_NAMES = new Set([
-  "package","users","map-pin","calendar-event","robot","plug-connected","list-check","wand",
-  "message-chatbot","tools","shield-check","copy","check","x","chevron-right","chevron-down",
-  "plus","pencil","trash","clock","building-community","school","book","walk","truck-delivery",
-  "bolt","sparkles","external-link","refresh","search","send","user","info-circle",
-  "alert-triangle","circle-check","arrow-right","map","route","device-mobile","key","lock",
-  "clipboard-text","chart-bar","sun","moon",
+  "package", "users", "map-pin", "calendar-event", "robot", "plug-connected", "list-check", "wand", "message-chatbot", "tools", "shield-check", "copy", "check", "x", "chevron-right", "chevron-down", "plus", "pencil", "trash", "clock", "building-community", "school", "book", "walk", "truck-delivery", "bolt", "sparkles", "external-link", "refresh", "search", "send", "user", "info-circle", "alert-triangle", "circle-check", "arrow-right", "map", "route", "device-mobile", "key", "lock", "clipboard-text", "chart-bar", "sun", "moon", "palette", "paint-brush", "download-simple", "upload-simple", "eraser", "sliders-horizontal", "eye", "eye-slash", "text-t", "circle", "arrows-out", "magnifying-glass-plus", "magnifying-glass-minus", "crosshair", "drop", "tag", "star", "heart", "flag", "note-pencil", "selection", "hand-pointing", "dots-three-vertical", "caret-up", "arrow-clockwise", "share-network", "chart-line-up", "users-three", "queue", "lightbulb", "note",
 ]);
 
 /** 三态里的装饰图标：认识的名字给 .icon（可着色），不认识的（例如历史遗留的 emoji）原样当文字 */
