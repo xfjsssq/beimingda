@@ -27,12 +27,18 @@ const RADII = [
   { id: "lg", label: "大圆角" },
 ];
 
+const FONTS = [
+  { id: "tight", label: "紧凑" },
+  { id: "normal", label: "标准" },
+  { id: "loose", label: "宽松" },
+];
+
 const BGS = [
   { id: "plain", label: "纯色" },
   { id: "texture", label: "校园纹理" },
 ];
 
-const DEFAULTS = { tone: "campus", radius: "md", bg: "texture" };
+const DEFAULTS = { tone: "campus", radius: "md", bg: "texture", font: "normal" };
 
 function load() {
   try {
@@ -56,6 +62,7 @@ export function applyTheme(state) {
   root.dataset.theme = state.tone;
   root.dataset.radius = state.radius;
   root.dataset.bg = state.bg;
+  root.dataset.font = state.font;
   root.style.colorScheme = "light";
 }
 
@@ -126,6 +133,9 @@ export function initTheme(opts = {}) {
     );
     panel.appendChild(
       row("背景", BGS, state.bg, (id) => { state = { ...state, bg: id }; commit(); }),
+    );
+    panel.appendChild(
+      row("字体", FONTS, state.font, (id) => { state = { ...state, font: id }; commit(); }),
     );
     const reset = document.createElement("button");
     reset.type = "button";

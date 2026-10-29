@@ -2344,3 +2344,36 @@ body > * { position: relative; z-index: 1; }
 .cta-final .btn--ghost { background: rgba(255, 255, 255, 0.14); color: #fff; border-color: rgba(255, 255, 255, 0.4); }
 .cta-final .btn--ghost:hover { background: rgba(255, 255, 255, 0.24); }
 @media (max-width: 768px) { .cta-final__inner { padding: 24px; } .cta-final__title { font-size: 20px; } }
+
+/* =============================================================================
+   ★ 渐变与氛围（2026-10-29 · 用户要求"各种渐变效果都弄一弄"）
+     说明：设计技能 B4 要求背景平面，但用户明确要求加渐变 —— 按"用户指令优先"处理：
+     渐变只用在 **大面积色块 / 强调块 / 图标底托**，正文字号区域继续保持高对比度。
+   ============================================================================= */
+.hero { background: linear-gradient(135deg, #143a6b 0%, var(--brand-flat) 48%, #2a6b96 100%); }
+.section--callout { background: linear-gradient(135deg, #1b4a86 0%, var(--brand-flat) 55%, #2e7a94 100%); }
+.cta-final__inner { background: linear-gradient(135deg, #143a6b 0%, var(--brand-flat) 52%, #2e7a94 100%); }
+.icon-tile { background: linear-gradient(140deg, var(--color-primary-soft) 0%, rgba(46, 139, 118, 0.14) 100%); }
+.card { position: relative; }
+.card::after {                       /* 卡片顶部一道极淡的品牌渐变线，制造层次 */
+  content: ""; position: absolute; inset: 0 0 auto; height: 2px; border-radius: var(--radius-card) var(--radius-card) 0 0;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-accent) 60%, transparent);
+  opacity: 0.5; pointer-events: none;
+}
+.btn { background: linear-gradient(180deg, color-mix(in srgb, var(--btn-flat) 88%, white) 0%, var(--btn-flat) 100%); }
+.chip[aria-pressed="true"] { background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 88%, white) 0%, var(--color-primary) 100%); }
+.segmented__btn[aria-pressed="true"] { background: linear-gradient(180deg, color-mix(in srgb, var(--color-primary) 90%, white) 0%, var(--color-primary) 100%); }
+/* 统计条 / 数字用渐变文字强调（技能 B5 允许的文字渐变用法） */
+.stat__value, .card__stat { background: linear-gradient(120deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+/* 页脚上方一条柔和渐变分隔，收住整页 */
+.site-footer { border-top: 1px solid var(--color-line);
+  background-image: linear-gradient(180deg, rgba(31, 78, 140, 0.04), transparent 60%); }
+
+/* ---------- 字体风格档位（用户："什么字体风格，都可以考虑考虑"） ---------- */
+:root { --font-tracking: 0; --body-leading: 1.7; }
+html[data-font="tight"] { --font-tracking: -0.01em; --body-leading: 1.6; }
+html[data-font="normal"] { --font-tracking: 0; --body-leading: 1.7; }
+html[data-font="loose"] { --font-tracking: 0.02em; --body-leading: 1.9; }
+body { letter-spacing: var(--font-tracking); }
+p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
