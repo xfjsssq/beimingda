@@ -1,5 +1,84 @@
 {
-  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 场景由 feat/m3-welcome 分支补齐，图片放 pano/ 并压到单张 ≤2MB。",
-  "default": { "firstScene": "dorm-12", "sceneFadeDuration": 800 },
-  "scenes": {}
+  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py）。",
+  "_note_attach": "把某个场景挂到校园点位上：在 config/map-nodes.json 里给该节点写 pano_url=\"/pano/pano-N.jpg\"、pano_yaw=<朝向>，页面就会在详情里给出「进入 3D 街景」。",
+  "default": {
+    "firstScene": "pano-1",
+    "sceneFadeDuration": 800,
+    "autoLoad": true,
+    "showControls": true
+  },
+  "scenes": {
+    "pano-1": {
+      "panorama": "/pano/pano-1.jpg",
+      "title": "明湖实景 1（原第一点位素材）",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-2"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-3"
+        }
+      ]
+    },
+    "pano-2": {
+      "panorama": "/pano/pano-2.jpg",
+      "title": "明湖实景 2（原第二点位素材）",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-3"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-1"
+        }
+      ]
+    },
+    "pano-3": {
+      "panorama": "/pano/pano-3.jpg",
+      "title": "明湖实景 3（原第三点位素材）",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-1"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-2"
+        }
+      ]
+    }
+  }
 }

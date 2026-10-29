@@ -1,0 +1,38 @@
+[
+  {
+    "point": "第一点位",
+    "file": "pano-1.jpg",
+    "eq_size": "6000x3000",
+    "ratio": 2.0,
+    "mb": 0.81,
+    "connected": false,
+    "ncc": 0.221,
+    "overlap_px": 60,
+    "overlap_pct": 1.2,
+    "seam_x": 4828
+  },
+  {
+    "point": "第二点位",
+    "file": "pano-2.jpg",
+    "eq_size": "6000x3000",
+    "ratio": 2.0,
+    "mb": 0.89,
+    "connected": true,
+    "ncc": 0.709,
+    "overlap_px": 1692,
+    "overlap_pct": 33.0,
+    "seam_x": 3436
+  },
+  {
+    "point": "第三点位",
+    "file": "pano-3.jpg",
+    "eq_size": "6000x3000",
+    "ratio": 2.0,
+    "mb": 0.92,
+    "connected": true,
+    "ncc": 0.957,
+    "overlap_px": 1603,
+    "overlap_pct": 33.4,
+    "seam_x": 3190
+  }
+]

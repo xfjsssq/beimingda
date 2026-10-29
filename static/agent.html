@@ -3,97 +3,431 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="北名大小助手 · MCP 接入页：把平台能力通过远程 Streamable HTTP MCP 开放给 WorkBuddy，用对话即可操控整个平台。" />
-  <title>接入 Agent · 把整个平台交给一句话 · 北名大小助手</title>
+  <meta name="description" content="北名大小助手 · MCP 接入页（分栏式）：一键配置 / 手动接入 / 使用示例 / MCP 工具 / 合规声明 —— 把平台能力通过远程 Streamable HTTP MCP 开放给 WorkBuddy。" />
+  <title>接入 Agent：把整个平台交给一句话</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    /* ===================================================================
+       本页专用微调（只写在这一页里，不改共享层 /css/app.css）
+       目标：把「一屏塞满」拆成 5 个分栏，窄屏单列不破版
+       =================================================================== */
+
+    .hero__body { min-width: 0; }
+
+    /* hero 里的次要按钮：深色渐变底上的透明描边版 */
+    .hero .btn--outline {
+      background: rgba(255, 255, 255, .12);
+      color: #fff;
+      border-color: rgba(255, 255, 255, .44);
+      box-shadow: none;
+    }
+    .hero .btn--outline:hover { background: rgba(255, 255, 255, .2); color: #fff; }
+
+    /* ---- 顶部极简「三步接入」概览 ---- */
+    .quick-steps {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px; margin-bottom: 18px;
+    }
+    .quick-step {
+      display: flex; align-items: flex-start; gap: 11px; min-width: 0;
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 12px 13px;
+    }
+    .quick-step b { display: block; font-size: 13.5px; color: var(--color-text); }
+    .quick-step__note { display: block; margin-top: 2px; font-size: 12px; color: var(--color-muted); line-height: 1.6; }
+
+    /* ---- 复制成功的一瞬间反馈 ---- */
+    .btn[data-copied="1"] {
+      background: var(--color-accent);
+      color: #fff;
+      border-color: var(--color-accent);
+    }
+
+    /* ---- 分栏外壳 ---- */
+    .tabpanel { min-width: 0; }
+    .panel-card {
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card); padding: 18px 20px;
+    }
+
+    /* ---- 一键配置：左右两栏（窄屏单列） ---- */
+    .cfg-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 20px; align-items: start; }
+    .cfg-grid > * { min-width: 0; }
+
+    .mini-title {
+      display: flex; align-items: center; gap: 7px;
+      margin: 18px 0 8px; font-size: 13.5px; font-weight: 600; color: var(--color-primary);
+    }
+
+    /* ---- 三步走：图标步骤 ---- */
+    .icon-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .icon-steps li { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--color-text-soft); line-height: 1.6; }
+    .icon-steps .icon-tile { width: 34px; height: 34px; border-radius: 10px; }
+    .icon-steps b { color: var(--color-text); }
+
+    /* ---- 手动接入：折叠步骤卡 ---- */
+    .step__body { flex: 1 1 auto; min-width: 0; }
+    .fold { width: 100%; border: 1px solid var(--color-line); border-radius: 12px; background: var(--color-sunken); }
+    .fold > summary {
+      display: flex; align-items: center; gap: 9px; cursor: pointer;
+      padding: 10px 12px; font-size: 13.5px; font-weight: 600; color: var(--color-text);
+      list-style: none;
+    }
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold__chev { margin-left: auto; color: var(--color-muted); transition: transform .16s; }
+    .fold[open] .fold__chev { transform: rotate(180deg); }
+    .fold__body { padding: 0 12px 12px 42px; font-size: 13px; color: var(--color-muted); line-height: 1.7; }
+    .fold__body code.inline { font-size: 12.5px; }
+
+    /* ---- 使用示例 ---- */
+    .dialog-item__text { margin: 0; overflow-wrap: anywhere; }
+    .dialog-item__meta { margin-top: 8px; }
+    .dialog-item .btn { margin-top: 9px; }
+
+    /* ---- 工具清单 ---- */
+    .tool-grid { grid-template-columns: repeat(auto-fit, minmax(268px, 1fr)); }
+    /* 长工具名不要被挤成逐字竖排：名称独占一行且不换行，说明另起一行 */
+    #tool-groups .tool-row { flex-wrap: wrap; }
+    #tool-groups .tool-row__name { flex: 0 0 auto; white-space: nowrap; overflow-wrap: normal; }
+    #tool-groups .tool-row__desc { flex: 1 1 100%; margin-left: 17px; }
+
+    /* ---- 合规声明 ---- */
+    .rules { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 10px; }
+    .rule {
+      display: flex; align-items: flex-start; gap: 11px;
+      background: var(--color-sunken); border: 1px solid var(--color-line);
+      border-radius: 12px; padding: 11px 13px;
+    }
+    .rule .icon-tile { width: 36px; height: 36px; border-radius: 11px; }
+    .rule b { display: block; font-size: 13.5px; color: var(--color-text); }
+    .rule p { margin: 2px 0 0; font-size: 12.5px; color: var(--color-muted); line-height: 1.7; }
+
+    /* ---- 窄屏：统一单列 ---- */
+    @media (max-width: 880px) {
+      .cfg-grid { grid-template-columns: 1fr; gap: 14px; }
+    }
+    @media (max-width: 768px) {
+      .panel-card { padding: 14px 13px; }
+      .tabs { border-radius: 12px; }
+      .tab { padding: 8px 12px; font-size: 13px; }
+    }
+    @media (max-width: 760px) {
+      .quick-steps { grid-template-columns: 1fr; }
+    }
+  </style>
+  <meta property="og:title" content="接入 Agent：把整个平台交给一句话" />
+  <meta property="og:description" content="远程 Streamable HTTP MCP，零配置接入 WorkBuddy；复制一段 JSON 就能用 14 个工具操控平台。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-  <!-- 页头导航由 /js/nav.js 注入 -->
-  <main class="page">
+  <a class="skip-link" href="#main">跳到主要内容</a>
+<!-- 页头导航由 /js/nav.js 注入 -->
+  <main class="page" id="main">
 
-    <!-- ============ 区块一 · 一句话说明 ============ -->
-    <section class="hero" aria-labelledby="block1-title">
-      <h1 id="block1-title">把整个平台，交给一句话</h1>
-      <p class="lead">
-        北名大小助手把代取、搭子、导览、日程四件事做成了平台，同时把<b>平台能力通过 MCP
-        （远程 Streamable HTTP）开放给 WorkBuddy</b>：
-        <b>用对话即可操控整个平台</b> —— 不用装 App、不用记网址、不用点按钮，
-        在 WorkBuddy 里接一次，之后说话就行。
-      </p>
-      <div class="hero__tags">
-        <span class="hero__tag">远程 URL 型 · 零配置接入</span>
-        <span class="hero__tag" id="tool-count-badge">14 个 MCP 工具</span>
-        <span class="hero__tag">无本地 stdio · 无 SSE 长连接</span>
+    <!-- ============ 区块一 · Hero（左文右图） ============ -->
+    <section class="hero hero--split" aria-labelledby="block1-title">
+      <div class="hero__body">
+        <p class="hero__eyebrow">银移杯赛道 17 · 智慧校园 Agent</p>
+        <h1 class="hero__title" id="block1-title">把整个平台，交给一句话</h1>
+        <p class="lead hero__lead">
+          北名大小助手把代取、搭子、导览、日程四件事做成了平台，同时把<b>平台能力通过 MCP
+          （远程 Streamable HTTP）开放给 WorkBuddy</b>：
+          <b>用对话即可操控整个平台</b> —— 不用装 App、不用记网址、不用点按钮，
+          在 WorkBuddy 里接一次，之后说话就行。
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn--light" href="#p-oneclick" data-goto="p-oneclick">
+            <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/bolt.svg)"></span>一键配置
+          </a>
+          <a class="btn btn--outline" href="#p-examples" data-goto="p-examples">
+            <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>看看能怎么说
+          </a>
+        </div>
+        <div class="hero__tags">
+          <span class="hero__tag" id="tool-count-badge">14 个 MCP 工具</span>
+          <span class="hero__tag">远程 URL 型 · 零本地依赖</span>
+          <span class="hero__tag">无 stdio · 无 SSE 长连接</span>
+        </div>
+      </div>
+      <div class="hero__art">
+        <img src="/img/agent-connect.png" width="751" height="760"
+             alt="机器人（WorkBuddy）与平台服务由一根线连接起来的示意图" />
       </div>
     </section>
 
-    <!-- ============ 区块二 · 一键复制的 MCP 配置 ============ -->
-    <section class="section" aria-labelledby="block2-title">
-      <h2 class="section__title" id="block2-title"><span class="section__index">2</span>一键复制的 MCP 配置</h2>
-      <div class="split">
+    <!-- ============ 顶部极简概览 · 三步接入 ============ -->
+    <section class="quick-steps" aria-label="三步接入概览">
+      <div class="quick-step">
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span></span>
         <div>
-          <p class="section__note" style="margin-top:0">
-            端点：<code class="inline" id="mcp-url">读取中…</code><br />
-            URL 取自<b>当前访问的站点</b>（<code class="inline">location.origin</code>），页面里没有写死任何域名。
-          </p>
-
-          <div class="row" role="group" aria-label="端点地址来源" style="margin-top:12px">
-            <button class="btn btn--quiet btn--sm" type="button" data-mode="origin" aria-pressed="true">当前站点地址</button>
-            <button class="btn btn--quiet btn--sm" type="button" data-mode="site" aria-pressed="false" id="mode-site">正式站点域名</button>
-          </div>
-          <p class="section__note" id="mode-note"></p>
-
-          <ul class="hint-list" id="token-notes"></ul>
+          <b>复制配置</b>
+          <span class="quick-step__note">一段合法 JSON，令牌是 <code class="inline">&lt;DEMO_TOKEN&gt;</code> 占位符</span>
         </div>
+      </div>
+      <div class="quick-step">
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span></span>
         <div>
-          <pre class="code" id="mcp-json" style="margin-top:0" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
-          <div class="copy-row">
-            <button class="btn" type="button" id="copy-btn">复制配置</button>
-            <button class="btn btn--ghost btn--sm" type="button" id="download-btn">下载 mcp.json</button>
-            <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
+          <b>粘进 mcp.json</b>
+          <span class="quick-step__note">放进 <code class="inline">~/.workbuddy/mcp.json</code> 的 <code class="inline">mcpServers</code></span>
+        </div>
+      </div>
+      <div class="quick-step">
+        <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></span>
+        <div>
+          <b>重启 + 信任一次</b>
+          <span class="quick-step__note">连接器列表里找到 <code class="inline">beimingda</code> 点一次信任</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 分栏导航 ============ -->
+    <div class="tabs" id="agentTabs" role="tablist" aria-label="Agent 接入分栏">
+      <button class="tab" type="button" role="tab" id="tab-oneclick" aria-controls="p-oneclick"
+              aria-selected="true" data-panel="p-oneclick">
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/bolt.svg)"></span>一键配置
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-manual" aria-controls="p-manual"
+              aria-selected="false" data-panel="p-manual">
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/pencil.svg)"></span>手动接入
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-examples" aria-controls="p-examples"
+              aria-selected="false" data-panel="p-examples">
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>使用示例
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-tools" aria-controls="p-tools"
+              aria-selected="false" data-panel="p-tools">
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>MCP 工具
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-compliance" aria-controls="p-compliance"
+              aria-selected="false" data-panel="p-compliance">
+        <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span>合规声明
+      </button>
+    </div>
+
+    <!-- ============ 分栏 1 · 一键配置（默认） ============ -->
+    <section class="tabpanel" id="p-oneclick" role="tabpanel" tabindex="0" aria-labelledby="tab-oneclick">
+      <div class="panel-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">区块二 · 一键配置</span>
+            <h2 id="block2-title">复制这段 JSON，Agent 就接上了</h2>
+            <p>URL 跟随你正在访问的站点，页面里没有写死任何域名；令牌一律是占位符。</p>
+          </div>
+          <span class="badge badge--muted" id="mode-badge">跟随当前站点</span>
+        </div>
+
+        <div class="cfg-grid">
+          <div>
+            <h3 class="mini-title" style="margin-top:0">
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>端点与环境
+            </h3>
+            <p class="section__note" style="margin-top:0">
+              端点：<code class="inline" id="mcp-url">读取中…</code><br />
+              URL 取自<b>当前访问的站点</b>（<code class="inline">location.origin</code>），页面里没有写死任何域名。
+            </p>
+
+            <div class="segmented" role="group" aria-label="端点地址来源" style="margin-top:12px">
+              <button class="segmented__btn" type="button" data-mode="origin" aria-pressed="true">当前站点地址</button>
+              <button class="segmented__btn" type="button" data-mode="site" aria-pressed="false" id="mode-site">正式站点域名</button>
+            </div>
+            <p class="section__note" id="mode-note"></p>
+
+            <h3 class="mini-title">
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/wand.svg)"></span>三步走
+            </h3>
+            <ol class="icon-steps" id="quick-steps"></ol>
+
+            <h3 class="mini-title">
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span>令牌怎么算
+            </h3>
+            <ul class="hint-list" id="token-notes"></ul>
+          </div>
+
+          <div>
+            <h3 class="mini-title" style="margin-top:0">
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span>直接复制 / 下载
+            </h3>
+            <pre class="code" id="mcp-json" style="margin-top:0" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
+            <div class="copy-row">
+              <button class="btn" type="button" id="copy-btn">
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span>复制配置
+              </button>
+              <button class="btn btn--ghost btn--sm" type="button" id="download-btn">
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/check.svg)"></span>下载 mcp.json
+              </button>
+              <span class="copy-state" id="copy-state" role="status" aria-live="polite"></span>
+            </div>
+            <p class="section__note">
+              复制出来的就是上面这段原文（合法 JSON，两空格缩进）；下载得到的
+              <code class="inline">mcp.json</code> 只是本地文件，不会上传任何内容。
+            </p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- ============ 区块三 · 四步接入指引 ============ -->
-    <section class="section" aria-labelledby="block3-title">
-      <h2 class="section__title" id="block3-title"><span class="section__index">3</span>四步接入</h2>
-      <ol class="steps" id="setup-steps"></ol>
-      <p class="section__note">
-        第 4 步的「信任」只需要点一次；之后 <code class="inline">beimingda</code> 会一直挂在你的连接器列表里。
-      </p>
+    <!-- ============ 分栏 2 · 手动接入 ============ -->
+    <section class="tabpanel" id="p-manual" role="tabpanel" tabindex="0" aria-labelledby="tab-manual" hidden>
+      <div class="panel-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">区块三 · 手动接入</span>
+            <h2 id="block3-title">不用复制按钮，手写也只要四步</h2>
+            <p>配置文件在哪、粘到哪一行、什么时候重启 —— 点开哪一步看哪一步。</p>
+          </div>
+          <span class="chip chip--brand">
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>四步
+          </span>
+        </div>
+
+        <ol class="steps" id="setup-steps"></ol>
+
+        <p class="section__note">
+          第 4 步的「信任」只需要点一次；之后 <code class="inline">beimingda</code>
+          会一直挂在你的连接器列表里。换机器时，把同一份 JSON 再粘一次即可，服务端不用改任何东西。
+        </p>
+
+        <ul class="rules" style="margin-top:14px">
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/info-circle.svg)"></span></span>
+            <div>
+              <b>文件不存在就先新建</b>
+              <p>目录 <code class="inline">~/.workbuddy/</code> 可能还没有 <code class="inline">mcp.json</code>，直接新建一个空文件即可；内容只有 <code class="inline">mcpServers</code> 一个键。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/book.svg)"></span></span>
+            <div>
+              <b>已有别的连接器也不冲突</b>
+              <p>文件里已经有 <code class="inline">mcpServers</code> 时，只需要把 <code class="inline">beimingda</code> 这一项放进那个对象，别把原有的覆盖掉。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span></span>
+            <div>
+              <b>改完必重启</b>
+              <p>WorkBuddy 只在启动时读一次配置；改完没重启，工具栏里不会出现 <code class="inline">beimingda</code>。</p>
+            </div>
+          </li>
+        </ul>
+      </div>
     </section>
 
-    <!-- ============ 区块四 · 可复制的示例对话 ============ -->
-    <section class="section" aria-labelledby="block4-title">
-      <h2 class="section__title" id="block4-title"><span class="section__index">4</span>接好之后，这样说就行</h2>
-      <ul class="dialog-list" id="dialogues"></ul>
-      <p class="section__note">
-        每条都能直接复制到 WorkBuddy 里；覆盖代取发布、跑腿登记、搭子、导览、日程四个模块。
-      </p>
+    <!-- ============ 分栏 3 · 使用示例 ============ -->
+    <section class="tabpanel" id="p-examples" role="tabpanel" tabindex="0" aria-labelledby="tab-examples" hidden>
+      <div class="panel-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">区块四 · 使用示例</span>
+            <h2 id="block4-title">接好之后，这样说就行</h2>
+            <p>每条都标了它落到哪个模块、由哪个 MCP 工具接住。</p>
+          </div>
+          <span class="chip chip--brand">
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)"></span>5 条 · 覆盖 4 个模块
+          </span>
+        </div>
+
+        <ul class="dialog-list" id="dialogues"></ul>
+
+        <p class="section__note">
+          每条都能直接复制到 WorkBuddy 里；覆盖代取发布、跑腿登记、搭子、导览、日程四个模块。
+          示例对话全部来自 <code class="inline">contracts/frontend.md</code>，与演示数据一致。
+        </p>
+      </div>
     </section>
 
-    <!-- ============ 区块五 · 14 个 MCP 工具一览 ============ -->
-    <section class="section" aria-labelledby="block5-title">
-      <h2 class="section__title" id="block5-title"><span class="section__index">5</span>14 个 MCP 工具，按模块分组</h2>
-      <p class="section__note" style="margin-top:0" id="tools-live">核对中…</p>
-      <div class="grid" id="tool-groups" style="grid-template-columns:repeat(auto-fit,minmax(268px,1fr))"></div>
-      <p class="section__note">
-        每个工具的参数都设了 <code class="inline">additionalProperties: false</code>
-        —— 多传一个字段就直接 <code class="inline">SCHEMA_REJECTED</code>，不给模型瞎编参数的机会。
-      </p>
+    <!-- ============ 分栏 4 · MCP 工具 ============ -->
+    <section class="tabpanel" id="p-tools" role="tabpanel" tabindex="0" aria-labelledby="tab-tools" hidden>
+      <div class="panel-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">区块五 · MCP 工具</span>
+            <h2 id="block5-title">14 个工具，按模块分组</h2>
+            <p>清单来自 <code class="inline">docs/MCP-TOOLS.md</code>，并且会拿服务端的实时结果核对一遍。</p>
+          </div>
+          <button class="btn btn--quiet btn--sm" type="button" id="recheck-btn">
+            <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)"></span>重新核对
+          </button>
+        </div>
+
+        <div class="toolbar">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/plug-connected.svg)"></span>
+          <span id="tools-live">核对中…</span>
+          <span class="toolbar__spacer"></span>
+          <span class="chip" id="tools-claim-chip">页面宣称 14</span>
+          <span class="chip chip--brand" id="tools-live-chip">服务端实际 —</span>
+        </div>
+
+        <div class="grid tool-grid" id="tool-groups"></div>
+
+        <p class="section__note">
+          每个工具的参数都设了 <code class="inline">additionalProperties: false</code>
+          —— 多传一个字段就直接 <code class="inline">SCHEMA_REJECTED</code>，不给模型瞎编参数的机会。
+          绿点表示服务端确实有这个名字，红点表示清单与服务端不一致（会就地写出来，不静默）。
+        </p>
+      </div>
     </section>
 
-    <!-- ============ 区块六 · 合规声明 ============ -->
-    <section class="section" aria-labelledby="block6-title">
-      <h2 class="section__title" id="block6-title"><span class="section__index">6</span>一句话合规声明</h2>
-      <p class="lead" id="compliance"></p>
-      <p class="section__note">
-        想先看效果，也可以回
-        <a href="/">首页</a> 用四个网页功能体验一遍；带 <code class="inline">?demo=1</code>
-        打开则是全虚构的演示数据。
-      </p>
+    <!-- ============ 分栏 5 · 合规声明 ============ -->
+    <section class="tabpanel" id="p-compliance" role="tabpanel" tabindex="0" aria-labelledby="tab-compliance" hidden>
+      <div class="panel-card">
+        <div class="section-head">
+          <div>
+            <span class="eyebrow">区块六 · 合规声明</span>
+            <h2 id="block6-title">这一页敢给你看的东西</h2>
+          </div>
+          <span class="chip chip--brand">
+            <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span>五条硬约束
+          </span>
+        </div>
+
+        <p class="lead" id="compliance"></p>
+
+        <ul class="rules">
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/user.svg)"></span></span>
+            <div>
+              <b>不收集身份信息</b>
+              <p>姓名、学号、手机号、身份证、学生证照片、校园网账号口令，一个都不收；姓名在演示模式下显示为「同学A / 同学B」。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/building-community.svg)"></span></span>
+            <div>
+              <b>不接学校内部系统</b>
+              <p>不接入、不登录、不抓取教务 / 图书馆 / 一卡通等任何校内系统；地图点位与任务全部来自本站自己的演示数据。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/lock.svg)"></span></span>
+            <div>
+              <b>没有课表上传入口</b>
+              <p>课表只接受 6 个白名单匿名字段的结构化写入，页面上刻意不做「上传课表文件」的控件 —— 这是设计出来的，不是漏了。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></span>
+            <div>
+              <b>脱敏审计只记字段名</b>
+              <p>截图解析等入口逐字段扫描黑名单：命中就<b>丢弃该字段</b>，并在 <code class="inline">scrub_audit</code> 里留一条记录 —— 记录里只有字段名，绝不记值。</p>
+            </div>
+          </li>
+          <li class="rule">
+            <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span></span>
+            <div>
+              <b>令牌口径说清楚</b>
+              <p>页面上只出现占位符 <code class="inline">&lt;DEMO_TOKEN&gt;</code>；真值只存在于服务端环境变量，限频 + 短周期轮换，只能操作演示数据，泄露无风险。</p>
+            </div>
+          </li>
+        </ul>
+
+        <p class="section__note">
+          想先看效果，也可以回
+          <a href="/">首页</a> 用四个网页功能体验一遍；带 <code class="inline">?demo=1</code>
+          打开则是全虚构的演示数据。
+        </p>
+      </div>
     </section>
 
   </main>
@@ -101,13 +435,19 @@
   <footer class="site-footer">
     <p>北名大小助手 · 第一届「银移杯」校园 AI Agent 创新大赛 赛道 17 智慧校园 Agent 创意赛道</p>
     <p>本页不依赖任何外部 CDN：样式与脚本都是本站文件，断网也能打开。</p>
-  </footer>
+  <nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
 
   <script src="/config.js"></script>
   <script type="module">
     import { mcpToolNames } from "/js/api.js";
     import { mountNav } from "/js/nav.js";
     import { initDemo } from "/js/demo.js";
+    import { icon, mountTabs, toast } from "/js/ui.js";
     import {
       TOKEN_NOTES,
       SETUP_STEPS,
@@ -126,7 +466,12 @@
     const jsonEl = $("#mcp-json");
     const stateEl = $("#copy-state");
 
-    /* ---------------- 端点与配置渲染：模式可切换，但默认跟随当前站点 ---------------- */
+    /* ================= 小工具：图标（用共享层的 CSS mask 图标系统） ================= */
+    const phIcon = (name, size = 18) => icon(name, { size });
+
+    /* ===================================================================
+       1) 端点与配置：模式可切换，但默认跟随当前站点
+       =================================================================== */
     let mode = "origin";
 
     function options() {
@@ -158,10 +503,14 @@
       } catch {
         valid = false;
       }
-      if (!valid) stateEl.textContent = "⚠ 配置生成异常（JSON 不合法），请刷新页面";
+      if (!valid) {
+        stateEl.textContent = "配置生成异常（JSON 不合法），请刷新页面";
+        toast("配置生成异常（JSON 不合法），请刷新页面", "danger");
+      }
 
       const domain = (window.__SITE_DOMAIN__ || "").trim();
       $("#mode-site").disabled = !domain;
+      $("#mode-badge").textContent = mode === "site" ? "正式站点域名" : "跟随当前站点";
       $("#mode-note").textContent = domain
         ? mode === "site"
           ? "使用服务端注入的正式站点域名（/config.js）"
@@ -170,7 +519,9 @@
       return json;
     }
 
-    /* ---------------- 剪贴板：带非安全上下文退路 ---------------- */
+    /* ===================================================================
+       2) 剪贴板：带非安全上下文退路（http://局域网IP 不是安全上下文）
+       =================================================================== */
     async function copyText(text) {
       try {
         if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -178,7 +529,7 @@
           return true;
         }
       } catch {
-        /* 走下面的退路（http://局域网IP 不是安全上下文，clipboard API 会拒绝） */
+        /* 走下面的退路 */
       }
       try {
         const ta = document.createElement("textarea");
@@ -197,16 +548,7 @@
       }
     }
 
-    function flash(message, ok = true) {
-      stateEl.textContent = message;
-      stateEl.style.color = ok ? "" : "var(--color-danger)";
-      if (flash.timer) clearTimeout(flash.timer);
-      flash.timer = setTimeout(() => {
-        stateEl.textContent = "";
-      }, 2600);
-    }
-
-    /** 复制被浏览器拦下时兜底：把 JSON 整段选中，用户按一次 Ctrl/⌘+C 就行 */
+    /** 复制被浏览器拦下时兜底：把 JSON 整段选中，用户按一次 Ctrl/Command+C 就行 */
     function selectJsonText() {
       try {
         const range = document.createRange();
@@ -220,22 +562,68 @@
     }
 
     async function copyWithFeedback(btn, text, label, onFailSelect) {
-      const original = btn.textContent;
       const ok = await copyText(text);
       if (ok) {
-        btn.textContent = "已复制 ✓";
-        flash((label || "内容") + "已复制到剪贴板");
-        setTimeout(() => (btn.textContent = original), 1800);
+        toast((label || "内容") + "已复制到剪贴板", "ok");
+        btn.dataset.copied = "1"; // 视觉反馈：按钮短暂变绿（见页面内样式）
+        stateEl.textContent = (label || "内容") + "已复制";
+        setTimeout(() => {
+          stateEl.textContent = "";
+          delete btn.dataset.copied;
+        }, 2200);
       } else {
         if (typeof onFailSelect === "function") onFailSelect();
-        flash((label || "内容") + "复制被浏览器拦下（窗口未聚焦时常见），已替你选中全部内容，按 Ctrl/⌘+C 即可", false);
+        toast(
+          (label || "内容") + "复制被浏览器拦下（窗口未聚焦时常见），已替你选中全部内容，按 Ctrl/Command+C 即可",
+          "danger",
+        );
+        stateEl.textContent = "复制被拦下，已选中内容";
       }
+      return ok;
     }
 
-    /* ---------------- 区块二 ---------------- */
+    /* ===================================================================
+       3) 分栏接线：mountTabs（hash 同步：刷新后停在同一栏）
+       =================================================================== */
+    const tabs = mountTabs("#agentTabs", {
+      syncHash: true,
+      onChange: (panelId) => {
+        // 分栏切换后把工具栏滚进视野（移动端点击后不至于停在页尾）
+        const bar = $("#agentTabs");
+        if (bar && bar.getBoundingClientRect().top < 0) {
+          bar.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+        if (panelId === "p-tools") probeTools();
+      },
+    });
+
+    /* hero / 概览里的锚点：交给 mountTabs，保证面板真的切过去（而不是只改 hash） */
+    document.querySelectorAll("[data-goto]").forEach((a) => {
+      a.addEventListener("click", (e) => {
+        e.preventDefault();
+        if (tabs) tabs.select(a.dataset.goto);
+        $("#agentTabs").scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
+    /* 浏览器前进 / 后退（或手改地址栏 hash）也要跟着切栏：
+       刷新时 mountTabs 自己会读 hash，这里只补「同文档导航」那一种 */
+    window.addEventListener("hashchange", () => {
+      const id = location.hash.slice(1);
+      if (!id || !tabs) return;
+      const hit = tabs.tabs.some((t) => t.dataset.panel === id);
+      const on = tabs.tabs.find((t) => t.getAttribute("aria-selected") === "true");
+      if (hit && (!on || on.dataset.panel !== id)) tabs.select(id);
+    });
+
+    /* ===================================================================
+       4) 分栏 1 · 一键配置
+       =================================================================== */
     let currentJson = renderConfig();
 
-    $("#copy-btn").addEventListener("click", (e) => copyWithFeedback(e.currentTarget, currentJson, "MCP 配置", selectJsonText));
+    $("#copy-btn").addEventListener("click", (e) =>
+      copyWithFeedback(e.currentTarget, currentJson, "MCP 配置", selectJsonText),
+    );
 
     $("#download-btn").addEventListener("click", () => {
       try {
@@ -247,18 +635,20 @@
         a.click();
         a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-        flash("mcp.json 已生成（本地文件，未上传任何内容）");
+        toast("mcp.json 已生成（本地文件，未上传任何内容）", "ok");
       } catch {
-        flash("浏览器不支持本地下载，请用「复制配置」", false);
+        toast("浏览器不支持本地下载，请用「复制配置」", "danger");
       }
     });
 
     document.querySelectorAll("[data-mode]").forEach((btn) => {
       btn.addEventListener("click", () => {
         mode = btn.dataset.mode === "site" ? "site" : "origin";
-        document.querySelectorAll("[data-mode]").forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+        document.querySelectorAll("[data-mode]").forEach((b) =>
+          b.setAttribute("aria-pressed", String(b === btn)),
+        );
         currentJson = renderConfig();
-        flash("已切换到" + (mode === "site" ? "正式站点域名" : "当前站点地址"));
+        toast("已切换到" + (mode === "site" ? "正式站点域名" : "当前站点地址"));
       });
     });
 
@@ -269,55 +659,138 @@
       notesEl.appendChild(li);
     }
 
-    /* ---------------- 区块三：四步 ---------------- */
+    /* 三步走小步骤图（图标步骤，不再挤在正文里） */
+    const QUICK_STEPS = [
+      { iconName: "copy", title: "复制这段 JSON", note: "点右侧「复制配置」，剪贴板里就是可直接粘的合法 JSON" },
+      { iconName: "plug-connected", title: "粘进 mcp.json 的 mcpServers", note: "文件位置 ~/.workbuddy/mcp.json（没有就新建）" },
+      { iconName: "shield-check", title: "重启 WorkBuddy 并信任一次", note: "连接器列表里找到 beimingda，点一次信任" },
+    ];
+    const quickEl = $("#quick-steps");
+    QUICK_STEPS.forEach((s, i) => {
+      const li = document.createElement("li");
+      const tile = document.createElement("span");
+      tile.className = "icon-tile";
+      tile.setAttribute("aria-hidden", "true");
+      tile.appendChild(phIcon(s.iconName, 18));
+      const body = document.createElement("div");
+      const b = document.createElement("b");
+      b.textContent = i + 1 + ". " + s.title;
+      const note = document.createElement("span");
+      note.className = "quick-step__note";
+      note.textContent = s.note;
+      body.append(b, note);
+      li.append(tile, body);
+      quickEl.appendChild(li);
+    });
+
+    /* ===================================================================
+       5) 分栏 2 · 手动接入（四步折叠成步骤卡）
+       =================================================================== */
+    const STEP_ICONS = ["pencil", "clipboard-text", "refresh", "shield-check"];
     const stepsEl = $("#setup-steps");
     SETUP_STEPS.forEach((s, i) => {
       const li = document.createElement("li");
       li.className = "step";
+
       const num = document.createElement("span");
       num.className = "step__num";
       num.textContent = String(i + 1);
+
       const body = document.createElement("div");
       body.className = "step__body";
-      const b = document.createElement("b");
-      b.textContent = s.title;
-      const p = document.createElement("div");
-      p.innerHTML = s.body; // 常量文案
-      body.appendChild(b);
-      body.appendChild(p);
-      li.appendChild(num);
-      li.appendChild(body);
+
+      const fold = document.createElement("details");
+      fold.className = "fold";
+      if (i === 0) fold.open = true; // 第一步默认展开，其余收起来
+
+      const sum = document.createElement("summary");
+      sum.appendChild(phIcon(STEP_ICONS[i] || "info-circle", 18));
+      const title = document.createElement("span");
+      title.textContent = s.title;
+      sum.appendChild(title);
+      const chev = phIcon("chevron-down", 16);
+      chev.classList.add("fold__chev");
+      sum.appendChild(chev);
+
+      const inner = document.createElement("div");
+      inner.className = "fold__body";
+      inner.innerHTML = s.body; // 常量文案（js/mcp-config.js），非用户输入
+
+      fold.append(sum, inner);
+      body.appendChild(fold);
+      li.append(num, body);
       stepsEl.appendChild(li);
     });
 
-    /* ---------------- 区块四：示例对话（每条可单独复制） ---------------- */
+    /* ===================================================================
+       6) 分栏 3 · 使用示例（原文照抄 + 标注模块与 MCP 工具名）
+       =================================================================== */
+    /** 示例对话对应「承接它的 MCP 工具」（名字与 docs/MCP-TOOLS.md 一一对应） */
+    const TOOLS_FOR_DIALOGUE = [
+      ["task_publish"],
+      ["runner_register", "match_find_for_task"],
+      ["buddy_publish", "buddy_search"],
+      ["map_list_nodes", "map_get_node"],
+      ["schedule_add"],
+    ];
+    const knownTools = new Set(TOOLS_BY_MODULE.flatMap((g) => g.tools.map((t) => t.name)));
+
     const dialogEl = $("#dialogues");
-    for (const d of SAMPLE_DIALOGUES) {
+    SAMPLE_DIALOGUES.forEach((d, i) => {
       const li = document.createElement("li");
       li.className = "dialog-item";
-      const text = document.createElement("span");
+
+      const text = document.createElement("p");
+      text.className = "dialog-item__text";
       text.textContent = d.text;
-      const tag = document.createElement("span");
-      tag.className = "dialog-item__tag";
-      tag.textContent = d.module + " · 直接复制这句话";
+
+      const meta = document.createElement("div");
+      meta.className = "dialog-item__meta";
+
+      const modChip = document.createElement("span");
+      modChip.className = "chip";
+      const modIcon = phIcon("package", 14);
+      modChip.append(modIcon, document.createTextNode(d.module));
+
+      meta.appendChild(modChip);
+
+      const tools = TOOLS_FOR_DIALOGUE[i] || [];
+      const wrap = document.createElement("div");
+      wrap.className = "chip-row";
+      wrap.style.marginTop = "6px";
+      for (const t of tools) {
+        const chip = document.createElement("span");
+        chip.className = "chip chip--brand";
+        chip.appendChild(phIcon("plug-connected", 14));
+        const nameEl = document.createElement("span");
+        nameEl.style.fontFamily = "var(--font-mono)";
+        nameEl.textContent = t;
+        chip.appendChild(nameEl);
+        if (!knownTools.has(t)) chip.title = "该名字不在页面清单里，请核对 docs/MCP-TOOLS.md";
+        wrap.appendChild(chip);
+      }
+      meta.appendChild(wrap);
+
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn btn--quiet btn--sm";
-      btn.textContent = "复制这句";
-      btn.style.marginTop = "6px";
+      btn.appendChild(phIcon("copy", 16));
+      btn.appendChild(document.createTextNode("复制这句"));
       btn.addEventListener("click", () => copyWithFeedback(btn, d.text, "示例对话"));
-      li.appendChild(text);
-      li.appendChild(tag);
-      li.appendChild(btn);
-      dialogEl.appendChild(li);
-    }
 
-    /* ---------------- 区块五：工具清单（静态清单 + 实时核对） ---------------- */
+      li.append(text, meta, btn);
+      dialogEl.appendChild(li);
+    });
+
+    /* ===================================================================
+       7) 分栏 4 · MCP 工具清单 + 实时核对（保留原有能力）
+       =================================================================== */
     const groupsEl = $("#tool-groups");
     const rowIndex = new Map();
     for (const group of TOOLS_BY_MODULE) {
       const box = document.createElement("div");
       box.className = "tool-group";
+
       const head = document.createElement("div");
       head.className = "tool-group__head";
       const title = document.createElement("span");
@@ -325,9 +798,9 @@
       const count = document.createElement("span");
       count.className = "badge badge--muted";
       count.textContent = group.tools.length + " 个";
-      head.appendChild(title);
-      head.appendChild(count);
+      head.append(title, count);
       box.appendChild(head);
+
       for (const t of group.tools) {
         const row = document.createElement("div");
         row.className = "tool-row";
@@ -347,31 +820,55 @@
     }
 
     $("#tool-count-badge").textContent = toolCount() + " 个 MCP 工具";
+    $("#tools-claim-chip").textContent = "页面宣称 " + toolCount();
 
-    (async function probeTools() {
-      const live = await mcpToolNames();
+    let probing = false;
+    async function probeTools() {
+      if (probing) return;
+      probing = true;
       const liveEl = $("#tools-live");
+      const chipEl = $("#tools-live-chip");
+      const btn = $("#recheck-btn");
+      btn.disabled = true;
+      liveEl.textContent = "核对中…";
+      chipEl.textContent = "服务端实际 —";
+
+      const live = await mcpToolNames();
       if (live === null) {
         liveEl.innerHTML =
           "静态清单 " + toolCount() + " 个（来自 docs/MCP-TOOLS.md）。" +
           "本页暂未拿到演示令牌，所以没法实时核对 <code class=\"inline\">POST " + MCP_PATH +
           " tools/list</code> —— 令牌由服务端注入后这里会自动显示实时结果。";
+        chipEl.textContent = "服务端实际 未取到";
+        chipEl.classList.remove("chip--brand");
+        chipEl.classList.add("chip");
+        btn.disabled = false;
+        probing = false;
         return;
       }
+
       const missing = [...rowIndex.keys()].filter((n) => !live.includes(n));
       const extra = live.filter((n) => !rowIndex.has(n));
       rowIndex.forEach((row, name) => {
         row.classList.toggle("is-live", live.includes(name));
         row.classList.toggle("is-missing", !live.includes(name));
       });
+
       liveEl.innerHTML =
         "实时核对：<code class=\"inline\">POST " + MCP_PATH + " tools/list</code> 返回 <b>" + live.length +
         "</b> 个工具" + (missing.length || extra.length
           ? "（清单缺 " + (missing.join("、") || "无") + "；多余 " + (extra.join("、") || "无") + "）"
-          : "，与下方清单完全一致 ✓");
-    })();
+          : "，与下方清单完全一致");
+      chipEl.textContent = "服务端实际 " + live.length;
+      btn.disabled = false;
+      probing = false;
+    }
+    $("#recheck-btn").addEventListener("click", probeTools);
+    probeTools();
 
-    /* ---------------- 区块六 + 演示模式 ---------------- */
+    /* ===================================================================
+       8) 分栏 5 · 合规声明 + 演示模式
+       =================================================================== */
     $("#compliance").textContent = COMPLIANCE_LINE;
     initDemo();
   </script>

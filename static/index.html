@@ -4,19 +4,24 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="description" content="北名大小助手 —— 把散落的校园服务收进一个对话：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 MCP 开放给 WorkBuddy。" />
-  <title>北名大小助手 · 把散落的校园服务，收进一个对话</title>
+  <title>北名大小助手：把散落的校园服务收进一个对话</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <meta property="og:title" content="北名大小助手：把散落的校园服务收进一个对话" />
+  <meta property="og:description" content="取快递、找搭子、认路、记 DDL 四件事做成一个平台，能力通过 MCP 开放给 WorkBuddy，在对话框里说一句话就能办事。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-  <!-- 页头导航由 /js/nav.js 注入（6 页共用，移动端自动收成底部 tab） -->
+  <a class="skip-link" href="#main">跳到主要内容</a>
+<!-- 页头导航由 /js/nav.js 注入（6 页共用，移动端自动收成底部 tab） -->
   <noscript>
     <div class="page"><p class="notice notice--warn">本页的「实时运行统计」需要 JavaScript 才能从后端接口取数；请开启后刷新。</p></div>
   </noscript>
 
-  <main class="page">
+  <main class="page" id="main">
 
     <!-- ============ 区块一 · Hero（左文案 + 右插画） ============ -->
-    <section class="hero hero--split" aria-labelledby="hero-title">
+    <section class="hero hero--split reveal" aria-labelledby="hero-title">
       <div class="hero__copy">
         <span class="hero__eyebrow">北名大小助手 · 银移杯赛道 17</span>
         <h1 id="hero-title">把散落的校园服务，收进一个对话</h1>
@@ -42,7 +47,7 @@
     </section>
 
     <!-- ============ 区块二 · 四张功能卡片 ============ -->
-    <section class="section" id="features" aria-labelledby="features-title">
+    <section class="section reveal" id="features" aria-labelledby="features-title">
       <div class="section-head">
         <div>
           <span class="eyebrow">四个功能</span>
@@ -52,25 +57,25 @@
       </div>
       <div class="grid grid--cards">
         <article class="card">
-          <span class="icon-tile icon-tile--dorm" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/package.svg)"></span></span>
+          <span class="icon-tile icon-tile--dorm" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/package.svg)"></span></span>
           <h3 class="card__title">代取撮合</h3>
           <p class="card__desc">发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/takeout" data-page-check="/takeout">进入代取看板</a>
         </article>
         <article class="card">
-          <span class="icon-tile icon-tile--teaching" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/users.svg)"></span></span>
+          <span class="icon-tile icon-tile--teaching" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/users.svg)"></span></span>
           <h3 class="card__title">搭子匹配</h3>
           <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）才互相可见联系方式，单方面看不到。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/buddy" data-page-check="/buddy">进入搭子墙</a>
         </article>
         <article class="card">
-          <span class="icon-tile icon-tile--gate" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/map-pin.svg)"></span></span>
+          <span class="icon-tile icon-tile--gate" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/map-pin.svg)"></span></span>
           <h3 class="card__title">迎新导览</h3>
           <p class="card__desc">校园地图 + 实景街景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/welcome" data-page-check="/welcome">进入迎新导览</a>
         </article>
         <article class="card">
-          <span class="icon-tile icon-tile--canteen" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/tabler/icons/calendar-event.svg)"></span></span>
+          <span class="icon-tile icon-tile--canteen" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/calendar-event.svg)"></span></span>
           <h3 class="card__title">日程提醒</h3>
           <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。快到点了提前两小时喊你一声。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/schedule" data-page-check="/schedule">进入日程表</a>
@@ -78,8 +83,14 @@
       </div>
     </section>
 
+
+    <!-- ============ B11 · 标语揭示区块（大字号，逐词点亮） ============ -->
+    <section class="section tagline reveal" aria-label="一句话说清">
+      <p data-words="取快递、|找搭子、|认路、|记 DDL，|本来要在四个群里喊人；|现在|一句话|就派出去了。">取快递、找搭子、认路、记 DDL，本来要在四个群里喊人。现在一句话就派出去了。</p>
+    </section>
+
     <!-- ============ 区块三 · 实时运行统计（⭐ 全部走真实 API，页面不写死任何数字） ============ -->
-    <section class="section" id="stats" aria-labelledby="stats-title">
+    <section class="section reveal" id="stats" aria-labelledby="stats-title">
       <h2 class="section__title" id="stats-title"><span class="section__index">3</span>实时运行统计</h2>
 
       <div class="grid grid--stats">
@@ -146,7 +157,12 @@
       演示数据全部虚构（<code class="inline">demo=1</code>），全站不收集真实姓名 / 学号 / 手机号。
     </p>
     <p>本页不依赖任何外部 CDN：样式与脚本都是本站文件，断网也能打开。</p>
-  </footer>
+  <nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
 
   <script src="/config.js"></script>
   <script type="module">

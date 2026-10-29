@@ -55,7 +55,7 @@ export function clearState(target) {
 
 function stateNode(kind, { icon, title, hint, actionText, onAction }) {
   const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
-  if (icon) wrap.appendChild(el("div", "state__icon", icon));
+  if (icon) { const holder = el("div", "state__icon"); holder.appendChild(decorIcon(icon, 30)); wrap.appendChild(holder); }
   if (title) wrap.appendChild(el("p", "state__title", title));
   if (hint) wrap.appendChild(el("p", "state__hint", hint));
   if (actionText && typeof onAction === "function") {
@@ -71,9 +71,13 @@ function stateNode(kind, { icon, title, hint, actionText, onAction }) {
 
 /** 加载中：旋转指示 + 一句说明（不阻塞页面其它部分） */
 export function showLoading(target, text = "正在读取…") {
+  // B9：加载态用"跟真实布局同形的骨架屏"，不用转圈
   const wrap = el("div", "state state--loading");
-  wrap.appendChild(el("div", "spinner"));
+  const sk = el("div", "skeleton");
+  sk.appendChild(el("i")); sk.appendChild(el("i")); sk.appendChild(el("i"));
+  wrap.appendChild(sk);
   wrap.setAttribute("role", "status");
+  wrap.setAttribute("aria-label", text);
   wrap.appendChild(el("p", "state__hint", text));
   return mount(target, wrap);
 }
@@ -83,7 +87,7 @@ export function showEmpty(target, opts = {}) {
   return mount(
     target,
     stateNode("", {
-      icon: opts.icon || "🗂️",
+      icon: opts.icon || "package",
       title: opts.title || "这里还没有内容",
       hint: opts.hint || "",
       actionText: opts.actionText,
@@ -110,7 +114,7 @@ export function showError(target, err, opts = {}) {
   return mount(
     target,
     stateNode("error", {
-      icon: "⚠️",
+      icon: "alert-triangle",
       title: opts.title || "这一步没成功",
       hint: opts.hint || errorText(err),
       actionText: opts.retryText || (opts.onRetry ? "重试" : ""),
@@ -122,7 +126,7 @@ export function showError(target, err, opts = {}) {
 
 /** 成功态（用于发布 / 登记 / 保存后的落点提示） */
 export function showSuccess(target, title, hint = "") {
-  return mount(target, stateNode("ok", { icon: "✅", title, hint }));
+  return mount(target, stateNode("ok", { icon: "circle-check", title, hint }));
 }
 
 /** 轻量行内提示（替代早期的 .msg.err / alert） */
@@ -169,6 +173,7 @@ export default {
   esc,
   el,
   icon,
+  decorIcon,
   clearState,
   showLoading,
   showEmpty,
@@ -179,6 +184,8 @@ export default {
   copyText,
   mountTabs,
   createSheet,
+  initReveals,
+  initTagline,
   openModal,
   toast,
 };
@@ -190,9 +197,26 @@ export default {
    ============================================================================= */
 
 /** 图标元素：用 CSS mask 着色，随父级文字颜色变化（一个 svg 文件适配所有场景） */
+/** 已本地化的图标名（static/vendor/phosphor/icons/*.svg）。列表外的名字一律当普通文字渲染，兼容旧调用。 */
+export const ICON_NAMES = new Set([
+  "package","users","map-pin","calendar-event","robot","plug-connected","list-check","wand",
+  "message-chatbot","tools","shield-check","copy","check","x","chevron-right","chevron-down",
+  "plus","pencil","trash","clock","building-community","school","book","walk","truck-delivery",
+  "bolt","sparkles","external-link","refresh","search","send","user","info-circle",
+  "alert-triangle","circle-check","arrow-right","map","route","device-mobile","key","lock",
+  "clipboard-text","chart-bar","sun","moon",
+]);
+
+/** 三态里的装饰图标：认识的名字给 .icon（可着色），不认识的（例如历史遗留的 emoji）原样当文字 */
+export function decorIcon(name, size = 28) {
+  if (typeof name === "string" && ICON_NAMES.has(name)) return icon(name, { size });
+  const n = el("span", "state__emoji", name || "");
+  n.setAttribute("aria-hidden", "true");
+  return n;
+}
 export function icon(name, { size = 18, cls = "" } = {}) {
   const n = el("span", "icon icon--" + size + (cls ? " " + cls : ""));
-  n.style.setProperty("--icon", `url(/vendor/tabler/icons/${name}.svg)`);
+  n.style.setProperty("--icon", `url(/vendor/phosphor/icons/${name}.svg)`);
   n.setAttribute("aria-hidden", "true");
   return n;
 }
@@ -252,6 +276,15 @@ export function mountTabs(root, { syncHash = false, onChange } = {}) {
   const fromHash = location.hash && tabs.find((t) => t.dataset.panel === location.hash.slice(1));
   const current = fromHash || tabs.find((t) => t.getAttribute("aria-selected") === "true") || tabs[0];
   if (current) select(current, { silent: true });
+
+  // 浏览器前进/后退（hash 变化）也要切栏；⛔ 不写回 hash，避免 history 抖动
+  if (syncHash) {
+    window.addEventListener("hashchange", () => {
+      const want = location.hash.slice(1);
+      const target = tabs.find((t) => t.dataset.panel === want);
+      if (target && target.getAttribute("aria-selected") !== "true") select(target, { silent: true });
+    });
+  }
   return { select: (id) => { const t = tabs.find((x) => x.dataset.panel === id); if (t) select(t); }, tabs };
 }
 
@@ -361,4 +394,56 @@ export function toast(text, kind = "") {
   wrap.appendChild(n);
   setTimeout(() => { n.style.opacity = "0"; n.style.transition = "opacity .25s"; setTimeout(() => n.remove(), 260); }, 2600);
   return n;
+}
+
+
+/* =============================================================================
+   B7 滚动揭示 + B11 标语逐词激活（2026-10-29）
+   规范：只动 transform/opacity；用 IntersectionObserver，⛔ 不用未节流的 scroll 监听；
+        每个区块只播一次；prefers-reduced-motion 下退化成直接显示。
+   ============================================================================= */
+
+/** 给所有 .reveal 区块挂观察器：进入视口 32px 后升起并淡入，只播一次 */
+export function initReveals(root = document) {
+  const items = [...root.querySelectorAll(".reveal")];
+  if (!items.length) return 0;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !("IntersectionObserver" in window)) {
+    items.forEach((n) => n.classList.add("is-in"));
+    return items.length;
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add("is-in");
+      io.unobserve(e.target);          // 只播一次，回滚时不重播
+    }
+  }, { rootMargin: "0px 0px -32px 0px", threshold: 0.08 });
+  items.forEach((n) => io.observe(n));
+  return items.length;
+}
+
+/**
+ * B11 标语揭示：文本里用 `|` 分隔"词"，逐词从 30% 灰升到正文色。
+ * 用法：<p class="tagline-text" data-words="取快递|找搭子|认路|记 DDL">…</p>
+ */
+export function initTagline(root = document) {
+  const nodes = [...root.querySelectorAll("[data-words]")];
+  if (!nodes.length) return 0;
+  const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  for (const n of nodes) {
+    const words = String(n.dataset.words || "").split("|").filter(Boolean);
+    n.textContent = "";
+    const spans = words.map((w) => {
+      const s = el("span", "w", w);
+      n.appendChild(s);
+      return s;
+    });
+    if (reduce || !("IntersectionObserver" in window)) { spans.forEach((s) => s.classList.add("on")); continue; }
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("on"); io.unobserve(e.target); }
+    }, { rootMargin: "0px 0px -45% 0px", threshold: 0 });
+    spans.forEach((s) => io.observe(s));
+  }
+  return nodes.length;
 }
