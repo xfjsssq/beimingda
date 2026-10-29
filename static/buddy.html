@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="zh-CN" data-page="buddy">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>搭子墙 · 北名大小助手</title>
+  <!--
+    契约：contracts/m2-buddy.md §6（4 个区块）
+    样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/ui.js
+    ⚠️ 候选卡片上不得出现任何可反推身份的字段：只渲染接口白名单字段
+        （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
+    ⛔ 本页不含任何文件上传控件（frontend.md §7）；搭子匹配不需要照片，照片不参与评分、不入库
+    ⛔ 令牌只走 /js/api.js 的运行时链路，不写 localStorage、不回填输入框
+  -->
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    .anon { font-family:var(--font-mono); font-size:12px; color:var(--color-muted); overflow-wrap:anywhere; }
+    .contact { font-family:var(--font-mono); color:var(--color-accent); font-weight:600; }
+    .bars { margin-top:10px; }
+    /* 「我的申请」：桌面表格 / 手机卡片，任何宽度下都不再隐藏「状态」 */
+    .mine-cards { display:none; }
+    @media (max-width:768px) {
+      .mine-table { display:none; }
+      .mine-cards { display:block; }
+    }
+  </style>
+</head>
+<body>
+<main class="page page--mid">
+  <div class="page-head">
+    <h1>搭子墙</h1>
+    <p class="lead">学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。</p>
+    <div class="page-head__tags">
+      <span class="badge badge--ok">双向同意才可见</span>
+      <span class="badge badge--muted">不收集姓名 / 学号 / 手机号 / 邮箱</span>
+    </div>
+  </div>
+
+  <section class="section">
+    <h2 class="section__title">我的身份（只填匿名昵称）</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label for="handle">匿名昵称（如 同学A）</label>
+        <input id="handle" placeholder="同学A" maxlength="32" />
+      </div>
+      <div class="field">
+        <label for="token">演示令牌（仅写接口需要，X-Demo-Token）</label>
+        <input id="token" type="password" placeholder="<DEMO_TOKEN>" autocomplete="off" />
+        <p class="field__hint" id="tokenState">令牌只存本机浏览器会话，不回显、不写进代码。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 区块一 · 发布 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">1</span>发布搭子帖</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label for="pubKind">类型</label>
+        <select id="pubKind">
+          <option value="study">学习</option>
+          <option value="roommate">室友</option>
+          <option value="project">项目</option>
+          <option value="sport">运动</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
+      <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="btnPublish" type="button">发布</button>
+      <button class="btn btn--ghost" id="btnPreview" type="button">先看画像抽取结果</button>
+    </div>
+    <div id="pubMsg"></div>
+    <pre class="code" id="pubOut" style="display:none"></pre>
+  </section>
+
+  <!-- 区块二 · 搜索 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">2</span>找搭子</h2>
+    <div class="form-grid">
+      <div class="field">
+        <label for="searchKind">类型</label>
+        <select id="searchKind">
+          <option value="study">学习</option>
+          <option value="roommate">室友</option>
+          <option value="project">项目</option>
+          <option value="sport">运动</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="topK">返回条数（1-20）</label>
+        <input id="topK" type="number" min="1" max="20" value="5" />
+      </div>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label for="seekText">描述你想要的搭子</label>
+      <textarea id="seekText" placeholder="例：大二 工科 想找一起刷算法题和摄影的同学，作息偏夜猫，周末有空，周三1-2节有课"></textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="btnSearch" type="button">搜索候选</button>
+      <button class="btn btn--ghost" id="btnList" type="button">只看搭子墙（不评分）</button>
+    </div>
+    <div id="searchMsg"></div>
+  </section>
+
+  <!-- 区块三 · 候选卡片 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">3</span>候选 <small>只显示评分 ≥ 60 的候选</small></h2>
+    <div id="cands"></div>
+    <p class="section__note">
+      候选卡上的分数 = 用你<b>这次搜索的画像</b>算出的匹配分（兴趣 35 / 作息 30 / 性格 20 / 语义 15）。
+      同意 / 拒绝在 WorkBuddy 里让 Agent 调用 <code class="inline">buddy_consent</code>（同一帖只能表决一次）；
+      也可以点卡片上的「复制『同意』话术」，直接粘给 Agent。双方都同意后这里会出现中转码。
+    </p>
+  </section>
+
+  <!-- 区块四 · 我的申请 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">4</span>我的申请</h2>
+    <div id="mine"></div>
+    <div class="form-actions"><button class="btn btn--ghost btn--sm" id="btnMine" type="button">刷新我的申请</button></div>
+    <p class="section__note">
+      这里的分数是<b>表决那一刻</b>估算的（表决接口不收画像，取你最近一次搜索的画像；从没搜过则按中性画像，会偏低），
+      所以和候选卡上的分数可能不同 —— 这是两处口径的固有差异，不是 bug。
+      <b>是否揭示联系方式只由双选状态机决定，与分数无关。</b>
+    </p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
+</footer>
+
+<script src="/config.js"></script>
+<script type="module">
+import { apiToken, setApiToken, hasWriteToken } from "/js/api.js";
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import { esc, el, showLoading, showEmpty, showError, showNotice, copyText } from "/js/ui.js";
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+mountNav();
+
+/* ---------- 昵称与令牌 ---------- */
+const getHandle = () => ($("handle").value || "").trim() || "同学A";
+const getToken = () => apiToken();
+
+$("handle").value = params.get("handle") || localStorage.getItem("beimingda.handle") || "同学A";
+$("handle").addEventListener("change", () => {
+  try { localStorage.setItem("beimingda.handle", getHandle()); } catch { /* 隐私模式：忽略 */ }
+});
+
+function paintTokenState() {
+  $("token").value = ""; // ⛔ 永不回填（含 localStorage 里的旧值），投屏不会露出令牌
+  $("token").placeholder = hasWriteToken() ? "已配置（重新输入可覆盖）" : "<DEMO_TOKEN>";
+  $("tokenState").textContent = hasWriteToken()
+    ? "写接口已就绪：令牌来自服务端注入或本机会话。"
+    : "未配置令牌：搜索 / 看墙可用，发布会返回 401。";
+}
+$("token").addEventListener("change", () => { setApiToken($("token").value); paintTokenState(); });
+
+/* ---------- 统一信封解包 ---------- */
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  let body = null;
+  try { body = await res.json(); } catch { throw new Error("响应不是 JSON（HTTP " + res.status + "）"); }
+  if (!body.ok) throw Object.assign(new Error((body.error && body.error.message) || "请求失败"), {
+    code: body.error && body.error.code,
+  });
+  return body.data;
+}
+
+/* ---------- 区块一：发布 ---------- */
+async function publish() {
+  const text = $("pubText").value.trim();
+  if (text.length < 4) { showNotice("pubMsg", "先把需求写清楚一点（至少一句话）。", "danger"); return; }
+  showLoading("pubMsg", "发布中…");
+  try {
+    const data = await api("/api/buddies", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-demo-token": getToken() },
+      body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text }),
+    });
+    $("pubMsg").innerHTML = "";
+    showNotice("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
+    $("pubOut").style.display = "block";
+    $("pubOut").textContent = "抽取出的 11 字段画像：\n" + JSON.stringify(data.profile, null, 2);
+  } catch (e) {
+    showError("pubMsg", e, { title: "发布失败" });
+  }
+}
+$("btnPublish").addEventListener("click", publish);
+
+$("btnPreview").addEventListener("click", async () => {
+  const text = $("pubText").value.trim();
+  if (!text) { showNotice("pubMsg", "先写一段描述。", "danger"); return; }
+  showLoading("pubMsg", "正在抽取画像（不落库）…");
+  try {
+    const rows = await api("/api/buddies/search?kind=" + $("pubKind").value +
+      "&handle=" + encodeURIComponent(getHandle()) + "&text=" + encodeURIComponent(text));
+    $("pubMsg").innerHTML = "";
+    showNotice("pubMsg", "抽取完成：这段描述能匹配到 " + rows.length + " 个候选（下方候选卡可见评分与理由）", "ok");
+    renderCandidates(rows);
+  } catch (e) { showError("pubMsg", e, { title: "抽取失败" }); }
+});
+
+/* ---------- 区块三：候选卡片 ---------- */
+function meterRow(label, val, max) {
+  const row = el("div", "meter-row");
+  row.appendChild(el("b", null, label));
+  const meter = el("div", "meter meter--primary");
+  const fill = el("i", "meter__fill");
+  fill.style.width = Math.round((Number(val) || 0) / max * 100) + "%";
+  meter.appendChild(fill);
+  row.appendChild(meter);
+  row.appendChild(el("span", "meter-row__val", (Number(val) || 0) + "/" + max));
+  return row;
+}
+
+function renderCandidates(rows) {
+  const box = $("cands");
+  if (!rows || !rows.length) {
+    showEmpty(box, {
+      icon: "🤝",
+      title: "没有评分 ≥ 60 的候选",
+      hint: "可以换个类型，或把描述写得更具体（年级 / 专业大类 / 作息 / 兴趣都写上，匹配更准）。",
+    });
+    return;
+  }
+  box.innerHTML = "";
+  for (const c of rows) {
+    const p = c.parts || {};
+    const mutual = c.reveal_status === "mutual";
+    const card = el("div", "item item--accent");
+    const top = el("div", "item__head");
+    top.appendChild(el("span", "anon", c.anon_token));
+    top.appendChild(el("span", "badge " + (mutual ? "badge--ok" : "badge--warn"),
+      mutual ? "已互相可见" : "待对方同意"));
+    const sc = el("span", "score");
+    sc.appendChild(el("span", "score__num", String(c.score)));
+    sc.appendChild(el("span", "score__max", "分 / 100"));
+    top.appendChild(sc);
+    card.appendChild(top);
+
+    const bars = el("div", "bars");
+    bars.appendChild(meterRow("兴趣", p.interest, 35));
+    bars.appendChild(meterRow("作息", p.schedule, 30));
+    bars.appendChild(meterRow("性格", p.traits, 20));
+    bars.appendChild(meterRow("语义", p.semantic, 15));
+    card.appendChild(bars);
+    card.appendChild(el("div", "reason", c.reason || "（无评分理由）"));
+
+    if (mutual && c.contact_code) {
+      const contact = el("div", "item__meta");
+      contact.appendChild(document.createTextNode("中转码："));
+      contact.appendChild(el("span", "contact", c.contact_code));
+      contact.appendChild(document.createTextNode("（双方已同意才会下发）"));
+      card.appendChild(contact);
+    }
+    const actions = el("div", "item__actions");
+    const btn = el("button", "btn btn--quiet btn--sm", "复制「同意」话术");
+    btn.type = "button";
+    btn.addEventListener("click", async () => {
+      const text = "我想和匿名标识为 " + c.anon_token +
+        " 的搭子互相可见联系方式，请用 buddy_consent 替我表示「同意」。";
+      const ok = await copyText(text);
+      btn.textContent = ok ? "已复制 ✓ 粘给 Agent 即可" : "复制被浏览器拦下，请手动复制";
+      setTimeout(() => { btn.textContent = "复制「同意」话术"; }, 2200);
+    });
+    actions.appendChild(btn);
+    card.appendChild(actions);
+    box.appendChild(card);
+  }
+}
+
+$("btnSearch").addEventListener("click", async () => {
+  const text = $("seekText").value.trim();
+  if (text.length < 2) { showNotice("searchMsg", "先写一句「我想要什么样的搭子」。", "danger"); return; }
+  showLoading("searchMsg", "检索中…");
+  showLoading("cands", "正在按你的描述计算匹配分…");
+  try {
+    const rows = await api("/api/buddies/search?kind=" + $("searchKind").value +
+      "&handle=" + encodeURIComponent(getHandle()) +
+      "&top_k=" + encodeURIComponent($("topK").value) +
+      "&text=" + encodeURIComponent(text));
+    $("searchMsg").innerHTML = "";
+    showNotice("searchMsg", "命中 " + rows.length + " 个候选（仅显示评分 ≥ 60 且未被一票否决的）", "ok");
+    renderCandidates(rows);
+  } catch (e) {
+    $("searchMsg").innerHTML = "";
+    showError("cands", e, { title: "搜索失败" });
+  }
+});
+
+$("btnList").addEventListener("click", async () => {
+  showLoading("searchMsg", "读取搭子墙…");
+  try {
+    const rows = await api("/api/buddies?kind=" + $("searchKind").value);
+    $("searchMsg").innerHTML = "";
+    showNotice("searchMsg", "共 " + rows.length + " 条（列表不含评分）", "ok");
+    const box = $("cands");
+    if (!rows.length) {
+      showEmpty(box, { icon: "🤝", title: "搭子墙还没有内容", hint: "先在区块一发布一条搭子帖。" });
+      return;
+    }
+    box.innerHTML = "";
+    for (const p of rows) {
+      const card = el("div", "item");
+      const top = el("div", "item__head");
+      top.appendChild(el("span", "anon", p.anon_token));
+      top.appendChild(el("span", "badge badge--muted", p.kind + " · " + p.created_at));
+      card.appendChild(top);
+      card.appendChild(el("div", "reason", (p.profile && p.profile.wanted) || "（未填写期望）"));
+      box.appendChild(card);
+    }
+  } catch (e) {
+    $("searchMsg").innerHTML = "";
+    showError("cands", e, { title: "搭子墙读取失败" });
+  }
+});
+
+/* ---------- 区块四：我的申请（桌面表格 / 手机卡片，状态列任何宽度都保留） ---------- */
+function statusBadge(r) {
+  if (r.reveal_status === "mutual") return el("span", "badge badge--ok", "已互相可见");
+  if (r.my_ok === 1) return el("span", "badge badge--warn", "待对方同意");
+  return el("span", "badge badge--muted", "我已拒绝");
+}
+
+function renderMine(rows) {
+  const box = $("mine");
+  if (!rows.length) {
+    showEmpty(box, {
+      icon: "📮",
+      title: "还没有发出过意愿",
+      hint: "在候选卡上复制「同意」话术，粘给 WorkBuddy 里的 Agent，让它替你表决。",
+    });
+    return;
+  }
+  box.innerHTML = "";
+
+  const wrap = el("div", "table-wrap mine-table");
+  const rowsHtml = rows.map((r) =>
+    "<tr><td class='mono'>" + esc(r.anon_token) + "</td><td>" + esc(r.score) + "</td><td>" +
+    (r.reveal_status === "mutual" ? '<span class="badge badge--ok">已互相可见</span>'
+      : r.my_ok === 1 ? '<span class="badge badge--warn">待对方同意</span>'
+      : '<span class="badge badge--muted">我已拒绝</span>') +
+    "</td><td class='nowrap'>" + esc(r.created_at) + "</td></tr>").join("");
+  wrap.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分<br><small>（表决时估算）</small></th>" +
+    "<th>状态</th><th>时间</th></tr></thead><tbody>" + rowsHtml + "</tbody></table>";
+  box.appendChild(wrap);
+
+  const cards = el("div", "mine-cards");
+  for (const r of rows) {
+    const card = el("div", "item");
+    const top = el("div", "item__head");
+    top.appendChild(el("span", "anon", r.anon_token));
+    top.appendChild(statusBadge(r));
+    const sc = el("span", "score");
+    sc.appendChild(el("span", "score__num", String(r.score)));
+    sc.appendChild(el("span", "score__max", "分"));
+    top.appendChild(sc);
+    card.appendChild(top);
+    card.appendChild(el("div", "item__meta", "评分口径：表决时估算｜时间：" + r.created_at));
+    cards.appendChild(card);
+  }
+  box.appendChild(cards);
+}
+
+async function loadMine() {
+  try {
+    const rows = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
+    renderMine(rows);
+  } catch (e) {
+    showError("mine", e, { title: "我的申请读取失败", onRetry: loadMine });
+  }
+}
+$("btnMine").addEventListener("click", loadMine);
+
+/* ---------- 启动 ---------- */
+(async function boot() {
+  paintTokenState();
+  showEmpty("cands", {
+    icon: "🤝",
+    title: "还没有候选",
+    hint: "在上方区块二写一句「我想要什么样的搭子」，点「搜索候选」。",
+  });
+  await initDemo();
+  await loadMine();
+})();
+</script>
+</body>
+</html>

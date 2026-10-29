@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="zh-CN" data-page="schedule">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>日程与提醒 · 北名大小助手</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    /* 本页只保留「周课表网格」特有样式；其余全走 /css/app.css
+       ⚠️ 7 列 × 节次的周课表在窄屏必然放进 375px：
+       ① 表格包在可横向滚动的容器里（表格自身宽度由内容决定，不能指望它收缩）
+       ② 首列「节次」冻结，横滑时不会丢失时间基准 */
+    #gridWrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    #gridWrap table.grid { min-width:600px; }
+    #gridWrap td { height:40px; }
+    .slot { background:var(--color-primary-soft); border-left:3px solid var(--color-primary);
+      padding:3px 6px; border-radius:5px; font-size:12px; line-height:1.5; }
+    .slot .room { font-size:11px; color:var(--color-muted); }
+    .slot.cont { opacity:.55; border-left-color:var(--color-line-strong); }
+    @media (max-width:640px) {
+      #gridWrap table.grid { min-width:540px; }
+      #gridWrap td { height:36px; }
+      .slot { font-size:11px; padding:2px 4px; }
+    }
+  </style>
+</head>
+<body>
+<main class="page">
+  <div class="page-head">
+    <h1>日程与主动提醒</h1>
+    <p class="lead">只保存「周几 / 起止节次 / 课程名 / 教室 / 周次」。提醒由平台定时任务触发，不占用任何长连接。</p>
+    <div class="page-head__tags">
+      <span class="badge">只收 6 个匿名字段</span>
+      <span class="badge badge--muted">姓名与学号不离开你的设备</span>
+    </div>
+  </div>
+
+  <!-- 身份：仅昵称，无任何身份字段 -->
+  <section class="section">
+    <div class="form-grid">
+      <div class="field">
+        <label for="handle">你的昵称（仅用于区分日程，不涉及身份信息）</label>
+        <input id="handle" type="text" value="同学A" maxlength="32" />
+      </div>
+      <div class="field">
+        <span class="field__label">当前日程归属</span>
+        <div class="row">
+          <button class="btn btn--ghost btn--sm" id="loadBtn" type="button">载入我的日程</button>
+          <span class="hint" id="whoami"></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 区块一 · 周视图 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">1</span>一周课表 <small>7 列 × 第 1–14 节，首列冻结</small></h2>
+    <div id="gridWrap"></div>
+  </section>
+
+  <!-- 区块二 · 导入指引（合规说明区，必须显眼） -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">2</span>怎么导入课表 <small>⚠️ 请先读这一段</small></h2>
+    <div class="notice notice--warn" style="margin-top:0">
+      <p style="margin:0 0 8px"><strong>课表文件不要上传到这里。</strong>本页面没有、也不会有任何上传入口。</p>
+      <p style="margin:0">
+        请在学校官方渠道导出课表后，在<strong>你自己的本机</strong> WorkBuddy 对话里交给 Agent 处理 ——
+        Agent 只会把「周几 / 起止节次 / 课程名 / 教室 / 周次」写入平台，
+        <strong>姓名与学号不会离开你的设备</strong>。每次导入后 Agent 会告诉你写入了多少条、
+        丢弃了哪些类别的字段（这些类别会记进下方第 ⑤ 区块的脱敏审计）。
+      </p>
+    </div>
+    <p class="section__note">
+      对话里可以这么说：<code class="inline">把我的课表导入：周一 1-2 节 课程A，周三 3-4 节 课程B……</code>
+    </p>
+  </section>
+
+  <!-- 区块三 · 手动添加（只有 6 个字段） -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">3</span>手动添加一门课 <small>不想用对话时的兜底</small></h2>
+    <form id="addForm">
+      <div class="form-grid form-grid--tight">
+        <div class="field"><label for="weekday">周几</label>
+          <select id="weekday">
+            <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
+            <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
+            <option value="7">周日</option>
+          </select></div>
+        <div class="field"><label for="ps">起节（1-14）</label><input id="ps" type="number" min="1" max="14" value="1" /></div>
+        <div class="field"><label for="pe">止节（1-14）</label><input id="pe" type="number" min="1" max="14" value="2" /></div>
+        <div class="field"><label for="title">课程名</label><input id="title" type="text" placeholder="课程A" /></div>
+        <div class="field"><label for="room">教室（可选）</label><input id="room" type="text" placeholder="教学楼A-101" /></div>
+        <div class="field"><label for="weeks">周次（可选）</label><input id="weeks" type="text" placeholder="1-16" /></div>
+        <div class="field"><label for="rb">提前提醒（分钟）</label><input id="rb" type="number" min="0" max="1440" placeholder="不提醒" /></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" type="submit">添加 / 更新</button>
+        <span class="hint">同一门课（周几+起止节次+课程名）再次提交是<strong>更新</strong>，不会产生重复条目。</span>
+      </div>
+    </form>
+    <div id="addMsg"></div>
+  </section>
+
+  <!-- 区块四 · 提醒设置 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">4</span>提醒设置 <small>每门课单独设置，单位分钟；留空 = 不提醒</small></h2>
+    <div id="remindWrap"></div>
+    <p class="section__note">提醒由服务端定时任务每 5 分钟检查一次（按 Asia/Shanghai 计算），不使用 SSE 长连接。</p>
+  </section>
+
+  <!-- 区块五 · 脱敏审计 -->
+  <section class="section">
+    <h2 class="section__title"><span class="section__index">5</span>脱敏审计 <small>最近一次导入丢弃了哪些类别的字段</small></h2>
+    <div id="auditWrap"></div>
+    <p class="section__note">审计只记录<strong>字段名</strong>，绝不记录任何字段值。</p>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>⛔ 本页不接收课表文件，也不收集姓名 / 学号 / 手机号。</p>
+</footer>
+
+<script src="/config.js"></script>
+<script type="module">
+import { apiToken } from "/js/api.js";
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import { esc, showLoading, showEmpty, showError, showNotice } from "/js/ui.js";
+
+const WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+/* 与表单 max=14 对齐：早期 MAX_PERIOD=10 会让 11-14 节的课「写进去了但课表不显示」 */
+const MAX_PERIOD = 14;
+const state = { items: [] };
+
+const el = (id) => document.getElementById(id);
+const handle = () => (el("handle").value || "").trim();
+
+mountNav();
+initDemo();
+
+/* 写接口按 contracts/core.md §4 需要 X-Demo-Token；令牌统一走 /js/api.js（⛔ 不硬编码、不回显） */
+function api(url, opts) {
+  opts = opts || {};
+  const method = (opts.method || "GET").toUpperCase();
+  if (method !== "GET") {
+    opts.headers = Object.assign({}, opts.headers || {}, { "X-Demo-Token": apiToken() });
+    if (!opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
+  }
+  return fetch(url, opts).then((r) => r.json());
+}
+
+function renderGrid() {
+  const wrap = el("gridWrap");
+  if (!state.items.length) {
+    wrap.className = "";
+    showEmpty(wrap, {
+      icon: "📅",
+      title: "还没有日程",
+      hint: "可以在下方手动添加一门课，或在 WorkBuddy 对话里让 Agent 导入整张课表。",
+    });
+    return;
+  }
+  const cells = {};
+  state.items.forEach((it) => {
+    for (let p = it.period_start; p <= it.period_end; p++) {
+      const key = it.weekday + "-" + p;
+      cells[key] = cells[key] || [];
+      cells[key].push(it);
+    }
+  });
+  let html = '<table class="grid table--sticky-first"><thead><tr><th style="width:56px">节次</th>';
+  WEEK_LABELS.forEach((w) => { html += "<th>" + w + "</th>"; });
+  html += "</tr></thead><tbody>";
+  for (let p = 1; p <= MAX_PERIOD; p++) {
+    html += "<tr><th>" + p + "</th>";
+    for (let d = 1; d <= 7; d++) {
+      const list = cells[d + "-" + p] || [];
+      html += "<td>";
+      list.forEach((it) => {
+        const isStart = it.period_start === p;
+        html += '<div class="slot' + (isStart ? "" : " cont") + '" title="' +
+          esc(it.weeks ? "周次 " + it.weeks : "") + '">' +
+          (isStart
+            ? esc(it.title) + (it.room ? '<br><span class="room">' + esc(it.room) + "</span>" : "")
+            : "…") +
+          "</div>";
+      });
+      html += "</td>";
+    }
+    html += "</tr>";
+  }
+  html += "</tbody></table>";
+  wrap.className = "table-wrap";
+  wrap.innerHTML = html;
+}
+
+function renderRemind() {
+  const wrap = el("remindWrap");
+  if (!state.items.length) {
+    wrap.className = "";
+    showEmpty(wrap, { icon: "⏰", title: "还没有可设置的课程", hint: "载入日程后，可在这里逐门课设置提前提醒。" });
+    return;
+  }
+  let html = '<div class="table-wrap"><table><thead><tr><th>课程</th><th>时间</th><th>提前提醒（分钟）</th><th></th></tr></thead><tbody>';
+  state.items.forEach((it, i) => {
+    html += "<tr><td>" + esc(it.title) + (it.room ? ' <span class="badge badge--muted">' + esc(it.room) + "</span>" : "") + "</td>" +
+      "<td class='nowrap'>" + WEEK_LABELS[it.weekday - 1] + " 第" + it.period_start +
+      (it.period_end > it.period_start ? "-" + it.period_end : "") + "节</td>" +
+      '<td><input type="number" min="0" max="1440" style="max-width:120px" id="rb' + i + '" value="' +
+      (it.remind_before == null ? "" : it.remind_before) + '" placeholder="不提醒" aria-label="提前提醒分钟数" /></td>' +
+      '<td><button class="btn btn--ghost btn--sm" type="button" data-i="' + i + '">保存</button></td></tr>';
+  });
+  html += "</tbody></table></div>";
+  wrap.className = "";
+  wrap.innerHTML = html;
+  Array.prototype.forEach.call(wrap.querySelectorAll("button[data-i]"), (btn) => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-i"));
+      const it = state.items[i];
+      const raw = el("rb" + i).value;
+      const rb = raw === "" ? null : Number(raw);
+      btn.disabled = true;
+      api("/api/schedule", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          user_handle: handle(), weekday: it.weekday, period_start: it.period_start,
+          period_end: it.period_end, title: it.title, room: it.room, weeks: it.weeks,
+          remind_before: rb,
+        }),
+      }).then((j) => {
+        btn.disabled = false;
+        if (j.ok) { showNotice("addMsg", "已保存「" + it.title + "」的提醒设置。", "ok"); load(); }
+        else showNotice("addMsg", "保存失败：" + ((j.error && j.error.message) || "未知错误"), "danger");
+      }).catch((e) => {
+        btn.disabled = false;
+        showNotice("addMsg", "保存失败：" + e.message, "danger");
+      });
+    });
+  });
+}
+
+function renderAudit() {
+  api("/api/scrub/audit?limit=20").then((j) => {
+    const wrap = el("auditWrap");
+    if (!j.ok || !j.data || !j.data.length) {
+      wrap.className = "";
+      showEmpty(wrap, { icon: "🛡️", title: "暂时没有审计记录", hint: "说明还没有字段被丢弃；导入课表后这里会列出被丢弃的字段名。" });
+      return;
+    }
+    let html = '<div class="table-wrap"><table><thead><tr><th>时间</th><th>类型</th><th>被丢弃的字段名</th></tr></thead><tbody>';
+    j.data.forEach((row) => {
+      html += "<tr><td class='nowrap'>" + esc(row.created_at) + "</td><td>" + esc(row.item_type) +
+        "</td><td><code>" + esc((row.dropped_fields || []).join(", ")) + "</code></td></tr>";
+    });
+    html += "</tbody></table></div>";
+    wrap.className = "";
+    wrap.innerHTML = html;
+  }).catch((e) => {
+    showError("auditWrap", e.message, { title: "审计读取失败" });
+  });
+}
+
+function load() {
+  const h = handle();
+  if (!h) { showNotice("addMsg", "请先填昵称，再载入日程。", "danger"); return; }
+  try { localStorage.setItem("bm_handle", h); } catch { /* 隐私模式：忽略 */ }
+  el("whoami").textContent = "当前：" + h;
+  showLoading("gridWrap", "正在载入你的课表…");
+  api("/api/schedule?handle=" + encodeURIComponent(h)).then((j) => {
+    state.items = j.ok && Array.isArray(j.data) ? j.data : [];
+    renderGrid();
+    renderRemind();
+  }).catch((e) => {
+    showError("gridWrap", e.message, { title: "载入失败", onRetry: load });
+  });
+  renderAudit();
+}
+
+el("loadBtn").addEventListener("click", load);
+
+el("addForm").addEventListener("submit", (ev) => {
+  ev.preventDefault();
+  const rbRaw = el("rb").value;
+  const body = {
+    user_handle: handle(),
+    weekday: Number(el("weekday").value),
+    period_start: Number(el("ps").value),
+    period_end: Number(el("pe").value),
+    title: (el("title").value || "").trim(),
+  };
+  if (el("room").value.trim()) body.room = el("room").value.trim();
+  if (el("weeks").value.trim()) body.weeks = el("weeks").value.trim();
+  if (rbRaw !== "") body.remind_before = Number(rbRaw);
+
+  api("/api/schedule", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((j) => {
+    if (j.ok) {
+      el("title").value = "";
+      showNotice("addMsg", "已保存「" + body.title + "」（同学再次提交同名课程会覆盖更新）。", "ok");
+      load();
+    } else {
+      showNotice("addMsg", "添加失败：" + ((j.error && j.error.message) || "未知错误"), "danger");
+    }
+  }).catch((e) => showNotice("addMsg", "添加失败：" + e.message, "danger"));
+});
+
+try {
+  const saved = localStorage.getItem("bm_handle");
+  if (saved) el("handle").value = saved;
+} catch { /* 隐私模式：忽略 */ }
+
+load();
+</script>
+</body>
+</html>

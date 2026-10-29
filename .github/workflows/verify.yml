@@ -1,0 +1,37 @@
+name: verify
+
+# 每次 push 与 PR 都自动跑：单测 → 骨架冒烟 → 跨模块集成自检
+#   npm test    : 信封 / schema / 各模块引擎与 service（含页面静态回归守卫）
+#   npm run smoke: 鉴权 / 表清单 / 无硬编码密钥
+#   npm run verify: 自动发现已注册 MCP 工具并逐个真调 + 6 页面 + HTTP 路由 + CDN 红线
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      # better-sqlite3 是原生模块，npm ci 会按需编译（runner 自带 build-essential）
+      - name: 安装依赖
+        run: npm ci
+
+      - name: 单元测试
+        run: npm test
+
+      - name: 骨架冒烟
+        run: npm run smoke
+
+      - name: 跨模块集成自检（14 个 MCP 工具真调 + 6 页面 + 路由 + CDN 红线）
+        run: npm run verify

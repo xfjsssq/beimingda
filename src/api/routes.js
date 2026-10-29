@@ -1,26 +1,34 @@
 /**
  * HTTP API 路由（冻版骨架）
- *   - 已实现：GET /api/health（T0 验收项）
+ *   - 核心：GET /api/health、GET /api/demo/seed
  *   - 各模块在这里挂自己的路由：
  *       M1  GET  /api/tasks?building=&limit=      open 且未过期
  *           POST /api/tasks                       写，需 X-Demo-Token
  *           GET  /api/tasks/:id
- *           POST /api/tasks/:id/match
+ *           POST /api/tasks/:id/match             写，需 X-Demo-Token
+ *           GET  /api/runners  /api/matches        只读门户辅助口
  *       M2  GET  /api/buddies?kind=               仅暴露 anon_token
- *           POST /api/buddies
+ *           POST /api/buddies                     写，需 X-Demo-Token
  *       M3  GET  /api/map/nodes?category=
  *       M4  GET  /api/schedule?handle=
- *           POST /api/schedule
+ *           POST /api/schedule                    写，需 X-Demo-Token
  *           GET  /api/scrub/audit?limit=          评委核验用
  *
  * 约定（冻版）：
  *   - 所有响应走统一信封 {ok,data,error}
  *   - 时间存库 Unix 秒、出接口 ISO 8601（用 src/util/time.js）
  *   - MCP 与 HTTP API 共用同一套 service，⛔ 不许各写一份业务逻辑
+ *   - ⛔ M4 刻意不提供任何课表文件上传接口
  */
 import express from "express";
 import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
+import { getDb } from "../db/index.js";
+import { requireWriteToken } from "../middleware/auth.js";
+import { addScheduleItem, getScheduleItem, listScrubAudit, querySchedule } from "../services/schedule.js";
+import { createMapRouter } from "./map.js";
+import { createDemoRouter } from "./demo.js";
+import { createBuddiesRouter } from "./buddies.js";
 import { createTaskRouter } from "./tasks.js";
 import { createRunnersRouter } from "./runners.js";
 import { createMatchesRouter } from "./matches.js";
@@ -42,15 +50,63 @@ export function createApiRouter() {
     );
   });
 
-  // ---------- 骨架占位：模块路由挂载点 ----------
-  // 各模块在自己的分支里 import 自己的 router，并 router.use(...) 到下面这两个前缀上。
-  // 例：router.use("/tasks", createTaskRouter());
-  //     router.use("/buddies", createBuddyRouter());
-  // ⛔ 不要在这里写具体业务逻辑。
+  // ---------- 模块路由挂载点 ----------
+  // ⛔ 只加自己模块的那一行，不要动别人的；⛔ 不要在这里写具体业务逻辑。
 
-  router.use("/tasks", createTaskRouter()); // M1 代取撮合（feat/m1-takeout）
+  // 核心：演示数据（契约 core.md §3：GET /api/demo/seed）
+  router.use("/demo", createDemoRouter());
+
+  // M3 迎新导览（GET /api/map/nodes、/api/map/summary）
+  router.use("/map", createMapRouter());
+
+  // ---------- M1 代取撮合 ----------
+  router.use("/tasks", createTaskRouter());
   router.use("/runners", createRunnersRouter()); // M1 只读：活跃跑腿者（门户统计，已脱敏）
   router.use("/matches", createMatchesRouter()); // M1 只读：最近撮合记录（门户「平均匹配得分」）
+
+  // ---------- M2 搭子匹配 ----------
+  router.use("/buddies", createBuddiesRouter());
+
+  // ---------- M4 日程提醒与脱敏审计 ----------
+  // 契约 §6：本模块刻意不提供任何课表文件上传接口。
+  router.get("/schedule", (req, res, next) => {
+    try {
+      const { handle, weekday } = req.query;
+      const items = querySchedule(getDb(), {
+        user_handle: handle,
+        weekday: weekday === undefined || weekday === "" ? undefined : Number(weekday),
+      });
+      res.json(ok(items));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // 单条详情（只读）：评委点单条看详情时用
+  router.get("/schedule/:id", (req, res, next) => {
+    try {
+      res.json(ok(getScheduleItem(getDb(), req.params.id)));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // 写接口：按 contracts/core.md §4 必须带 X-Demo-Token
+  router.post("/schedule", requireWriteToken, (req, res, next) => {
+    try {
+      res.json(ok(addScheduleItem(getDb(), req.body ?? {})));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  router.get("/scrub/audit", (req, res, next) => {
+    try {
+      res.json(ok(listScrubAudit(getDb(), req.query.limit)));
+    } catch (e) {
+      next(e);
+    }
+  });
 
   router.use((req, res) => {
     res.status(404).json({

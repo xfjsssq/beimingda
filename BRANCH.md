@@ -1,98 +1,48 @@
-# 分支：feat/m1-takeout
+# main · 集成分支（模块交付名册）
 
-## 本分支做什么
-**M1 代取撮合**：撮合评分引擎 + 任务/跑腿 service + MCP 5 个工具 + `GET/POST /api/tasks` 路由 + `static/takeout.html`
-+ 两条**只读**门户辅助口 `GET /api/runners`、`GET /api/matches`（F0 首页统计用，契约外、已按 M3 `/api/map/summary` 的先例处理）。
+> 每个模块分支在自己的 `BRANCH.md` 里写「本分支做什么 / 依赖什么 / 完成标准 / 不能碰什么」；
+> 合进 `main` 后本文件改为**名册**：逐模块一行，细节回对应 `feat/*` 分支查看该分支自己的 `BRANCH.md`。
 
-## 依赖什么
-- `contracts/core.md`（表结构、信封、鉴权）
-- `contracts/m1-takeout.md`（算法与工具契约，**权重 40/30/30 与阈值 60 不得改**）
-- `tasks/M1-代取撮合.md`（任务卡）
-- T0 骨架已合入 `main`（`src/server.js` `src/db/` `src/mcp/` `src/util/` 可用）
+| 分支 | 模块 | 交付物 | 状态 |
+|---|---|---|---|
+| `feat/m3-welcome` | M3 迎新导览 | `src/services/map.js` · `src/api/map.js` · `src/mcp/handlers/map.js` · `static/welcome.html` · `static/map/map-bg.json` · `pano/` · Pannellum 本地化 | ✅ 已合（底图/全景素材待人工补，页面如实显示"该点暂无实景"） |
+| `feat/m1-takeout` | M1 代取撮合 | `src/engine/match.js` · `src/services/{task,runner,users}.js` · `src/api/tasks.js` · `src/mcp/handlers/takeout.js` · `static/takeout.html` · fixtures | ✅ 已合（契约 §7 八条逐条过） |
+| `feat/frontend` | F0 前端与门户 | `static/css/app.css` · `static/js/{api,nav,demo,mcp-config}.js` · `static/index.html` · `static/agent.html` | ✅ 已合（契约 §7 过） |
+| `feat/m2-buddy` | M2 搭子匹配 | `src/engine/{doubleOpt,buddy}.js` · `src/services/buddy.js` · `src/api/buddies.js` · `src/mcp/handlers/buddy.js` · `static/buddy.html` · fixtures | ✅ 已合（契约 §8 九条逐条过） |
+| `feat/m4-schedule` | M4 日程提醒 | `src/services/{scrub,schedule}.js` · `src/mcp/handlers/schedule.js` · `src/api/routes.js`（3 路由） · `scripts/reminder.js` · `static/schedule.html` · `fixtures/schedule.json` | ✅ 已合（协作者 `CJY-sys` 交付，PR #10 + upsert 修复 #13） |
+| `chore/integration` | 集成校验 | 跨模块合并、`scripts/verify-integration.js`、核心层收尾 | Lead 维护 |
 
-## 完成标准
-`contracts/m1-takeout.md` §7 自测清单全部勾上，外加 `npm test` 有撮合断言测试。
+## 共享文件接触面（多人同时改，合并时只看这几处）
 
-## 不能碰什么
-- `src/db/schema.sql`（要改先提 PR 到 main）
-- `src/mcp/tools.js` / `src/mcp/handlers.js` 里**其他模块**的工具定义（只加 m1 区块）
-- `contracts/` 下任何文件
-- 截图原图落盘、从截图抽取姓名/手机号/运单号
-
-## 当前进度
-- [x] `src/engine/match.js` 撮合评分引擎（含可解释 reason，分值严格相加 = score）
-- [x] `src/services/task.js` `src/services/runner.js` `src/services/users.js`
-- [x] MCP 5 工具注册与 handler（`src/mcp/handlers/takeout.js`）
-- [x] `src/api/tasks.js` + `src/api/routes.js` 挂 4 条路由
-- [x] `static/takeout.html` 4 区块（匹配结果区显示 score 与 reason）
-- [x] `fixtures/tasks.json` 10 条 / `fixtures/runners.json` 9 名（含可匹配 / 无人可接 / 不可达 / 时间不重叠 / 已过期 / done 六类样本）
-- [x] `tests/m1-takeout.test.js` 覆盖契约 §7 八条 + reason 分值 = score
-
-## 本分支新增/改动的文件（集成时看这里）
-| 文件 | 说明 |
+| 文件 | 规则 |
 |---|---|
-| `src/engine/match.js` | 新增。评分引擎，参数从 `config/match-rules.json` 读 |
-| `src/services/users.js` | 新增。昵称→用户（`ensureUser`）+ 入参归一化，**与 `scripts/seed.js` 的 `demo-user-<handle>` 约定一致**，避免 handle UNIQUE 与外键冲突 |
-| `src/services/task.js` | 新增。任务 CRUD / 发布校验 / 撮合落库 / 推送去重 / 截图字段理解 |
-| `src/services/runner.js` | 新增。能力登记（`runners.user_id` UPSERT）+ `reachable_buildings` 归一 |
-| `src/services/buildings.js` | 新增。楼栋/站点**规范名归一**（口语写法 → `config/map-nodes.json` 的 label），MCP 与 HTTP 共用 |
-| `src/mcp/handlers/takeout.js` | 新增。5 个工具 schema（照抄契约）+ handler（不写 SQL） |
-| `src/mcp/handlers.js` | **只加 2 行**：顶部 `import { registerTakeoutTools }`；`MODULE_REGISTRARS` 里 `{ module: "m1", register: registerTakeoutTools }`（m2/m3/m4 的注释行未动） |
-| `src/api/tasks.js` | 新增。4 条路由，写接口 `requireWriteToken` |
-| `src/api/runners.js` | 新增。`GET /api/runners` 只读、脱敏（不出 `user_id` / 联系方式），门户「活跃跑腿者数」用 |
-| `src/api/matches.js` | 新增。`GET /api/matches?limit=` 只读，最近撮合记录（含 `score`），门户「平均匹配得分」用 |
-| `src/api/routes.js` | **只加 6 行**：3 个 import + `router.use("/tasks"…, "/runners"…, "/matches"…)`，全部挂在 404 兜底之前；其他模块的行未动 |
-| `static/takeout.html` | 新增。自包含（内联样式+脚本），只外链 `/config.js` |
-| `fixtures/tasks.json` `fixtures/runners.json` | 覆盖写（原来各 1 条占位） |
-| `tests/m1-takeout.test.js` | 新增 |
-| `tests/skeleton.test.js` | 由 lead 预置的 T0 过期断言修复（tools/list 不再断言为空），本分支仅原样提交 |
+| `src/mcp/handlers.js` | 每个模块只加自己的 `import` 与 `MODULE_REGISTRARS` 数组项，⛔ 不动别人的行、不重排 |
+| `src/api/routes.js` | 每个模块只加自己的 `import` 与一行 `router.use(...)` |
+| `tests/skeleton.test.js` | T0 的 `tools/list === []` 断言已过期，统一改为「返回数组 + 每个工具 `additionalProperties:false` + 工具名不重复」，**各分支内容字节一致**（SHA256 前 16 位 `E092CA0D10683F77`） |
+| `BRANCH.md` | 各分支各写自己的；合进 main 后以本名册为准，冲突时保名册、细节回分支看 |
+| `config/map-nodes.json` | M3 维护；M1 的 `from_building`/`to_building` 必须与它的 `label` **字面一致**（可达性得分的唯一依据） |
 
-## 降级实现说明（无 LLM key 时）
-`.env` 里 `LLM_BASE_URL` / `LLM_API_KEY` / `LLM_MODEL` 为空 → `task_parse_screenshot` 走**规则化兜底**：
-- 只用 `hint` 文本做确定性匹配：楼栋/快递站取自 `config/map-nodes.json` 的规范 `label`，报酬区间识别「3-5元 / 3块到5块」这类写法；
-- **不做 OCR、不调外部接口、图片不落盘、不打日志**；
-- 识别不出的字段一律 `null`，关键字段全空时 `confidence = 0`（`<0.4` 时强制全 null，不猜测）；
-- `deadline_iso` 与 `note` 在兜底路径里**刻意不填**（时间表述歧义大；自由文本可能带姓名/电话/单号，抄进库等于变相抽取）；
-- 三件套配齐时才走真模型调用（`POST {LLM_BASE_URL}/chat/completions`，图片以 data URL 进请求体，25 秒超时，⛔ 单次 < 90 秒），模型返回里除契约字段外的键一律丢弃，姓名/手机号/运单号不落任何字段。
-> M2 分支的语义相似度兜底同理，但那是 M2 的文件，本分支不碰。
+## 集成校验（一条命令跑完）
 
-## 其他实现约定（评审可能问）
-- **可解释性**：三段得分各自四舍五入到 2 位小数，再按整数「分」相加 → `reason` 里显示的数字相加**严格等于** `score`（不会出现「+30 却 59.7」）。
-- **推送**：单任务最多同时推 3 名（`max_push_per_task`），只对前 3 名写 `matches`；超出的候选仍在返回里，带 `skip_reason`。
-- **去重**：同一 `(task_id, runner_id)` 300 秒内不重复写 `matches`；被跳过的候选仍然返回 score/reason，只把 `pushed` 置 false 并给出 `skip_reason`（这样演示时重复点「查看匹配」不会 401/空结果，也不会重复落库）。
-- **note 脱敏**：手机号（11 位）与 ≥12 位长数字串入库前打码，并把**字段名**（`phone,tracking_no`）写进 `scrub_audit`（只记名字，绝不记值）。
-- **active 过滤**：`active = 0` 的能力登记不进候选池（service 层 `WHERE active=1`，引擎里也再判一次）。
+```bash
+npm test          # 单测（信封 / schema / 各模块引擎与 service）
+npm run smoke     # 骨架级冒烟（鉴权 / 表清单 / 无硬编码密钥）
+npm run verify    # 模块级集成：自动发现 MCP 工具真调 + 6 页面 + HTTP 路由 + CDN 红线
+```
 
-## 楼栋规范名归一（`src/services/buildings.js`）
-`config/map-nodes.json` 的 `label` 是撮合唯一口径（可达性 40 分靠**字面比对**），而调用方（尤其经 LLM / WorkBuddy）
-天然会写「12号楼」「12栋」「菜鸟驿站」——直接用会「发布成功但永远匹配不到」，看起来像引擎坏了。所以 **先归一、归一失败再拒**：
+## 已知限制（如实记录，不是待修 bug）
 
-| 输入 | 结果 |
-|---|---|
-| `12号楼` / `12栋` / `十二号宿舍楼` / `12号` / `12号宿舍楼东` | `12号宿舍楼` |
-| `菜鸟驿站` / `快递站` | `快递驿站` |
-| `南大门` | `南门` |
-| `二食堂` / `2食堂` / `第2食堂` | `第二食堂` |
-| `火星楼` / `12号教学楼` | `SCHEMA_REJECTED` + message 里列出可选规范名（让 Agent 自我纠正） |
-
-- 别名由 **config 的 label 自动派生**（编号 × 宿舍/食堂核心词 × 阿拉伯/中文数字，驿站类与门类同义词），**不写死楼栋**；config 加节点即自动生效。
-- 覆盖面：`task_publish` 的 `from_building`/`to_building`、`runner_register` 的 `reachable_buildings`、`task_list_open`/`GET /api/tasks` 的 `building` 过滤参数；MCP 与 HTTP 走同一套（⛔ 没有第二份实现）。
-- 快递站 `station` 是**宽松**策略：归一命中就用规范名，归不出来**保留原文**（station 不参与打分，过度拒绝只会让 Agent 反复试错）。
-- 已知限制：`一食堂` 会被折成 `第一食堂`，但本校园 config 里只有 `第二食堂` → 因此**会被拒并列出可选值**（宁可让 Agent 改正，也不匹配到错的楼）。B6（覆盖率显示 `0%` 应写成 `<1%`）本轮按 lead 决定跳过，记入已知限制。
-
-## 集成注意（lead 用）
-1. `src/mcp/handlers.js` 与 `src/api/routes.js` 各只加了自己那两行，**与 m2/m3/m4 的改动不重叠**；若发生冲突，保留 m1 的那两行即可。
-2. 🖊 **前端令牌**：写接口要 `X-Demo-Token`、MCP 要 `Authorization: Bearer`。`static/takeout.html` 按 `?token=` → `window.__DEMO_TOKEN__` → `localStorage` 的优先级取令牌（**不硬编码**）。若希望评委零操作就能发布/撮合，可在 `/config.js` 里注入 `window.__DEMO_TOKEN__`（我按边界要求没有改 `src/server.js`，请 lead 决定）——注入后我的页面会自动用上，无需改页面。
-3. `static/takeout.html` 的楼栋下拉优先读 M3 的 `GET /api/map/nodes`，接口不存在时用与 `config/map-nodes.json` 字面一致的内置兜底清单；M3 合进来后自动切换。
-4. 本分支**没有** `static/js/api.js` / `nav.js`，页面自带内联脚本；F0 合入后若要统一样式，只需替换 `<style>` 与外链，别动脚本逻辑（匹配结果区的 `score` / `reason` 渲染是评委看点）。
-5. fixtures 的时间是 `*_in_minutes` 相对时间 → **路演/录制前请重跑 `npm run seed -- --reset`**，否则任务会全部过期。
-6. `demo-runner-2`（同学E）刻意把报酬下限设成 4 元，让它稳定在 65~75 分；避免演示中途从候选里消失（50% 覆盖边界会随时间把 60 分卡在阈值上下）。
-7. **门户两格数据**：`GET /api/runners` 已能点亮「活跃跑腿者数」（seed 后 = 8）。`GET /api/matches` 在 `seed` 之后是 **0 条**（库里的 `matches` 只有撮合过才有行）→ F0 的「平均匹配得分」会显示「—」，在 `/takeout` 点一次「查看匹配」（或调 `match_find_for_task`）后即变为真实平均分（实测 86.7）。若希望**首页开箱即有数**，需要在核心层加一步「对 open 任务跑一遍撮合」（`scripts/seed.js` 末尾或 `/api/demo/seed`）——这两个都是核心层文件/路由，我没动，请 lead 定。
-
-## 验收证据（本分支提交时实测）
-- `npm test` → **29/29 通过**（T0 的 10 条 + M1 的 19 条）
-- `npm run smoke` → **8/8 通过**
-- `node scripts/verify-integration.js`（lead 的跨模块验证器，临时拷入后已删）→ M1 相关 `tools/schema/call/guard/page( /takeout )/route( /api/tasks* )` 全 ✅；❌ 仅 buddy*/map*/schedule* 与 `/buddy /welcome /schedule /agent`（其他模块未合并）
-- `npm run seed -- --reset && npm run seed -- --check` → tasks 10 / runners 9 灌库成功
-- 起服务实测：MCP 5 工具注册、`GET/POST /api/tasks`、`GET /api/tasks/:id`、`POST /api/tasks/:id/match`（含 5 分钟去重）、`demo-task-1` 6 名候选按 score 降序、`demo-task-5` 0 候选（无人可接）、`/takeout` HTTP 200
-- 门户辅助口实测（复刻 F0 `index.html` 的 `listOf()` 消费逻辑）：`GET /api/runners` → 8 人（9 名里 1 名 `active=false` 被排除），返回里**不含** `user_id` / `contact_code`；撮合一次后 `GET /api/matches?limit=20` → 3 条、平均得分 **86.7**
+1. **LLM 能力默认关闭**：`.env` 里 `LLM_*` 为空时，M1 的截图字段理解、M2 的语义 15 分都走**规则化降级实现**（功能不阻塞、精度下降）。有 key 时自动走模型；未为自测调用过付费模型。
+2. **M1 fixtures 用相对时间**（`*_in_minutes`）：路演/录制前必须重跑 `npm run seed -- --reset`，否则任务全部过期。
+3. **M2 契约标题「11 字段」是概数**：以 `contracts/m2-buddy.md` §1 的 JSON 结构为权威（9 个顶层键 / 13 个叶子字段）。
+4. **M2 发布方"拒绝后不可反悔"仅在进程内记忆**：三个 bit 列无法区分"没表态"与"拒绝了"；寻找方侧由数据库 `UNIQUE(post_id, seeker_id)` 硬保证（契约要求的那一条）。
+5. **M3 底图与全景是人工素材**：底图需一张手机地图截图（`static/map/campus-map.jpg`），全景按 `pano/HOWTO-补全景.md` 补；缺素材时页面诚实提示，不拿别的图糊弄。
+6. **本机 3000 端口被无关常驻进程占用**：本地演示请 `PORT=3080 npm start`，MCP 地址相应变为 `http://<host>:3080/mcp`。
+7. **M2「先表决后搜索」时两处分数口径不同**：`buddy_consents.score`（表决时算；表决请求不带 `text_profile`，只能拿该 seeker 最近一次 search 的画像缓存，从没搜过则用中性画像、会偏低）与候选列表同一条的 `score`（用当次 search 的画像算）可能不一致。**是否揭示只由双选状态机决定，与这个分数无关**（不存在"分不够就不给揭示"的门槛）——这是契约（表决接口不收画像）带来的固有差异，不改语义。
+8. **M3 底图以 `contracts/m3-welcome.md` §1 为准**：手机地图截图 + 百分比坐标（零申请、断网可跑），缺素材时用占位示意图并如实标注来源；后续若有"在线可拖动底图"的增强，必须保留离线截图兜底。
+9. **楼栋名"先归一、归一失败再拒"**：`12号楼`/`15栋`/`十二号楼`/`菜鸟驿站` 会自动折成 `config/map-nodes.json` 里的规范名（别名由该文件自动派生，加节点即生效）；**折不出来就 `SCHEMA_REJECTED` 并列出可选规范名**（例：`一食堂`→`第一食堂`，但本校园只有 `第二食堂` → 拒绝并提示）。这比"硬造一个不存在的楼、让任务永远匹配不到人"更诚实。
+10. **个别展示文案未做微调**（不影响验收）：M1 `reason` 的时段覆盖率在极小重叠时显示 `0%`（实为 1 秒级重叠），可读性上建议未来显示 `<1%`；报酬分按"分"（×100 取整）相加与 score 严格相等，直接当浮点数相加末位可能差 1 ulp —— 校验请取整或留极小容差。
+11. **M4 的 upsert 键是 `(user_id, weekday, period_start, period_end, title)`**：同一时段但**改了课程名**会新增一条而不是更新。页面「提醒设置」带原 title，所以正常；**批量导入请走 `schedule_import`**（先清空该用户旧课表再插入），不要和 upsert 混用。
+12. **M4 的 `config/periods.json` 作息未核实**：`scripts/reminder.js` 完全靠这张表把 `period_start` 换算成当天时刻，**作息错了提醒时刻就错**。演示前必须由负责人从教务/学生手册核实 1–10 节开始时刻与课间并更新该文件；核实之前，材料与口头汇报只能说「按**可配置的**节次时间表」，不能说「按学校作息」。
+13. **令牌措辞与实现的偏差（已在页面侧改准）**：`contracts/core.md` §4 写"令牌设计为**只读** + 限频 + 短周期轮换"，但同一个演示令牌既能调 MCP 工具，也能过 HTTP 写接口（发布任务/发帖/写日程）。契约不改，**页面与配置页文案已改为准确表述**：`限频 + 短周期轮换，且只能操作演示数据`。材料（`materials/04`）按实际行为描述。
+14. **两个素材缺口（非代码问题，提交前需人工决定）**：`pano/manifest.json` 的 `scenes` 为空 → 实景 0 个（页面如实提示，材料按"不假装有实景"写）；`static/map/` 底图仍是占位示意图（离线兜底），高德 JS API 视图需 ① 服务端配 `AMAP_JS_KEY` 且白名单含访问域名 ② 用 `/tools/pick.html` 把 12 个点位坐标录进 `config/map-nodes.json`（当前 `lat/lng` 全为 0，增强视图画不出点位）。
