@@ -673,6 +673,8 @@ function openStreetScene(sceneId) {
   const scenes = MANIFEST.scenes || {};
   if (!scenes[sceneId]) return;
   streetScene = sceneId;
+  // 遮罩由函数自己保证可见：深链 ?pano=、卡片按钮、场景切换都走这里
+  $("#panoOverlay").classList.add("on");
   $("#streetFallback").hidden = true;
   $("#panoTitle").textContent = "3D 街景 · " + (scenes[sceneId].title || sceneId);
   renderStreetPick();
@@ -690,7 +692,6 @@ function openStreetScene(sceneId) {
       showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true,
       // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
       minPitch: -18, maxPitch: 18, pitch: 0,
-      hfov: 100, minHfov: 60, maxHfov: 120,
       compass: false,
     });
   } catch (e) {
