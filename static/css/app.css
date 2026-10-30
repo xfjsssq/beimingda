@@ -2497,3 +2497,32 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 .help-figure img { display: block; width: 100%; height: auto; border-radius: var(--radius-card);
   border: 1px solid var(--color-line); background: #fff; }
 .help-step__text { margin: 0; font-size: 13.5px; line-height: 1.8; color: var(--color-muted); }
+
+/* ---------- 3D 街景的缩放进度条（数值 = 水平视场角） ---------- */
+.pano-zoom {
+  display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(31, 78, 140, 0.18);
+  border-radius: 9999px; box-shadow: 0 3px 12px rgba(16, 24, 40, 0.18); backdrop-filter: blur(6px);
+}
+.pano-zoom__btn { width: 24px; height: 24px; border-radius: 9999px; background: var(--color-primary-soft);
+  color: var(--color-primary); display: inline-flex; align-items: center; justify-content: center;
+  font-size: 16px; line-height: 1; cursor: pointer; user-select: none; }
+.pano-zoom__btn:hover { background: rgba(31, 78, 140, 0.18); }
+.pano-zoom__range { width: 132px; accent-color: var(--color-primary); cursor: pointer; }
+.pano-zoom__val { font-size: 12px; color: var(--color-muted); min-width: 38px; text-align: right; }
+@media (max-width: 768px) {
+  .pano-zoom { gap: 6px; padding: 3px 8px; }
+  .pano-zoom__range { width: 88px; }
+}
+
+/* ---------- 卫星点位：常驻小气泡（不用点开就知道是哪） ---------- */
+.sat-marker__label {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  padding: 2px 8px; border-radius: 9999px; white-space: nowrap;
+  font-size: 11px; line-height: 1.5; color: #1f2a37;
+  background: rgba(255, 255, 255, 0.92); border: 1px solid rgba(31, 78, 140, 0.18);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18); pointer-events: none;   /* 点它等于点圆点 */
+}
+.sat-marker.side-right .sat-marker__label { left: 22px; }
+.sat-marker.side-left  .sat-marker__label { right: 22px; }
+.sat-marker.has-pano .sat-marker__label { border-color: rgba(46, 139, 118, 0.45); }

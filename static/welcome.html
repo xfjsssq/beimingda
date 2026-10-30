@@ -233,6 +233,13 @@
   <div class="street-bar">
     <span class="title" id="panoTitle">3D 街景</span>
     <div class="street-pick" id="streetPick"></div>
+    <label class="pano-zoom" for="panoZoom" title="缩放（数值 = 水平视场角，越小越近）">
+      <span class="pano-zoom__btn" id="panoZoomOut" aria-hidden="true">−</span>
+      <input class="pano-zoom__range" id="panoZoom" type="range" min="55" max="140" step="1" value="100"
+             aria-label="街景缩放（水平视场角）" />
+      <span class="pano-zoom__btn" id="panoZoomIn" aria-hidden="true">+</span>
+      <span class="pano-zoom__val" id="panoZoomVal">100°</span>
+    </label>
     <button id="panoClose" type="button">关闭</button>
   </div>
   <div id="pano"></div>
@@ -613,6 +620,25 @@ function renderStreetPick() {
   }
 }
 
+/** 街景缩放：进度条 + 加减按钮，数值就是水平视场角（越小越近） */
+function setupPanoZoom() {
+  const range = $("#panoZoom");
+  const val = $("#panoZoomVal");
+  const apply = (hfov) => {
+    const v = Math.min(140, Math.max(55, Number(hfov)));
+    if (range) range.value = String(v);
+    if (val) val.textContent = Math.round(v) + "\u00b0";
+    if (streetViewer && streetViewer.setHfov) {
+      try { streetViewer.setHfov(v, 200); } catch { /* 查看器还没就绪就忽略 */ }
+    }
+  };
+  range?.addEventListener("input", () => apply(range.value));
+  $("#panoZoomIn")?.addEventListener("click", () => apply(Number(range?.value || 100) - 8));
+  $("#panoZoomOut")?.addEventListener("click", () => apply(Number(range?.value || 100) + 8));
+  return apply;
+}
+const panoZoomApply = setupPanoZoom();
+
 function openStreetScene(sceneId) {
   const scenes = MANIFEST.scenes || {};
   if (!scenes[sceneId]) return;
@@ -630,14 +656,14 @@ function openStreetScene(sceneId) {
       scenes,
       autoLoad: true,
       showControls: true,
-      // ⭐ 不要缩放：用户要求"保证画面完整就定死了" —— 关掉滚轮/按钮/双指缩放，
-      //    并把水平视场锁死在一个固定值（全站一致），免得缩进去露出补出来的假天空/地面
-      hfov: 100, minHfov: 100, maxHfov: 100,
+      // 缩放：先用进度条自己调，站长定下最合适的数值后再锁（minHfov = maxHfov = 那个值）
+      hfov: 100, minHfov: 55, maxHfov: 140,
       showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true,
       // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
       minPitch: -18, maxPitch: 18, pitch: 0,
       compass: false,
     });
+    setTimeout(() => { try { panoZoomApply?.(streetViewer?.getHfov?.() ?? 100); } catch { /* 忽略 */ } }, 400);
   } catch (e) {
     streetViewer = null;
     showStreetEmpty("查看器启动失败：" + (e && e.message ? e.message : e));
@@ -798,9 +824,27 @@ function satCoordsOf(node) {
   return null;
 }
 
+/** 密集处气泡朝簇外指：先看整簇经度均值，偏左的点标签朝左、偏右的朝右，再上下错开 */
+function labelSlotsFor(nodes) {
+  const withCoord = nodes.map((n) => ({ n, c: satCoordsOf(n) })).filter((x) => x.c);
+  const meanLng = withCoord.reduce((s, x) => s + x.c.lng, 0) / (withCoord.length || 1);
+  const used = { left: 0, right: 0 };
+  const slots = new Map();
+  for (const { n, c } of withCoord) {
+    const side = c.lng < meanLng ? "left" : "right";
+    const dy = [0, -28, 28][used[side] % 3];
+    used[side] += 1;
+    slots.set(n.id, { side, dy });
+  }
+  return slots;
+}
+
 function renderSatMarkers() {
   if (!satState.map || !satState.group) return;
   satState.group.clearLayers();
+  satState.labelSideFlip = false;
+  const shown = NODES.filter((x) => !satState.onlyPano || sceneOf(x)).filter((x) => satCoordsOf(x));
+  const labelSlot = labelSlotsFor(shown);   // 先算好每个点标签朝哪边、错多少
   let placed = 0;
   for (const n of NODES) {
     if (satState.onlyPano && !sceneOf(n)) continue;      // 3D 街景视图只显示有实景的点位
@@ -808,9 +852,13 @@ function renderSatMarkers() {
     if (!c) continue;
     placed++;
     const hasPano = Boolean(sceneOf(n));
+    // 常驻小气泡：标出"这是哪"，不用点开就能看到；点开才有「进入 3D 街景」
+    const slot = labelSlot.get(n.id) || { side: "right", dy: 0 };
+    const dy = slot.dy, side = slot.side;
     const icon = L.divIcon({
-      className: "sat-marker cat-" + (n.category || "service") + (hasPano ? " has-pano" : ""),
-      html: '<span class="sat-marker__dot"></span>',
+      className: "sat-marker cat-" + (n.category || "service") + (hasPano ? " has-pano" : "") + " side-" + side,
+      html: '<span class="sat-marker__dot"></span><span class="sat-marker__label" style="margin-top:' + dy + 'px">' +
+            esc(n.short || n.label) + '</span>',
       iconSize: [18, 18], iconAnchor: [9, 9],
     });
     const m = L.marker([c.lat, c.lng], { icon, title: n.label }).addTo(satState.group);
@@ -1016,7 +1064,7 @@ function removeSpot(id) {
       if (p.id && p.lat && p.lng) satState.coords[p.id] = { lat: Number(p.lat), lng: Number(p.lng) };
       if (p.id && Array.isArray(NODES) && !NODES.some((n) => n.id === p.id)) {
         NODES.push({
-          id: p.id, label: p.label || "实景点位", category: p.category || "service",
+          id: p.id, label: p.label || "实景点位", short: p.short || null, category: p.category || "service",
           desc: p.note || "", color: p.color || "",
           pano_url: p.pano_scene ? "/pano/" + p.pano_scene + ".jpg" : null,   // ⭐ 绑定实景素材
           lat: 0, lng: 0,
@@ -1024,6 +1072,7 @@ function removeSpot(id) {
       } else if (p.id) {
         const n = NODES.find((x) => x.id === p.id);
         if (n && p.label) n.label = p.label;
+        if (n && p.short) n.short = p.short;
         if (n && p.note) n.desc = p.note;
         if (n && p.pano_scene) n.pano_url = "/pano/" + p.pano_scene + ".jpg";
       }
