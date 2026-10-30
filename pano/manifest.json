@@ -10,7 +10,7 @@
   "scenes": {
     "pano-1": {
       "panorama": "/pano/pano-1.jpg",
-      "title": "第一点位",
+      "title": "明湖风光 1",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -34,7 +34,7 @@
     },
     "pano-2": {
       "panorama": "/pano/pano-2.jpg",
-      "title": "第二点位",
+      "title": "明湖风光 2",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -82,7 +82,7 @@
     },
     "pano-4": {
       "panorama": "/pano/pano-4.jpg",
-      "title": "第三点位",
+      "title": "明湖风光 3",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,

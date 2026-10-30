@@ -406,6 +406,23 @@ export function mountNav(opts = {}) {
     // B7/B11：滚动揭示 + 标语逐词（走共享层，六个页面共用，各页不用改）
     // 右上角调色盘（色调 / 圆角 / 背景），选择存 localStorage
     import("/js/theme.js").then((t) => t.initTheme?.()).catch(() => {});
+
+    // 「这一页怎么用」小问号（用户要求：每个功能右上角一个，点开是教学）
+    try {
+      if (!document.querySelector(".help-btn")) {
+        const hb = document.createElement("button");
+        hb.type = "button";
+        hb.className = "help-btn";
+        hb.setAttribute("aria-label", "这一页怎么用");
+        hb.title = "这一页怎么用";
+        hb.innerHTML = '<span class="icon icon--18" aria-hidden="true" ' +
+          'style="--icon:url(/vendor/phosphor/icons/info-circle.svg)"></span>';
+        hb.addEventListener("click", () => {
+          import("/js/ui.js").then((ui) => ui.openHelp?.(activeId)).catch(() => {});
+        });
+        document.body.appendChild(hb);
+      }
+    } catch { /* 教学按钮失败不影响页面 */ }
     import("/js/ui.js")
       .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); ui.initCardPicker?.(); })
       .catch(() => {});   // 环境不支持 IntersectionObserver 时静默降级

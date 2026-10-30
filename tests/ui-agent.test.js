@@ -119,6 +119,18 @@ test("/agent：零外链（断网可跑）—— 没有外站 src/href，也没�
 });
 
 /* ------------------------------------------------------------------ 4. 原有可用功能一个都不能丢 */
+test("/agent：一键配置给出「整段提示词 + mcp.json」两个框，提示词覆盖接入/启动/反问", () => {
+  assert.match(html, /id="prompt-box"/, "要有提示词框");
+  assert.match(html, /id="mcp-json"/, "要保留纯 mcp.json 框");
+  assert.match(html, /id="copy-prompt-btn"/, "要有「复制提示词（含配置）」按钮");
+  assert.match(html, /agent-prompt\.js/, "提示词由共享模块生成，页面不硬编码");
+  const mod = fs.readFileSync(path.join(ROOT, "static/js/agent-prompt.js"), "utf8");
+  for (const kw of ["mcpServers", "npm start", "\u53cd\u95ee", "\u4e0d\u6536\u96c6", "app_open_view", "schedule_import"]) {
+    assert.ok(mod.includes(kw), "提示词要覆盖：" + kw);
+  }
+  assert.ok(!/<pre[^>]*id="prompt-box"[\s\S]{0,200}<\/pre>\s*<\/pre>/.test(html), "结构别写坏");
+});
+
 test("/agent：保留原有可用功能（复制 / 下载 / 实时核对 / 演示徽章 / 6 个区块锚点）", () => {
   for (const id of ["block1-title", "block2-title", "block3-title", "block4-title", "block5-title", "block6-title"]) {
     assert.match(html, new RegExp(`id="${id}"`), `丢了区块锚点 ${id}`);

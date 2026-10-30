@@ -1948,8 +1948,8 @@ code.inline {
 }
 .tab:hover { background: rgba(31, 78, 140, .06); color: var(--color-primary); }
 .tab[aria-selected="true"] {
-  background: #fff; color: var(--color-primary); font-weight: 600;
-  box-shadow:var(--shadow-card);
+  background: var(--btn-flat); color: #fff; font-weight: 600;   /* ⚠️ 底色与文字必须成对改：白底白字会看不见 */
+  box-shadow: var(--shadow-card);
 }
 .tab:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .tabpanel[hidden] { display: none; }
@@ -2448,6 +2448,52 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 }
 .segmented__btn[aria-pressed="true"] .icon, .segmented__btn.is-on .icon { background-color: #fff; }
 .chip[aria-pressed="true"] { background: var(--btn-flat); color: #fff; border-color: var(--btn-flat); }
-.tab[aria-selected="true"] { color: #fff; }
 .map-hud .segmented__btn { color: var(--color-text); }
 .map-hud .segmented__btn[aria-pressed="true"] { color: #fff; }
+
+/* 分栏选中态里的图标跟着反白（否则线性图标还是深色、压在品牌底上看不清） */
+.tab[aria-selected="true"] .icon { background-color: #fff; }
+
+/* ---------- 首页四功能卡：悬停即生效（用户要求"鼠标移上去就跟点击一样"） ----------
+   · 桌面（有 hover 的设备）：悬停某张卡 → 它浮起放大，其余后退；
+   · 触屏（无 hover）：仍由点击/点按触发（ui.js 的 initCardPicker 负责），两者互不打架。 */
+@media (hover: hover) and (pointer: fine) {
+  #features .grid--cards .card:hover,
+  #features .grid .card:hover {
+    transform: translateY(-10px) scale(1.04);
+    box-shadow: 0 18px 40px -18px rgba(16, 24, 40, 0.38), 0 0 0 2px var(--color-primary) inset;
+    z-index: 3;
+  }
+  #features .grid--cards:has(.card:hover) .card:not(:hover),
+  #features .grid:has(.card:hover) .card:not(:hover) {
+    transform: scale(0.965) translateY(2px);
+    opacity: 0.62;
+    filter: saturate(0.85);
+  }
+}
+
+/* ---------- 「这一页怎么用」小问号 + 教学侧栏（2026-10-30） ---------- */
+.help-btn {
+  position: fixed; top: 12px; right: 64px; z-index: 45;   /* 与调色盘并排 */
+  width: 40px; height: 40px; border-radius: 9999px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(255, 255, 255, 0.86); border: 1px solid rgba(31, 78, 140, 0.16);
+  color: var(--color-primary); box-shadow: 0 8px 24px -12px rgba(16, 24, 40, 0.32);
+  backdrop-filter: blur(10px); transition: background var(--dur-color) var(--ease), transform 200ms var(--ease);
+}
+.help-btn:hover { background: #fff; }
+.help-btn:active { transform: scale(0.94); }
+@media (max-width: 768px) { .help-btn { top: 8px; right: 56px; width: 36px; height: 36px; } }
+
+.help-body { display: flex; flex-direction: column; gap: 20px; }
+.help-intro { margin: 0; font-size: 14px; line-height: 1.75; color: var(--color-text); }
+.help-step { display: flex; flex-direction: column; gap: 8px; }
+.help-step__title { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; font-weight: 600; }
+.help-step__num {
+  flex: 0 0 auto; width: 22px; height: 22px; border-radius: 9999px; background: var(--btn-flat); color: #fff;
+  font-size: 12px; display: inline-flex; align-items: center; justify-content: center;
+}
+.help-figure { margin: 0; }
+.help-figure img { display: block; width: 100%; height: auto; border-radius: var(--radius-card);
+  border: 1px solid var(--color-line); background: #fff; }
+.help-step__text { margin: 0; font-size: 13.5px; line-height: 1.8; color: var(--color-muted); }

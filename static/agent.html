@@ -111,7 +111,13 @@
     @media (max-width: 760px) {
       .quick-steps { grid-template-columns: 1fr; }
     }
-  </style>
+    /* 提示词框：固定高度 + 可滚动（鼠标放上去滚轮上下浏览完整内容） */
+  .code--scroll { max-height: 320px; overflow: auto; overscroll-behavior: contain; white-space: pre-wrap;
+    word-break: break-word; line-height: 1.65; }
+  .prompt-hint { margin: 0 0 8px; font-size: 13px; line-height: 1.7; color: var(--color-muted); }
+  .code--scroll:focus { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+  .field__label { display: block; margin: 0 0 4px; font-size: 12px; color: var(--color-muted); }
+</style>
   <meta property="og:title" content="接入 Agent：把整个平台交给一句话" />
   <meta property="og:description" content="远程 Streamable HTTP MCP，零配置接入 WorkBuddy；复制一段 JSON 就能用 14 个工具操控平台。" />
   <meta property="og:type" content="website" />
@@ -235,12 +241,22 @@
 
           <div>
             <h3 class="mini-title" style="margin-top:0">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span>直接复制 / 下载
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span>复制这段，Agent 就能直接用
             </h3>
+            <p class="prompt-hint">
+              下面第一框是<b>整段提示词</b>（把 MCP 怎么接、能干什么、站点红线、源码怎么起服务、信息不全要反问都写进去了），
+              第二框是<b>纯 mcp.json</b>。鼠标放上去可上下滚动看完整内容。复制按钮会一次给全。
+            </p>
+            <label class="field__label" for="prompt-box">整段提示词（可直接粘给对话方）</label>
+            <pre class="code code--scroll" id="prompt-box" tabindex="0" aria-label="接入提示词（可滚动浏览）">正在生成…</pre>
+            <label class="field__label" for="mcp-json" style="margin-top:12px">mcp.json（只接 MCP 时用这段）</label>
             <pre class="code" id="mcp-json" style="margin-top:0" aria-label="MCP 配置 JSON（含 &lt;DEMO_TOKEN&gt; 占位符）">读取中…</pre>
             <div class="copy-row">
-              <button class="btn" type="button" id="copy-btn">
-                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span>复制配置
+              <button class="btn" type="button" id="copy-prompt-btn">
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span>复制提示词（含配置）
+              </button>
+              <button class="btn btn--ghost" type="button" id="copy-btn">
+                <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span>只复制 mcp.json
               </button>
               <button class="btn btn--ghost btn--sm" type="button" id="download-btn">
                 <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/check.svg)"></span>下载 mcp.json
@@ -401,6 +417,7 @@
 
   <script src="/config.js"></script>
   <script type="module">
+  import { buildAgentPrompt } from "/js/agent-prompt.js";
     import { mcpToolNames } from "/js/api.js";
     import { mountNav } from "/js/nav.js";
     import { initDemo } from "/js/demo.js";
@@ -451,6 +468,16 @@
 
       const url = resolveMcpUrl(options());
       $("#mcp-url").textContent = url || "（未取到，请用浏览器打开本站）";
+
+      // 整段提示词（含怎么接、能干什么、站点红线、源码怎么起服务、信息不全要反问）
+      const box = $("#prompt-box");
+      if (box) {
+        box.textContent = buildAgentPrompt({
+          origin: location.origin,
+          mcpUrl: url || location.origin + "/mcp",
+          tokenPlaceholder: "<DEMO_TOKEN>",
+        });
+      }
 
       // 自证：渲染出来的就是合法 JSON，不合格就地报出来而不是静默
       let valid = true;
@@ -569,7 +596,13 @@
        =================================================================== */
     let currentJson = renderConfig();
 
-    $("#copy-btn").addEventListener("click", (e) =>
+    $("#copy-prompt-btn")?.addEventListener("click", async () => {
+    const prompt = $("#prompt-box")?.textContent || "";
+    const json = $("#mcp-json")?.textContent || "";
+    const ok = await copyText(prompt + "\n\n```json\n" + json + "\n```");
+    toast(ok ? "提示词 + 配置已复制，整段粘给对话方即可" : "复制失败，请手动选中复制", ok ? "ok" : "danger");
+  });
+  $("#copy-btn")?.addEventListener("click", (e) =>
       copyWithFeedback(e.currentTarget, currentJson, "MCP 配置", selectJsonText),
     );
 

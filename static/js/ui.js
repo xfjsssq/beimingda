@@ -184,6 +184,7 @@ export default {
   copyText,
   mountTabs,
   createSheet,
+  openHelp,
   initCardPicker,
   initReveals,
   initTagline,
@@ -486,4 +487,55 @@ export function initCardPicker(selector = "#features .card") {
     if (e.key === "Escape" && picked) { picked = null; apply(); }
   });
   return cards.length;
+}
+
+
+/* =============================================================================
+   openHelp —— 「使用教学」侧栏（2026-10-30 · 用户要求：每个功能右上角放个小问号）
+     内容来自 /js/help-content.js（文案与截图都在那边，改内容不用动逻辑）；
+     截图是真实界面 + 红框序号（static/img/help/），保证"教的就是你现在看到的界面"。
+   ============================================================================= */
+export async function openHelp(pageId) {
+  let content = null;
+  try {
+    const mod = await import("/js/help-content.js");
+    content = mod.PAGE_HELP?.[pageId] || null;
+  } catch {
+    content = null;
+  }
+  if (!content) {
+    toast("这一页还没有教学（" + (pageId || "未知页") + "）", "danger");
+    return null;
+  }
+
+  const body = el("div", "help-body");
+  const intro = el("p", "help-intro", content.intro || "");
+  body.appendChild(intro);
+
+  content.steps.forEach((s, i) => {
+    const step = el("section", "help-step");
+    const head = el("h4", "help-step__title");
+    const num = el("span", "help-step__num", String(i + 1));
+    head.append(num, el("span", "", s.title || ""));
+    step.appendChild(head);
+    if (s.img) {
+      const fig = el("figure", "help-figure");
+      const img = document.createElement("img");
+      img.src = s.img;
+      img.alt = s.title || "使用示意";
+      img.loading = "lazy";
+      fig.appendChild(img);
+      step.appendChild(fig);
+    }
+    step.appendChild(el("p", "help-step__text", s.text || ""));
+    body.appendChild(step);
+  });
+
+  const foot = el("div", "stack stack--sm");
+  const tip = el("p", "small muted", "看不清图？按住 Ctrl/Command 加号放大页面即可；想要文字版，看「接入说明」页的合规与工具分栏。");
+  foot.appendChild(tip);
+
+  const sheet = createSheet({ title: content.title || "使用教学", iconName: "book", body, footer: foot });
+  sheet.open();
+  return sheet;
 }
