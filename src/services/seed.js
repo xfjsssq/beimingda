@@ -198,7 +198,8 @@ function seedSchedule(db) {
 export function resetDemo(db) {
   const tx = db.transaction(() => {
     db.prepare("DELETE FROM matches").run();
-    db.prepare("DELETE FROM buddy_consents").run();
+    db.prepare("DELETE FROM buddy_messages").run();
+  db.prepare("DELETE FROM buddy_consents").run();
     db.prepare("DELETE FROM tasks WHERE demo=1").run();
     db.prepare("DELETE FROM runners WHERE demo=1").run();
     db.prepare("DELETE FROM buddy_posts WHERE demo=1").run();

@@ -272,7 +272,7 @@ test("/buddy：局部样式的字号与间距只用设计令牌（--size-* / --s
 
 test("接口：一句话帖子真的能发（POST /api/buddies 走 kind + text_profile）", async () => {
   const data = await publishPost({
-    author_handle: "界面发帖人",
+    author_handle: WHO,
     kind: "study",
     text_profile: "想找人一起自习，图书馆三楼，晚上七点",
   });
@@ -281,7 +281,9 @@ test("接口：一句话帖子真的能发（POST /api/buddies 走 kind + text_p
   assert.ok(data.profile.wanted.includes("自习") || data.profile.wanted.includes("图书馆"), "内容被保留");
 });
 
+  const WHO = "界面同学" + Math.random().toString(36).slice(2, 8);   // 一次性 handle：不受历史投票影响
 test("接口：新端点（留言 / 回复）未就绪时页面必须降级而不是崩 —— 记录当前实际状态", async () => {
+  process.env.API_WRITE_LIMIT = process.env.API_WRITE_LIMIT || "1000";   // 测试内放宽写限频
   const { createApp } = await import("../src/server.js");
   const app = createApp();
   const server = app.listen(0);
@@ -295,7 +297,7 @@ test("接口：新端点（留言 / 回复）未就绪时页面必须降级而�
       assert.ok(p.post_id && p.anon_token && p.profile, "卡片渲染需要的字段");
       assert.ok(!("user_id" in p), "列表不得暴露 user_id");
     }
-    const mine = await fetch(`${base}/api/buddies/mine?handle=${encodeURIComponent("界面发帖人")}`).then((r) => r.json());
+    const mine = await fetch(`${base}/api/buddies/mine?handle=${encodeURIComponent(WHO)}`).then((r) => r.json());
     assert.equal(mine.ok, true, "我的接口可用");
     assert.ok(Array.isArray(mine.data), "当前结构 = 我发出的意愿数组（新结构由后端扩展）");
 
@@ -304,12 +306,38 @@ test("接口：新端点（留言 / 回复）未就绪时页面必须降级而�
       headers: { "content-type": "application/json", "x-demo-token": process.env.DEMO_TOKEN },
       body: JSON.stringify(body),
     }).then((r) => r.json());
-    const consent = await post(`${base}/api/buddies/x/consent`, { agree: true, message: "测试" });
-    const reply = await post(`${base}/api/buddies/x/reply`, { message: "测试" });
-    const notReady = (env) => env.ok === false && env.error.code === "NOT_FOUND" && /no route for/i.test(env.error.message);
-    // 已就绪 or 明确 no-route，两种都算通过；但要把实际状态打出来，便于后端接上后自动生效
-    assert.ok(notReady(consent) || consent.ok === true, "consent 端点状态：" + JSON.stringify(consent.error));
-    assert.ok(notReady(reply) || reply.ok === true, "reply 端点状态：" + JSON.stringify(reply.error));
+    // ⭐ 站内留言 / 回复 / 表达意愿：后端已于 2026-10-30 落地，页面不再需要降级
+    const first = list.data[0];
+    const post2 = (url, body) => fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-demo-token": process.env.DEMO_TOKEN },
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+    // ⚠️ 表达意愿必须打在「别人的帖」上：打在自己的帖上会走"发布方同意某人"那条分支
+    const OTHER = "对方同学" + Math.random().toString(36).slice(2, 8);
+    const others = await post2(`${base}/api/buddies`, {
+      author_handle: OTHER,
+      kind: "study",
+      text_profile: "想找人一起自习，图书馆三楼，晚上七点",
+    });
+    assert.equal(others.ok, true, "别人的帖要能发出来：" + JSON.stringify(others.error));
+    let target = null;
+    let consent = null;
+    for (const p of [{ post_id: others.data.post_id }, ...list.data]) {
+      if (!p.post_id) continue;
+      const r = await post2(`${base}/api/buddies/${p.post_id}/consent`, { handle: WHO, agree: true, message: "我也想找人一起自习" });
+      if (r.ok) { target = p; consent = r; break; }
+    }
+    assert.ok(consent, "至少要能对某个帖子表达意愿（端点必须可用）");
+    const msg = await post2(`${base}/api/buddies/${target.post_id}/reply`, { handle: WHO, message: "我周三周四晚上都在图书馆，可以一起" });
+    assert.equal(msg.ok, true, "留言端点必须可用：" + JSON.stringify(msg.error));
+    const msgs = await fetch(`${base}/api/buddies/${target.post_id}/messages`).then((r) => r.json());
+    assert.equal(msgs.ok, true);
+    assert.ok(Array.isArray(msgs.data) && msgs.data.length >= 1, "留言必须能读回来");
+    const cons = await fetch(`${base}/api/buddies/mine?handle=${encodeURIComponent(WHO)}&shape=console`).then((r) => r.json());
+    assert.equal(cons.ok, true, "我的申请三块结构可用");
+    assert.ok(Array.isArray(cons.data.posts) && Array.isArray(cons.data.intents) && Array.isArray(cons.data.mutual),
+      "三块必须都在：posts / intents / mutual")
   } finally {
     server.close();
   }

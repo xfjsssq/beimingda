@@ -78,10 +78,18 @@ export function createApp() {
 
   // HTTP API
   // 读接口放宽（演示时连续翻页/截图会被自己的限频挡住）：读 240 次/分钟，写仍 60 次/分钟
-  const readLimiter = createRateLimiter({ windowMs: 60_000, max: 240, label: "api-read" });
+  const READ_MAX = Number(process.env.API_READ_LIMIT) || 240;
+  const WRITE_MAX = Number(process.env.API_WRITE_LIMIT) || 60;
+  const readLimiter = createRateLimiter({ windowMs: 60_000, max: READ_MAX, label: "api-read" });
+  // 写接口默认 60/分钟；测试或压测时可用 API_WRITE_LIMIT 放宽
+  // 写接口限频：默认 60/分钟；测试或压测可用 API_WRITE_LIMIT 放宽（懒创建，避免多实例互相干扰）
+  let writeLimiter = null;
+  const createWriteLimiter = () =>
+    (writeLimiter ??= createRateLimiter({ windowMs: 60_000, max: WRITE_MAX, label: "api-write" }));
+
   app.use("/api", (req, res, next) => {
     const isRead = req.method === "GET" || req.method === "HEAD";
-    return (isRead ? readLimiter : apiLimiter)(req, res, next);
+    return (isRead ? readLimiter : createWriteLimiter())(req, res, next);
   }, createApiRouter());
 
   // MCP 远程端点（必须零配置可接入：POST /mcp）

@@ -159,6 +159,7 @@ test("标注页：字号与间距只用设计刻度", () => {
 test("标注页：静态路由可达（/tools/annotate 与底图都能 200）", async () => {
   process.env.DB_PATH = path.join(os.tmpdir(), `beimingda-annotate-${process.pid}.db`);
   process.env.DEMO_TOKEN = process.env.DEMO_TOKEN || "annotate-test-token";
+  process.env.API_WRITE_LIMIT = process.env.API_WRITE_LIMIT || "1000";   // 测试内放宽写限频
   const { createApp } = await import("../src/server.js");
   const app = createApp();
   const server = app.listen(0);

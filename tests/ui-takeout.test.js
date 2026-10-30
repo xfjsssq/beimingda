@@ -313,6 +313,7 @@ test("setMatchState：pushed → accepted 成功；只有 pushed 能被改；不
 /* ============================================================ 4) HTTP */
 
 test("HTTP /api/matches/:id/accept｜decline：鉴权 + 状态迁移 + 重复操作被拒", async () => {
+  process.env.API_WRITE_LIMIT = process.env.API_WRITE_LIMIT || "1000";   // 测试内放宽写限频
   const { createApp } = await import("../src/server.js");
   const app = createApp();
   const server = app.listen(0);
@@ -333,16 +334,22 @@ test("HTTP /api/matches/:id/accept｜decline：鉴权 + 状态迁移 + 重复操
     assert.equal(noToken.status, 401);
     assert.equal((await noToken.json()).ok, false);
 
-    // 派单请求会带 as=发布者（服务端未就绪时忽略，就绪后用于校验发布者身份）
+    // ⭐ 派单权限（2026-10-30 用户要求）：只有任务发布者能选人接单
+    const notOwner = await post(`/api/matches/${encodeURIComponent(a.match_id)}/accept`, {
+      "x-demo-token": token,
+    }, { as: "同学A" });
+    assert.equal(notOwner.status, 400, "非发布者派单必须被拒");
+    assert.match((await notOwner.json()).error.message, /只有发布者/, "错误信息要说清是谁说了算");
+
     const accepted = await post(`/api/matches/${encodeURIComponent(a.match_id)}/accept`, {
       "x-demo-token": token,
-    }, { as: "同学A" }).then((r) => r.json());
-    assert.equal(accepted.ok, true);
+    }, { as: "测试同学" }).then((r) => r.json());
+    assert.equal(accepted.ok, true, "发布者本人派单必须成功");
     assert.deepEqual(accepted.data, { match_id: a.match_id, task_id: a.task_id, state: "accepted" });
 
     const again = await post(`/api/matches/${encodeURIComponent(a.match_id)}/accept`, {
       "x-demo-token": token,
-    }, { as: "同学A" });
+    }, { as: "测试同学" });
     assert.equal(again.status, 400);
     const againBody = await again.json();
     assert.equal(againBody.ok, false);
