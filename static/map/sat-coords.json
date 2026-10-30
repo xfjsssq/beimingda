@@ -1,0 +1,5 @@
+{
+  "_comment": "点位在卫星图上的 WGS84 经纬度。用 /welcome 的「校准点位」逐点在卫星图上点出来，导出后覆盖本文件即生效（无需改代码）。",
+  "_format": "{ points: [ { id, label, lat, lng } ] }",
+  "points": []
+}

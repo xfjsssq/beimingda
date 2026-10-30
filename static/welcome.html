@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>迎新导览：校园地图与 3D 街景</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <!-- 本地化的 Leaflet（BSD-2，见 vendor/leaflet/LICENSE）：站内自建卫星图层用 -->
+  <link rel="stylesheet" href="/vendor/leaflet/leaflet.css" />
   <link rel="stylesheet" href="/vendor/pannellum/pannellum.css" />
   <style>
     /* 本页只保留「地图 / 全景 / 高德视图」特有样式，其余全走 /css/app.css */
@@ -172,6 +174,11 @@
         <div class="map-wrap" id="amapWrap" hidden>
           <div id="amapCanvas"></div>
         </div>
+        <!-- ⭐ 站内自建卫星图层（Leaflet + 影像瓦片）：零 key、零白名单，可叠加我们自己的点位 -->
+        <div class="map-wrap" id="satWrap" hidden>
+          <div id="satMap"></div>
+          <p class="map-credit" id="satCredit"></p>
+        </div>
 
         <div class="map-zoom" role="group" aria-label="地图缩放">
         <button class="map-zoom__btn" id="zoomOut" type="button" aria-label="缩小">−</button>
@@ -197,6 +204,9 @@
             <button class="map-hud__btn" id="openList" type="button">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>点位列表
             </button>
+            <button class="map-hud__btn" id="calBtn" type="button" hidden>
+              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/crosshair.svg)"></span>校准点位
+            </button>
             <button class="map-hud__btn" id="openAmap" type="button">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sun.svg)"></span>卫星图
             </button>
@@ -205,6 +215,7 @@
 
         <!-- 视图状态条（贴在地图左下角，如"该视图需要联网 / 未授权当前域名"） -->
         <p class="map-badge" id="amapTip" hidden></p>
+        <p class="map-badge map-badge--light" id="satTip" hidden></p>
       </div>
       <p class="source" id="source"></p>
     </div>
@@ -242,6 +253,7 @@
 </div>
 
 <script src="/vendor/pannellum/pannellum.js"></script>
+<script src="/vendor/leaflet/leaflet.js"></script>
 <script src="/config.js"></script>
 <script type="module">
 import { mountNav } from "/js/nav.js";
@@ -569,7 +581,7 @@ function setupMapHud() {
       if (!btn) return;
       const v = btn.dataset.view;
       if (v === "shot") return useShotBase();
-      if (v === "sat") return useAmapBase();
+      if (v === "sat") return useSatBase();
       if (v === "street") return enterStreet();
     });
   }
@@ -613,6 +625,8 @@ function setupMapHud() {
     if (b) b.disabled = true;
   }
   setBasePressed("shot");
+  // 「校准点位」：切到卫星图层并打开点位列表（逐点在图上标出真实经纬度）
+  $("#calBtn")?.addEventListener("click", () => { useSatBase(); openCalSheet(); });
 }
 
 /* ---------- ⭐ 3D 街景（Pannellum；素材由 tools/stitch-pano.py 从实拍 180°×2 拼出） ---------- */
@@ -763,6 +777,176 @@ function setupMapZoom() {
   });
   wrap.addEventListener("pointerup", () => { zoomState.dragging = false; });
   wrap.addEventListener("pointercancel", () => { zoomState.dragging = false; });
+}
+
+
+/* =============================================================================
+   ⭐ 站内自建卫星图层（Leaflet + Esri 影像）
+     · 为什么自己做：高德 JS API 的域名白名单**不接受 IP**（127.0.0.1 会被判"不符合规范"），
+       而官方嵌入 iframe 是跨域黑盒、没法叠我们自己的点位 → 自建图层才能"点自己的点"。
+     · 配置全在 /map/map-bg.json 的 satellite 段（⛔ 页面不硬编码任何外部地址）。
+     · 坐标：点位经纬度存在 /map/sat-coords.json（WGS84），用「校准点位」在卫星图上逐点标出后导出。
+   ============================================================================= */
+function satCfg() { return (BG && BG.satellite) || {}; }
+
+/** GCJ-02 → WGS84（高德坐标 → 卫星影像坐标；不转会有几十到几百米错位） */
+function gcj2wgs(lng, lat) {
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  const outOfChina = lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+  if (outOfChina) return { lng, lat };
+  const tLat = (x, y) => {
+    let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+    r += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+    r += ((20 * Math.sin(y * Math.PI) + 40 * Math.sin((y / 3) * Math.PI)) * 2) / 3;
+    r += ((160 * Math.sin((y / 12) * Math.PI) + 320 * Math.sin((y * Math.PI) / 30)) * 2) / 3;
+    return r;
+  };
+  const tLng = (x, y) => {
+    let r = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+    r += ((20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2) / 3;
+    r += ((20 * Math.sin(x * Math.PI) + 40 * Math.sin((x / 3) * Math.PI)) * 2) / 3;
+    r += ((150 * Math.sin((x / 12) * Math.PI) + 300 * Math.sin((x / 30) * Math.PI)) * 2) / 3;
+    return r;
+  };
+  let dLat = tLat(lng - 105.0, lat - 35.0), dLng = tLng(lng - 105.0, lat - 35.0);
+  const radLat = (lat / 180.0) * Math.PI;
+  let magic = Math.sin(radLat);
+  magic = 1 - ee * magic * magic;
+  const sqrtMagic = Math.sqrt(magic);
+  dLat = (dLat * 180.0) / (((a * (1 - ee)) / (magic * sqrtMagic)) * Math.PI);
+  dLng = (dLng * 180.0) / ((a / sqrtMagic) * Math.cos(radLat) * Math.PI);
+  return { lng: lng * 2 - (lng + dLng), lat: lat * 2 - (lat + dLat) };
+}
+
+const satState = { map: null, base: null, labels: null, layerGroup: null, coords: {}, calMode: false, pendingId: "" };
+
+function satCoordsOf(node) {
+  if (!node) return null;
+  const c = satState.coords[node.id];
+  if (c && c.lat && c.lng) return c;
+  if (node.lat && node.lng) return gcj2wgs(Number(node.lng), Number(node.lat));
+  return null;
+}
+
+function renderSatMarkers() {
+  if (!satState.map || !satState.layerGroup) return;
+  satState.layerGroup.clearLayers();
+  let placed = 0;
+  for (const n of NODES) {
+    const c = satCoordsOf(n);
+    if (!c) continue;
+    placed++;
+    const hasPano = Boolean(sceneOf(n));
+    const icon = L.divIcon({
+      className: "sat-marker cat-" + (n.category || "other") + (hasPano ? " has-pano" : ""),
+      html: '<span class="sat-marker__dot"></span>',
+      iconSize: [18, 18], iconAnchor: [9, 9],
+    });
+    const m = L.marker([c.lat, c.lng], { icon, title: n.label }).addTo(satState.layerGroup);
+    m.bindTooltip(n.label + (hasPano ? " · 有实景" : ""), { direction: "top", offset: [0, -10] });
+    m.on("click", () => selectNode(n.id));
+  }
+  const pending = NODES.length - placed;
+  const el = $("#satTip");
+  if (el) {
+    el.hidden = false;
+    el.textContent = placed
+      ? "卫星图层：已定位 " + placed + " / " + NODES.length + " 个点位" + (pending ? "（还有 " + pending + " 个待校准：点「校准点位」在图上点出位置）" : "")
+      : "卫星图层已就绪。点位还没有经纬度 —— 点「校准点位」，在卫星图上逐点点出每个位置，导出后我固化进配置。";
+  }
+}
+
+function useSatBase(opts = {}) {
+  const cfg = satCfg();
+  if (!cfg.enabled || !cfg.tile_url_template) {
+    amapTip("卫星图层未配置（/map/map-bg.json 的 satellite 段）");
+    return useShotBase();
+  }
+  $("#mapWrap").hidden = true;
+  $("#amapWrap").hidden = true;
+  $("#satWrap").hidden = false;
+  if (!satState.map) {
+    const c = gcj2wgs((cfg.center && cfg.center.lng) || 106.1077, (cfg.center && cfg.center.lat) || 38.4977);
+    satState.map = L.map("satMap", { center: [c.lat, c.lng], zoom: cfg.zoom || 16, zoomControl: true });
+    satState.base = L.tileLayer(cfg.tile_url_template, { maxZoom: cfg.max_zoom || 19, attribution: cfg.attribution || "" }).addTo(satState.map);
+    if (cfg.label_tile_url_template && cfg.labels_default_on !== false) {
+      satState.labels = L.tileLayer(cfg.label_tile_url_template, { maxZoom: cfg.max_zoom || 19 }).addTo(satState.map);
+    }
+    satState.layerGroup = L.layerGroup().addTo(satState.map);
+    satState.map.on("click", onSatClick);
+    const credit = $("#satCredit");
+    if (credit) credit.textContent = cfg.attribution || "";
+  }
+  setTimeout(() => satState.map.invalidateSize(), 60);
+  renderSatMarkers();
+  setBasePressed("sat");
+  $("#calBtn").hidden = false;
+}
+
+/** 校准模式：先在侧栏选一个点位，再在卫星图上点它的真实位置 */
+function onSatClick(e) {
+  if (!satState.calMode) return;
+  const id = satState.pendingId || currentId;
+  if (!id) { toast("先在「校准点位」里选一个点位，再在图上点它的位置", "info"); return; }
+  satState.coords[id] = { lat: Number(e.latlng.lat.toFixed(6)), lng: Number(e.latlng.lng.toFixed(6)) };
+  renderSatMarkers();
+  const n = NODES.find((x) => x.id === id);
+  toast("已记录「" + (n ? n.label : id) + "」的卫星坐标（可继续点下一个）");
+}
+
+function openCalSheet() {
+  const body = document.createElement("div");
+  body.className = "stack stack--sm";
+  const tip = document.createElement("p");
+  tip.className = "small muted";
+  tip.textContent = "① 在这里选一个点位 → ② 在卫星图上点它的真实位置（可反复点修正）→ ③ 全部标完点下方「导出坐标 JSON」发我。";
+  body.appendChild(tip);
+  for (const n of NODES) {
+    const has = Boolean(satState.coords[n.id]);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "map-hud__btn";
+    b.style.width = "100%";
+    b.style.justifyContent = "flex-start";
+    b.innerHTML = '<span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/crosshair.svg)"></span>' +
+      "<span>" + esc(n.label) + "</span>" +
+      '<span class="chip" style="margin-left:auto">' + (has ? "已定位" : "待定位") + "</span>";
+    b.addEventListener("click", () => {
+      satState.pendingId = n.id;
+      satState.calMode = true;
+      const co = satState.coords[n.id];
+      if (co) satState.map.setView([co.lat, co.lng], Math.max(satState.map.getZoom(), 17));
+      sheet.close();                                   // ⚠️ 必须收起：侧栏的遮罩会挡住地图点击
+      toast("现在在卫星图上点「" + n.label + "」的位置（标完再点「校准点位」继续下一个）");
+    });
+    body.appendChild(b);
+  }
+  const foot = document.createElement("div");
+  foot.className = "stack stack--sm";
+  const sheet = createSheet({ title: "校准点位（卫星图）", iconName: "crosshair", body, footer: foot });
+  const exp = document.createElement("button");
+  exp.type = "button";
+  exp.className = "btn";
+  exp.textContent = "导出坐标 JSON";
+  exp.addEventListener("click", () => {
+    const points = NODES.filter((n) => satState.coords[n.id]).map((n) => ({ id: n.id, label: n.label, ...satState.coords[n.id] }));
+    const txt = JSON.stringify({ points }, null, 2);
+    copyText(txt).then((ok) => {
+      if (ok) return toast("坐标 JSON 已复制（" + points.length + " 个点位），发给我即可固化");
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(new Blob([txt], { type: "application/json" }));
+      a.download = "sat-coords.json";
+      a.click();
+      toast("已下载 sat-coords.json");
+    });
+  });
+  const done = document.createElement("button");
+  done.type = "button";
+  done.className = "btn btn--ghost";
+  done.textContent = "退出校准模式";
+  done.addEventListener("click", () => { satState.calMode = false; toast("已退出校准模式"); });
+  foot.append(exp, done);
+  sheet.open();
 }
 
 (async function init() {

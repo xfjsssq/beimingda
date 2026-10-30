@@ -2378,3 +2378,25 @@ html[data-font="normal"] { --font-tracking: 0; --body-leading: 1.7; }
 html[data-font="loose"] { --font-tracking: 0.02em; --body-leading: 1.9; }
 body { letter-spacing: var(--font-tracking); }
 p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
+
+/* ---------- 站内自建卫星图层（Leaflet）：容器、点位样式、署名 ---------- */
+#satMap { width: 100%; height: 100%; min-height: 420px; border-radius: var(--radius-card); background: #dfe6ee; }
+#satWrap { position: relative; }
+.map-credit { position: absolute; right: 8px; bottom: 8px; z-index: 500; margin: 0;
+  background: rgba(255, 255, 255, 0.82); color: #3d4a5c; font-size: 12px; padding: 2px 8px;
+  border-radius: 6px; pointer-events: none; }
+.map-badge--light { background: rgba(255, 255, 255, 0.94); color: #24303f; border: 1px solid rgba(31, 78, 140, 0.16); }
+/* 卫星图上的点位：纯 CSS 圆点，按分类着色，有实景的加一圈光晕 */
+.sat-marker { background: none; border: 0; }
+.sat-marker__dot { display: block; width: 14px; height: 14px; margin: 2px; border-radius: 9999px;
+  background: #1f4e8c; border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+.sat-marker.cat-dorm .sat-marker__dot { background: #1f4e8c; }
+.sat-marker.cat-canteen .sat-marker__dot { background: #e08c1b; }
+.sat-marker.cat-teaching .sat-marker__dot { background: #2e8b76; }
+.sat-marker.cat-gate .sat-marker__dot { background: #7a5af8; }
+.sat-marker.cat-service .sat-marker__dot { background: #c0392b; }
+.sat-marker.has-pano .sat-marker__dot { box-shadow: 0 0 0 5px rgba(46, 139, 118, 0.32), 0 1px 4px rgba(0, 0, 0, 0.45); }
+/* Leaflet 默认控件按站点风格收一下 */
+.leaflet-container { font: inherit; }
+.leaflet-control-attribution { font-size: 11px; background: rgba(255, 255, 255, 0.8); }
+.leaflet-bar a { border-radius: 6px; }
