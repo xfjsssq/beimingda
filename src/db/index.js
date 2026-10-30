@@ -31,6 +31,7 @@ export function initDb(options = {}) {
   conn.pragma("journal_mode = WAL");
   conn.pragma("foreign_keys = ON");
   conn.exec(fs.readFileSync(SCHEMA_PATH, "utf8"));
+  ensureColumns(conn);   // 老库补新列
 
   if (options.force) {
     db = conn;
@@ -38,6 +39,15 @@ export function initDb(options = {}) {
   }
   db = conn;
   return db;
+}
+
+/** 老库兼容：schema 里新增的列在既有库上补一遍（SQLite 没有 IF NOT EXISTS 的 ADD COLUMN） */
+function ensureColumns(conn) {
+  const want = [["tasks", "photo", "TEXT"], ["matches", "source", "TEXT NOT NULL DEFAULT 'engine'"]];
+  for (const [table, col, type] of want) {
+    const cols = conn.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name);
+    if (!cols.includes(col)) conn.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+  }
 }
 
 export function getDb() {

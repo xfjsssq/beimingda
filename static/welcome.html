@@ -684,6 +684,10 @@ function openStreetScene(sceneId) {
       scenes,
       autoLoad: true,
       showControls: true,
+      // ⭐ 不要缩放：用户要求"保证画面完整就定死了" —— 关掉滚轮/按钮/双指缩放，
+      //    并把水平视场锁死在一个固定值（全站一致），免得缩进去露出补出来的假天空/地面
+      hfov: 100, minHfov: 100, maxHfov: 100,
+      showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true,
       // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
       minPitch: -18, maxPitch: 18, pitch: 0,
       hfov: 100, minHfov: 60, maxHfov: 120,

@@ -244,7 +244,7 @@ def main() -> None:
         out_path = os.path.join(args.out, out_name)
         eq.save(out_path, "JPEG", quality=JPEG_Q, optimize=True, progressive=True)
         size_mb = os.path.getsize(out_path) / 1024 / 1024
-        entries.append({"id": f"pano-{i}", "file": out_name, "title": f"实景点位 {i}（{name}）"})
+        entries.append({"id": f"pano-{i}", "file": out_name, "title": name})
         row = {"point": name, "file": out_name, "eq_size": f"{eq.width}x{eq.height}",
                "ratio": round(eq.width / eq.height, 2), "mb": round(size_mb, 2), **info}
         report.append(row)

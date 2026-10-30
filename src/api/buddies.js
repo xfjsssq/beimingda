@@ -15,7 +15,16 @@
 import express from "express";
 import { requireWriteToken } from "../middleware/auth.js";
 import { ok } from "../util/envelope.js";
-import { listPosts, myApplications, publishPost, searchBuddies } from "../services/buddy.js";
+import {
+  castConsent,
+  listMessages,
+  listPosts,
+  myApplications,
+  myConsole,
+  postMessage,
+  publishPost,
+  searchBuddies,
+} from "../services/buddy.js";
 
 /** Express 4 不会自动接住 async handler 的异常，这里统一转交 routes.js 的错误中间件 */
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -43,15 +52,47 @@ export function createBuddiesRouter() {
   );
 
   // 辅助（只读）：我发出的意愿（⛔ 只给 pending / mutual，不暴露对方个人表决位）
+  // 我的申请：默认仍是「我发出的意愿」数组（契约口径不变）；
+  // ?shape=console 时给站内用的三块结构 { posts, intents, mutual }
   router.get("/mine", (req, res) => {
-    res.json(
-      ok(
-        myApplications({
-          seeker_handle: req.query.handle ?? req.query.seeker_handle,
-          limit: req.query.limit,
-        }),
-      ),
-    );
+    const handle = req.query.handle ?? req.query.seeker_handle;
+    if (req.query.shape === "console") {
+      return res.json(ok(myConsole({ handle, limit: req.query.limit })));
+    }
+    res.json(ok(myApplications({ seeker_handle: handle, limit: req.query.limit })));
+  });
+
+  // 表达意愿（站内直接点，不再必须走 MCP）/ 回复（留言）
+  router.post(
+    "/:id/consent",
+    requireWriteToken,
+    wrap(async (req, res) => {
+      const body = req.body ?? {};
+      const r = castConsent({ post_id: req.params.id, seeker_handle: body.handle ?? body.seeker_handle ?? body.from_handle, agree: body.agree !== false });
+      if (body.message) postMessage({ post_id: req.params.id, from_handle: body.handle ?? body.seeker_handle, body: body.message, kind: "message" });
+      res.json(ok(r));
+    }),
+  );
+
+  router.post(
+    "/:id/reply",
+    requireWriteToken,
+    wrap(async (req, res) => {
+      const body = req.body ?? {};
+      res.json(ok(postMessage({
+        post_id: req.params.id,
+        consent_id: body.to_consent_id ?? null,
+        from_handle: body.handle ?? body.from_handle,
+        to_handle: body.to_handle ?? null,
+        body: body.message,
+        kind: body.to_consent_id ? "reply" : "message",
+      })));
+    }),
+  );
+
+  // 留言与回复（只读）
+  router.get("/:id/messages", (req, res) => {
+    res.json(ok(listMessages(req.params.id)));
   });
 
   // 契约 §5：发布（写接口 → X-Demo-Token）

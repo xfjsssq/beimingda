@@ -68,6 +68,20 @@ const SEARCH_POOL = () => (llmEnabled() ? 30 : 200); // 单次响应必须 < 90 
  * 匿名标识：随机 12 位十六进制。
  * ⛔ 绝不用 hash(user_id) / user_id.slice() 这类可反推的派生方式。
  */
+/** 入参校验（本模块自带一份，⛔ 不与 task.js 互相依赖） */
+function requiredText(value, label, maxLen = 60) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) reject(CODES.SCHEMA_REJECTED, `${label} 不能为空`);
+  if (text.length > maxLen) reject(CODES.SCHEMA_REJECTED, `${label} 过长（≤ ${maxLen} 字符）`);
+  return text;
+}
+
+function clampLimit(value, fallback = 50, max = 200) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
 export function anonToken() {
   return `anon_${crypto.randomBytes(6).toString("hex")}`;
 }
@@ -437,3 +451,125 @@ export default {
   SAFE_POST_KEYS,
   SAFE_CANDIDATE_KEYS,
 };
+
+
+/* =============================================================================
+   站内留言 / 回复（2026-10-30 · 用户要求"在站点里就能发帖、留言、回复、接受"）
+     · postMessage：给某个帖子留言；带上 consent_id 就是回复某一条"表达意愿"
+     · listMessages：帖子下的留言与回复（按时间升序）
+     · myConsole：我的申请三块 —— 我发布的帖（含收到的留言）/ 我表达的意愿 / 已互相同意
+   ============================================================================= */
+
+export function postMessage({ post_id, consent_id = null, from_handle, to_handle = null, body, kind = "message" } = {}) {
+  const postId = requiredText(post_id, "post_id");
+  const text = requiredText(body, "留言内容", 300);
+  const from = requiredText(from_handle, "handle");
+  const db = getDb();
+  const post = db.prepare("SELECT id, author_id, raw_status FROM buddy_posts WHERE id = ?").get(postId);
+  if (!post) reject(CODES.NOT_FOUND, `post not found: ${postId}`);
+  if (post.raw_status !== "open") reject(CODES.SCHEMA_REJECTED, "这个帖子已经关闭了，不能再留言");
+
+  const fromId = ensureUser(from).id;             // ⚠️ 本模块的 ensureUser 返回对象，不是 id
+  const toId = to_handle ? ensureUser(to_handle).id : null;
+  const id = `msg_${crypto.randomUUID()}`;
+  db.prepare(
+    `INSERT INTO buddy_messages(id, post_id, consent_id, from_id, to_id, kind, body, created_at)
+     VALUES (@id, @post_id, @consent_id, @from_id, @to_id, @kind, @body, @created_at)`,
+  ).run({
+    id, post_id: postId, consent_id: consent_id ?? null, from_id: fromId,
+    to_id: toId ?? null, kind, body: text, created_at: nowSec(),
+  });
+  return { message_id: id, post_id: postId, consent_id, kind, body: text, at: toIso(nowSec()) };
+}
+
+export function listMessages(postId) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT m.id, m.post_id, m.consent_id, m.kind, m.body, m.created_at,
+              uf.handle AS from_handle, ut.handle AS to_handle
+         FROM buddy_messages m
+         JOIN users uf ON uf.id = m.from_id
+         LEFT JOIN users ut ON ut.id = m.to_id
+        WHERE m.post_id = ?
+        ORDER BY m.created_at ASC`,
+    )
+    .all(String(postId))
+    .map((m) => ({
+      message_id: m.id,
+      post_id: m.post_id,
+      consent_id: m.consent_id,
+      kind: m.kind,
+      body: m.body,
+      from: m.from_handle,
+      to: m.to_handle,
+      at: toIso(m.created_at),
+    }));
+}
+
+/** 我的申请（三块）：posts=我发布的（含收到的留言）/ intents=我表达的意愿（含回复）/ mutual=已互相同意 */
+export function myConsole({ handle, limit = 50 } = {}) {
+  const me = requiredText(handle, "handle");
+  const db = getDb();
+  const myId = ensureUser(me).id;                 // ⚠️ 同上
+  const lt = clampLimit ? clampLimit(limit, 50, 200) : 50;
+
+  const posts = db
+    .prepare(
+      `SELECT id, kind, profile_json, anon_token, raw_status, created_at
+         FROM buddy_posts WHERE author_id = ? ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(myId, lt)
+    .map((p) => {
+      const cons = db
+        .prepare(
+          `SELECT c.id, c.score, c.author_ok, c.seeker_ok, c.revealed, c.created_at,
+                  us.handle AS seeker_handle
+             FROM buddy_consents c JOIN users us ON us.id = c.seeker_id
+            WHERE c.post_id = ? ORDER BY c.created_at DESC`,
+        )
+        .all(p.id)
+        .map((c) => ({
+          consent_id: c.id,
+          seeker: c.seeker_handle,
+          score: c.score,
+          status: c.revealed === 1 ? "mutual" : c.author_ok === 1 ? "accepted" : "pending",
+          at: toIso(c.created_at),
+          messages: listMessages(p.id).filter((m) => m.consent_id === c.id),
+        }));
+      return {
+        post_id: p.id,
+        kind: p.kind,
+        anon_token: p.anon_token,
+        status: p.raw_status,
+        profile: safeParse(p.profile_json),
+        at: toIso(p.created_at),
+        consents: cons,
+        messages: listMessages(p.id).filter((m) => !m.consent_id),
+      };
+    });
+
+  const intents = myApplications({ seeker_handle: me, limit: lt });
+
+  const mutual = db
+    .prepare(
+      `SELECT c.id, c.post_id, c.seeker_ok, c.author_ok, c.revealed, c.created_at, p.kind, p.anon_token
+         FROM buddy_consents c JOIN buddy_posts p ON p.id = c.post_id
+        WHERE c.seeker_id = ? AND c.revealed = 1 ORDER BY c.created_at DESC`,
+    )
+    .all(myId)
+    .map((c) => ({
+      consent_id: c.id,
+      post_id: c.post_id,
+      kind: c.kind,
+      anon_token: c.anon_token,
+      revealed: c.revealed,
+      at: toIso(c.created_at),
+    }));
+
+  return { posts, intents, mutual };
+}
+
+function safeParse(v) {
+  try { return JSON.parse(v || "{}"); } catch { return {}; }
+}

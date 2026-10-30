@@ -10,7 +10,7 @@
   "scenes": {
     "pano-1": {
       "panorama": "/pano/pano-1.jpg",
-      "title": "明湖风光 1",
+      "title": "第一点位",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -28,13 +28,13 @@
           "yaw": -150,
           "type": "scene",
           "text": "回上一个点位",
-          "sceneId": "pano-3"
+          "sceneId": "pano-8"
         }
       ]
     },
     "pano-2": {
       "panorama": "/pano/pano-2.jpg",
-      "title": "明湖风光 2",
+      "title": "第二点位",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -58,7 +58,127 @@
     },
     "pano-3": {
       "panorama": "/pano/pano-3.jpg",
-      "title": "明湖风光 3",
+      "title": "三号楼后方十字路口",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-4"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-2"
+        }
+      ]
+    },
+    "pano-4": {
+      "panorama": "/pano/pano-4.jpg",
+      "title": "第三点位",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-5"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-3"
+        }
+      ]
+    },
+    "pano-5": {
+      "panorama": "/pano/pano-5.jpg",
+      "title": "主楼后方",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-6"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-4"
+        }
+      ]
+    },
+    "pano-6": {
+      "panorama": "/pano/pano-6.jpg",
+      "title": "图书馆正门右侧",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-7"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-5"
+        }
+      ]
+    },
+    "pano-7": {
+      "panorama": "/pano/pano-7.jpg",
+      "title": "图书馆正门左侧",
+      "type": "equirectangular",
+      "hfov": 100,
+      "yaw": 0,
+      "pitch": 0,
+      "hotSpots": [
+        {
+          "pitch": -3,
+          "yaw": 30,
+          "type": "scene",
+          "text": "去下一个点位",
+          "sceneId": "pano-8"
+        },
+        {
+          "pitch": -3,
+          "yaw": -150,
+          "type": "scene",
+          "text": "回上一个点位",
+          "sceneId": "pano-6"
+        }
+      ]
+    },
+    "pano-8": {
+      "panorama": "/pano/pano-8.jpg",
+      "title": "网球场后方",
       "type": "equirectangular",
       "hfov": 100,
       "yaw": 0,
@@ -76,7 +196,7 @@
           "yaw": -150,
           "type": "scene",
           "text": "回上一个点位",
-          "sceneId": "pano-2"
+          "sceneId": "pano-7"
         }
       ]
     }

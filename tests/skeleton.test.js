@@ -57,11 +57,12 @@ test("时间：Unix 秒 ↔ ISO 往返", () => {
   assert.equal(isFutureIso("2030-01-01T00:00:00Z", ts), true);
 });
 
-test("schema.sql：9 张表 + 关键索引齐全", () => {
+test("schema.sql：10 张表 + 关键索引齐全", () => {
   const sql = fs.readFileSync(path.join(ROOT, "src/db/schema.sql"), "utf8");
   const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
   assert.deepEqual(tables, [
     "buddy_consents",
+    "buddy_messages",
     "buddy_posts",
     "map_nodes",
     "matches",

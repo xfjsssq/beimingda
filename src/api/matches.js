@@ -38,7 +38,7 @@ export function createMatchesRouter() {
   // POST /api/matches/:id/accept —— 接单（matches.state: pushed → accepted）
   router.post("/:id/accept", requireWriteToken, (req, res, next) => {
     try {
-      res.json(ok(setMatchState(req.params.id, "accepted")));
+      res.json(ok(setMatchState(req.params.id, "accepted", { as: req.body?.as })));
     } catch (e) {
       next(e);
     }

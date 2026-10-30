@@ -15,7 +15,7 @@
 import express from "express";
 import { ok } from "../util/envelope.js";
 import { requireWriteToken } from "../middleware/auth.js";
-import { getTask, listOpenTasks, matchForTask, publishTask } from "../services/task.js";
+import { expressInterest, getTask, listOpenTasks, matchForTask, publishTask } from "../services/task.js";
 
 export function createTaskRouter() {
   const router = express.Router();
@@ -40,7 +40,16 @@ export function createTaskRouter() {
   });
 
   // GET /api/tasks/:id
-  router.get("/:id", (req, res, next) => {
+  // POST /api/tasks/:id/interest —— 表达意愿（别人对我发布的单说"我想接"；不改变任务归属）
+router.post("/:id/interest", requireWriteToken, (req, res, next) => {
+  try {
+    res.json(ok(expressInterest(req.params.id, req.body?.runner_handle)));
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/:id", (req, res, next) => {
     try {
       res.json(ok(getTask(req.params.id)));
     } catch (e) {

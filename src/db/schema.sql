@@ -115,3 +115,16 @@ CREATE TABLE IF NOT EXISTS scrub_audit (
   dropped_fields TEXT NOT NULL,
   created_at     INTEGER NOT NULL
 );
+
+-- ★ 搭子留言 / 回复（站内直接沟通；也可由 MCP 写入）
+CREATE TABLE IF NOT EXISTS buddy_messages (
+  id         TEXT PRIMARY KEY,
+  post_id    TEXT NOT NULL REFERENCES buddy_posts(id),
+  consent_id TEXT REFERENCES buddy_consents(id),
+  from_id    TEXT NOT NULL REFERENCES users(id),
+  to_id      TEXT REFERENCES users(id),
+  kind       TEXT NOT NULL DEFAULT 'message',   -- message=留言 / reply=回复
+  body       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_buddy_msg_post ON buddy_messages(post_id, created_at);

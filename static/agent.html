@@ -159,7 +159,7 @@
         <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/copy.svg)"></span></span>
         <div>
           <b>复制配置</b>
-          <span class="quick-step__note">一段合法 JSON，令牌是 <code class="inline">&lt;DEMO_TOKEN&gt;</code> 占位符</span>
+          <span class="quick-step__note">一段合法 JSON，里面只出现 <code class="inline">&lt;DEMO_TOKEN&gt;</code> 占位符</span>
         </div>
       </div>
       <div class="quick-step">
@@ -228,11 +228,6 @@
               <button class="segmented__btn" type="button" data-mode="site" aria-pressed="false" id="mode-site">正式站点域名</button>
             </div>
             <p class="section__note" id="mode-note"></p>
-
-            <h3 class="mini-title">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span>拿到真令牌之后
-            </h3>
-            <ul class="hint-list" id="token-notes"></ul>
             <p class="section__note" style="margin-top:6px">
               数据与隐私口径见 <a href="#p-compliance" data-goto="p-compliance">「合规声明」</a>。
             </p>
@@ -378,7 +373,7 @@
           <li class="rule">
             <span class="icon-tile" aria-hidden="true"><span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/key.svg)"></span></span>
             <div>
-              <b>令牌口径说清楚</b>
+              <b>写入凭据口径说清楚</b>
               <p>页面上只出现占位符 <code class="inline">&lt;DEMO_TOKEN&gt;</code>；真值只存在于服务端环境变量，限频 + 短周期轮换，只能操作演示数据，泄露无风险。</p>
             </div>
           </li>
@@ -411,7 +406,6 @@
     import { initDemo } from "/js/demo.js";
     import { icon, mountTabs, toast } from "/js/ui.js";
     import {
-      TOKEN_NOTES,
       SETUP_STEPS,
       SAMPLE_DIALOGUES,
       TOOLS_BY_MODULE,
@@ -606,13 +600,6 @@
       });
     });
 
-    /* 令牌这里只讲「拿到之后怎么替换」这条操作性的事：
-       限频 / 占位符 / 不外传这些口径统一放在「合规声明」分栏，别处不再重复一遍 */
-    const notesEl = $("#token-notes");
-    const noteLi = document.createElement("li");
-    noteLi.innerHTML = TOKEN_NOTES[TOKEN_NOTES.length - 1]; // 常量文案（本模块自带），非用户输入
-    notesEl.appendChild(noteLi);
-
     /* ===================================================================
        5) 分栏 2 · 手动接入（四步折叠成步骤卡）
        =================================================================== */
@@ -767,8 +754,8 @@
       if (live === null) {
         liveEl.innerHTML =
           "静态清单 " + toolCount() + " 个（来自 docs/MCP-TOOLS.md）。" +
-          "本页暂未拿到演示令牌，所以没法实时核对 <code class=\"inline\">POST " + MCP_PATH +
-          " tools/list</code> —— 令牌由服务端注入后这里会自动显示实时结果。";
+          "本页暂未拿到演示写入凭据，所以没法实时核对 <code class=\"inline\">POST " + MCP_PATH +
+          " tools/list</code> —— 写入凭据由服务端注入后这里会自动显示实时结果。";
         chipEl.textContent = "服务端实际 未取到";
         chipEl.classList.remove("chip--brand");
         chipEl.classList.add("chip");

@@ -131,7 +131,7 @@ test("/agent：保留原有可用功能（复制 / 下载 / 实时核对 / 演�
   assert.match(html, /id="tool-count-badge"/);
   assert.match(html, /id="setup-steps"/);
   assert.match(html, /id="dialogues"/);
-  assert.match(html, /id="token-notes"/);
+  assert.ok(!/id="token-notes"/.test(html), "令牌说明列表已按用户要求下线");
   assert.match(html, /id="compliance"/);
   // 复制反馈：文案 + toast
   assert.match(html, /navigator\.clipboard/);
@@ -155,7 +155,7 @@ test("/agent：分栏 1/2 用共享层常量渲染（示例与四步指引照抄
   assert.match(html, /SAMPLE_DIALOGUES/);
   assert.match(html, /TOOLS_BY_MODULE/);
   assert.match(html, /COMPLIANCE_LINE/);
-  assert.match(html, /TOKEN_NOTES/);
+  assert.ok(!/TOKEN_NOTES/.test(html), "令牌话术常量已从页面移除");
   assert.match(html, /toMcpConfigJson/);
   assert.match(html, /resolveMcpUrl/);
   assert.equal(mcpConfig.SAMPLE_DIALOGUES.length, 5);
@@ -194,12 +194,12 @@ test("/agent：分栏 2 的四步是折叠步骤卡（details/summary），不�
   assert.match(html, /classList\.add\("fold__chev"\)/);
 });
 
-test("/agent：分栏 5 的合规五条都在（身份信息 / 校内系统 / 课表入口 / 脱敏审计 / 令牌口径）", () => {
+test("/agent：分栏 5 的合规五条都在（身份信息 / 校内系统 / 课表入口 / 脱敏审计 / 写入凭据口径）", () => {
   const panel = /<section class="tabpanel" id="p-compliance"[\s\S]*?<\/section>/.exec(html);
   assert.ok(panel, "找不到合规声明面板");
   const p = panel[0];
   assert.equal([...p.matchAll(/class="rule"/g)].length, 5, "合规声明应是 5 条");
-  for (const kw of ["不收集身份信息", "不接学校内部系统", "没有课表上传入口", "脱敏审计只记字段名", "令牌口径说清楚"]) {
+  for (const kw of ["不收集身份信息", "不接学校内部系统", "没有课表上传入口", "脱敏审计只记字段名", "写入凭据口径说清楚"]) {
     assert.ok(p.includes(kw), `合规声明缺「${kw}」`);
   }
   assert.match(p, /scrub_audit/);
@@ -275,8 +275,8 @@ test("/agent：分栏之间不再互相重复，每栏说明收敛（不再把�
   assert.equal([...manual[0].matchAll(/class="panel-card"/g)].length, 1, "手动接入只保留一张卡");
 
   // 一键配置：令牌只讲操作性那一条，合规口径回合规栏讲
-  assert.match(html, /TOKEN_NOTES\[TOKEN_NOTES\.length - 1\]/, "令牌说明只渲染最后一条（操作性）");
-  assert.ok(!/for \(const note of TOKEN_NOTES\)/.test(html), "不要再把 TOKEN_NOTES 全量铺出来");
+  assert.ok(!/TOKEN_NOTES/.test(html), "令牌说明整块已下线（用户要求：没什么用）");
+  assert.match(html, /id="copy-btn"/, "一键复制按钮必须保留");
 
   // 每栏的说明段落收敛到 ≤3 段
   for (const id of ["p-oneclick", "p-manual", "p-examples", "p-tools"]) {
