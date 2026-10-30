@@ -149,6 +149,10 @@
   .layout { display: block; }
   .map-wrap { height: clamp(420px, 66vh, 780px); }
   .map-zoomable { position: absolute; inset: 0; will-change: transform; }
+  /* 标记层独立：不参与缩放，所以放大后点位与文字都清晰 */
+  .map-markers { position: absolute; inset: 0; pointer-events: none; }
+  .map-markers .marker { position: absolute; pointer-events: auto; transform: translate(-50%, -100%); }
+  .map-markers .marker .tag { white-space: nowrap; }
   .map-zoomable img.base { width: 100%; height: 100%; object-fit: contain; }
   /* ⚠️ Leaflet 的图层 z-index 是 400+，会把 HUD 和徽标盖住 → 明确压层 */
   #satWrap { z-index: 0; }
@@ -188,6 +192,8 @@
           <div class="map-zoomable" id="mapInner">
             <img class="base" id="baseImg" src="/map/campus-map.jpg" alt="校园楼宇编号示意图底图" />
           </div>
+          <!-- ⭐ 标记层：不参与缩放（位置用像素算），所以放大后文字依然清晰 -->
+          <div class="map-markers" id="markerLayer"></div>
           <!-- 标记由 JS 按 /map/map-bg.json 的百分比坐标渲染 -->
         </div>
         <div class="map-wrap" id="amapWrap" hidden>
@@ -219,9 +225,6 @@
           <div class="map-hud__row">
             <button class="map-hud__btn" id="addBtn" type="button">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plus.svg)"></span>添加点位
-            </button>
-            <button class="map-hud__btn" id="openList" type="button">
-              <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span>点位列表
             </button>
             <button class="map-hud__btn" id="openAmap" type="button">
               <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sun.svg)"></span>高德在线地图
@@ -387,41 +390,53 @@ function avoidLabelOverlap() {
 }
 
 function renderMarkers() {
-  const mapInner = $("#mapInner");
-  const wrapWrap = $("#mapWrap");
-  const wrapInner = $("#mapInner") || wrapWrap;
-  wrapWrap.querySelectorAll(".marker").forEach((el) => el.remove());
+  const layer = $("#markerLayer");
+  const img = $("#baseImg");
+  if (!layer || !img) return;
+  layer.innerHTML = "";
+  const geo = imageGeometry();
   for (const n of NODES) {
-    const p = BG.points[n.id];
-    if (!p) continue;                                   // 未标坐标的节点不显示（不猜位置）
+    const p = BG.points[n.id] || (typeof n.x_pct === "number" ? { x_pct: n.x_pct, y_pct: n.y_pct } : null);
+    if (!p) continue;                                  // 没坐标就不画（不猜位置）
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "marker";
     btn.dataset.id = n.id;
     btn.dataset.cat = n.category;
-    btn.style.left = p.x_pct + "%";
-    btn.style.top = p.y_pct + "%";
-    const hasPano = Boolean(n.pano_url) && Boolean(MANIFEST.scenes[n.id]);
-    btn.innerHTML = '<span class="dot"></span><span class="tag">' + esc(n.label) +
-      (hasPano ? ' · 实景' : '') + '</span>';
+    btn.dataset.x = p.x_pct;
+    btn.dataset.y = p.y_pct;
+    const hasPano = Boolean(sceneOf(n));
+    btn.innerHTML = '<span class="dot"></span><span class="tag">' + esc(n.label) + (hasPano ? " · 实景" : "") + "</span>";
     btn.setAttribute("aria-label", n.label + "（" + catLabel(n.category) + "）");
-    btn.hidden = filter === "__3d" ? !sceneOf(n) : (Boolean(filter) && n.category !== filter);
-    btn.addEventListener("click", () => selectNode(n.id));
-    wrapInner.appendChild(btn);
+    btn.hidden = Boolean(filter) && n.category !== filter;
+    btn.addEventListener("click", (e) => { e.stopPropagation(); selectNode(n.id); });
+    layer.appendChild(btn);
   }
-  avoidLabelOverlap();
+  layoutMarkers(geo);
 }
 
-function selectNode(id) {
-  const n = NODES.find((x) => x.id === id);
-  if (!n) return;
-  currentId = id;
-  document.querySelectorAll(".marker").forEach((el) => {
-    el.setAttribute("aria-current", el.dataset.id === id ? "true" : "false");
-  });
-  const scene = sceneOf(n);
-  if (scene) return enterStreet(id);                    // 有实景：直接进 3D 街景
-  toast("「" + n.label + "」暂无 360 实景素材，不拿别的图冒充实景", "danger");
+/** 底图在容器里的实际摆放（object-fit: contain）：缩放/平移都用它算标记位置 */
+function imageGeometry() {
+  const wrap = $("#mapWrap"), img = $("#baseImg");
+  const nw = img.naturalWidth || 1279, nh = img.naturalHeight || 854;
+  const w = wrap.clientWidth, hh = wrap.clientHeight;
+  const k = Math.min(w / nw, hh / nh);
+  const dw = nw * k, dh = nh * k;
+  return { ox: (w - dw) / 2, oy: (hh - dh) / 2, dw, dh };
+}
+
+/** 把标记放到"像素坐标"上：缩放只影响图，标记层不动 → 文字永远清晰 */
+function layoutMarkers(geo) {
+  const g = geo || imageGeometry();
+  const layer = $("#markerLayer");
+  if (!layer) return;
+  for (const el of layer.querySelectorAll(".marker")) {
+    const px = Number(el.dataset.x), py = Number(el.dataset.y);
+    const x = g.ox + (px / 100) * g.dw * zoomState.z + zoomState.x;
+    const y = g.oy + (py / 100) * g.dh * zoomState.z + zoomState.y;
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+  }
 }
 
 /** 搜索栏/地图上的旧入口保留：直接进 3D 街景查看器 */
@@ -565,34 +580,35 @@ function renderAmapMarkers(AMap) {
 }
 
 function useShotBase() {
-  satState.onlyPano = false;
-  syncZoomUI("shot");
-  $("#mapWrap").hidden = false;
-  $("#amapWrap").hidden = true;
-  setBasePressed("shot");
-  amapState.active = false;
-  amapTip("");
-}
+    satState.onlyPano = false;
+    syncZoomUI("shot");
+    $("#mapWrap").hidden = false;
+    $("#amapWrap").hidden = true;
+    $("#satWrap").hidden = true;   // ⚠️ 切回示意图必须隐藏卫星图层，否则两张图叠在一起
+    const _st = $("#satTip"); if (_st) _st.hidden = true;
+    setBasePressed("shot");
+    amapState.active = false;
+    amapTip("");
+    return;
+  }
 
-/* ---------- 高德官方嵌入（零 key 卫星图）：既是独立入口，也是 JS API 被域名白名单拒绝时的兜底 ---------- */
-// 高德官方嵌入（零 key、卫星图）：既是独立入口，也是 JS API 失败时的兜底
-const iframeBtn = $("#openAmap");
+/* ---------- 高德官方嵌入（零 key 卫星图）：独立入口，也是 JS API 被域名白名单拒绝时的兜底 ---------- */
 function openAmapEmbed() {
-  // ⚠️ 必须在调用时取 BG：它是 init 里异步加载的，模块求值时还是空的
-  const cfgAmap = (BG && BG.amap) || {};
-if (!cfgAmap || !cfgAmap.embed_url_template || !cfgAmap.center) return false;
-const url = cfgAmap.embed_url_template
-  .replace("{lng}", cfgAmap.center.lng).replace("{lat}", cfgAmap.center.lat)
-  .replace("{zoom}", cfgAmap.zoom || 17).replace("{maptype}", cfgAmap.maptype || "satellite");
-if (!$("#amapFrame").firstChild) {
-  $("#amapFrame").innerHTML = '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
-    'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
-}
-$("#amapOverlay").classList.add("on");
-return true;
+  const cfgAmap = (BG && BG.amap) || {};          // ⚠️ 必须在调用时取：BG 是 init 里异步加载的
+  if (!cfgAmap.embed_url_template || !cfgAmap.center) return false;
+  const url = cfgAmap.embed_url_template
+    .replace("{lng}", cfgAmap.center.lng).replace("{lat}", cfgAmap.center.lat)
+    .replace("{zoom}", cfgAmap.zoom || 17).replace("{maptype}", cfgAmap.maptype || "satellite");
+  const frame = $("#amapFrame");
+  if (frame && !frame.firstChild) {
+    frame.innerHTML = '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
+      'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+  }
+  $("#amapOverlay").classList.add("on");
+  return true;
 }
 
-/* ---------- 地图上的功能按键：示意图 / 卫星图 / 3D 街景 / 点位列表 ---------- */
+
 function setupMapHud() {
   const seg = $("#viewSeg");
   if (seg) {
@@ -601,37 +617,11 @@ function setupMapHud() {
       if (!btn) return;
       const v = btn.dataset.view;
       if (v === "shot") return useShotBase();
-      if (v === "street") return useStreetView3D();            // 3D 街景 = 卫星底图 + 实景点位
+      if (v === "street") return useStreetView3D();     // 3D 街景 = 卫星底图 + 实景点位
     });
   }
 
-  // 点位列表抽屉（复用共享组件 createSheet）
-  $("#openList")?.addEventListener("click", () => {
-    const body = document.createElement("div");
-    body.className = "stack stack--sm";
-    for (const n of NODES) {
-      const row = document.createElement("button");
-      row.type = "button";
-      row.className = "map-hud__btn";
-      row.style.width = "100%";
-      row.style.justifyContent = "flex-start";
-      const hasPano = Boolean(sceneOf(n));
-      row.innerHTML =
-        '<span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/map-pin.svg)"></span>' +
-        '<span class="label">' + n.label + "</span>" +
-        '<span class="chip" style="margin-left:auto">' + catLabel(n.category) +
-        (hasPano ? " · 有实景" : " · 暂无实景") + "</span>";
-      row.addEventListener("click", () => { sheet.close(); selectNode(n.id); });
-      body.appendChild(row);
-    }
-    const foot = document.createElement("div");
-    foot.className = "small muted";
-    foot.textContent = "共 " + NODES.length + " 个点位；有实景的点位可以直接进入 3D 街景。";
-    const sheet = createSheet({ title: "点位列表", iconName: "map-pin", body, footer: foot });
-    sheet.open();
-  });
-
-  // 高德「真实卫星图」iframe 兜底入口（零 key，联网可用）
+  // 高德官方嵌入（零 key 卫星图）：独立入口，也是 JS API 被域名白名单拒绝时的兜底
   const cfgAmap = (BG && BG.amap) || {};
   const iframeBtn2 = $("#openAmap");
   if (iframeBtn2 && cfgAmap.enabled !== false && cfgAmap.center) {
@@ -643,9 +633,10 @@ function setupMapHud() {
     const b = $("#vSat");
     if (b) b.disabled = true;
   }
-  setBasePressed("shot");
-  // 「校准点位」：切到卫星图层并打开点位列表（逐点在图上标出真实经纬度）
+
+  // 「添加点位」：在当前视图（示意图或 3D 街景）上点位置即可添加
   $("#addBtn")?.addEventListener("click", () => { openAddSheet(); });
+  setBasePressed("shot");
 }
 
 /* ---------- ⭐ 3D 街景（Pannellum；素材由 tools/stitch-pano.py 从实拍 180°×2 拼出） ---------- */
@@ -764,9 +755,7 @@ function applyZoom() {
   clampPan();
   inner.style.transformOrigin = "50% 50%";
   inner.style.transform = "translate(" + zoomState.x + "px," + zoomState.y + "px) scale(" + zoomState.z + ")";
-  inner.querySelectorAll(".marker").forEach((m) => {
-    m.style.transform = "translate(-50%, -100%) scale(" + (1 / zoomState.z) + ")";
-  });
+  layoutMarkers();          // 标记在独立图层里按像素重排：放大后不会变模糊
   const val = $("#zoomVal");
   if (val) val.textContent = Math.round(zoomState.z * 100) + "%";
   const rng = $("#zoomRange");
@@ -779,6 +768,20 @@ function setZoom(z) {
   zoomState.z = Math.min(3.2, Math.max(1, Number(z.toFixed(2))));
   if (zoomState.z === 1) { zoomState.x = 0; zoomState.y = 0; }
   applyZoom();
+}
+
+/** 示意图上的点击：添加点位时把点击换算成底图百分比坐标 */
+function onShotClick(e) {
+  if (!satState.addMode) return;
+  const wrap = $("#mapWrap");
+  const g = imageGeometry();
+  const r = wrap.getBoundingClientRect();
+  const x = e.clientX - r.left - g.ox - zoomState.x;
+  const y = e.clientY - r.top - g.oy - zoomState.y;
+  const xPct = Number(((x / (g.dw * zoomState.z)) * 100).toFixed(2));
+  const yPct = Number(((y / (g.dh * zoomState.z)) * 100).toFixed(2));
+  if (xPct < 0 || xPct > 100 || yPct < 0 || yPct > 100) { toast("点在底图范围内才能加", "danger"); return; }
+  addCustomSpot({ x_pct: xPct, y_pct: yPct });
 }
 
 function setupMapZoom() {
@@ -805,6 +808,7 @@ function setupMapZoom() {
     applyZoom();
   });
   wrap.addEventListener("pointerup", () => { zoomState.dragging = false; });
+  wrap.addEventListener("click", onShotClick);
   wrap.addEventListener("pointercancel", () => { zoomState.dragging = false; });
 }
 
@@ -885,6 +889,13 @@ function renderSatMarkers() {
       m.on("popupopen", (e) => {
         const btn = e.popup.getElement()?.querySelector("[data-pano]");
         btn?.addEventListener("click", () => { satState.map.closePopup(); enterStreet(n.id); });
+      });
+    } else if (customSpots.some((s) => s.id === n.id)) {
+      m.bindPopup('<div class="sat-pop"><b>' + esc(n.label) + '</b><button class="btn btn--quiet btn--sm" data-del="' + n.id + '" type="button">删除这个点位</button></div>', { closeButton: false, offset: [0, -6] });
+      m.on("popupopen", (e) => {
+        e.popup.getElement()?.querySelector("[data-del]")?.addEventListener("click", () => {
+          satState.map.closePopup(); removeSpot(n.id);
+        });
       });
     } else {
       m.bindTooltip(n.label, { direction: "top", offset: [0, -10] });
@@ -987,21 +998,89 @@ function onSatClick(e) {
   }
 }
 
-/** 「添加点位」：填名称/类别/备注 → 在图上点位置 → 导出 JSON（我拿去固化） */
+/** 自定义点位：存在 localStorage，刷新/切视图都不丢；可删、可导出（导出后我固化） */
+const SPOT_KEY = "beimingda.spots";
+let customSpots = [];
+try { customSpots = JSON.parse(localStorage.getItem(SPOT_KEY) || "[]") || []; } catch { customSpots = []; }
+
+function saveSpots() {
+  try { localStorage.setItem(SPOT_KEY, JSON.stringify(customSpots)); } catch { /* 隐私模式：本次会话内仍生效 */ }
+}
+
+/** 把自定义点位并进三套数据：底图百分比、卫星经纬度、点位列表 */
+function applySpots() {
+  for (const s of customSpots) {
+    if (!NODES.some((n) => n.id === s.id)) {
+      NODES.push({
+        id: s.id, label: s.label, category: s.category || "service",
+        desc: s.note || "", color: s.color || "",
+        pano_url: s.pano_scene ? "/pano/" + s.pano_scene + ".jpg" : null, lat: 0, lng: 0,
+      });
+    } else {
+      const n = NODES.find((x) => x.id === s.id);
+      n.label = s.label; n.desc = s.note || n.desc;
+      if (s.pano_scene) n.pano_url = "/pano/" + s.pano_scene + ".jpg";
+    }
+    if (typeof s.x_pct === "number" && typeof s.y_pct === "number") {
+      BG.points = BG.points || {};
+      BG.points[s.id] = { x_pct: s.x_pct, y_pct: s.y_pct };
+    }
+    if (s.lat && s.lng) satState.coords[s.id] = { lat: Number(s.lat), lng: Number(s.lng) };
+  }
+}
+
+function addCustomSpot(coord) {
+  const draft = satState.newPoint || {};
+  const id = "spot-" + Date.now().toString(36) + Math.floor(Math.random() * 90 + 10);
+  const spot = {
+    id,
+    label: (draft.label || "").trim() || "未命名点位",
+    category: draft.category || "service",
+    note: (draft.note || "").trim(),
+    color: draft.color || "",
+    pano_scene: draft.pano_scene || "",
+    ...coord,
+  };
+  customSpots.push(spot);
+  saveSpots();
+  applySpots();
+  renderMarkers();
+  renderSatMarkers();
+  satState.addMode = false;
+  toast("已添加「" + spot.label + "」。接着加下一个吧（名字再输一次）。");
+  openAddSheet();                                  // 每次加完都重新问名字（用户要求）
+}
+
+function removeSpot(id) {
+  const s = customSpots.find((x) => x.id === id);
+  customSpots = customSpots.filter((x) => x.id !== id);
+  saveSpots();
+  const i = NODES.findIndex((n) => n.id === id);
+  if (i >= 0) NODES.splice(i, 1);
+  if (BG.points) delete BG.points[id];
+  delete satState.coords[id];
+  renderMarkers();
+  renderSatMarkers();
+  toast("已删除「" + (s ? s.label : id) + "」");
+}
+
+/** 「添加点位」：每次都要填名字 → 在当前视图上点位置 → 立刻重新问下一个（可删、可导出） */
 function openAddSheet() {
   const body = document.createElement("div");
   body.className = "stack stack--sm";
-  const mk = (label, el) => {
+  const mkField = (labelText, el) => {
     const w = document.createElement("label");
     w.className = "field";
-    w.innerHTML = '<span class="field__label">' + label + "</span>";
-    w.appendChild(el);
+    const sp = document.createElement("span");
+    sp.className = "field__label";
+    sp.textContent = labelText;
+    w.append(sp, el);
     return w;
   };
   const name = document.createElement("input");
   name.className = "input";
   name.placeholder = "例如：明湖风光 1、图书馆";
-  name.value = "明湖风光 " + (NODES.filter((n) => /^明湖风光/.test(n.label)).length + 1);
+  name.value = "";
   const cat = document.createElement("select");
   cat.className = "input";
   for (const [v, t] of [["teaching", "教学与自习"], ["dorm", "宿舍楼"], ["canteen", "食堂"], ["gate", "校门"], ["service", "服务设施"]]) {
@@ -1009,48 +1088,83 @@ function openAddSheet() {
   }
   const note = document.createElement("input");
   note.className = "input";
-  note.placeholder = "备注（会显示在点位说明里，可留空）";
+  note.placeholder = "备注（可留空，会显示在点位说明里）";
   const color = document.createElement("input");
-  color.type = "color";
-  color.value = "#1f4e8c";
-  color.className = "input input--color";
-  body.append(mk("点位名称", name), mk("类别", cat), mk("备注", note), mk("标记颜色", color));
-  const tip = document.createElement("p");
-  tip.className = "small muted";
-  tip.textContent = "① 填好上面 → ② 点「开始在图上标」→ ③ 在卫星图上点位置（可连续加多个）→ ④ 点「导出点位 JSON」发我。";
-  body.appendChild(tip);
+  color.type = "color"; color.value = "#1f4e8c"; color.className = "input input--color";
+  const pano = document.createElement("select");
+  pano.className = "input";
+  pano.appendChild(Object.assign(document.createElement("option"), { value: "", textContent: "不关联 360 实景" }));
+  for (const [k, sc] of Object.entries(MANIFEST.scenes || {})) {
+    pano.appendChild(Object.assign(document.createElement("option"), { value: k, textContent: "关联：" + (sc.title || k) }));
+  }
+  body.append(mkField("点位名称（每个点位单独填）", name), mkField("类别", cat), mkField("备注", note), mkField("标记颜色", color), mkField("360 实景素材", pano));
+
+  const howto = document.createElement("p");
+  howto.className = "small muted";
+  howto.textContent = "填好名字 → 点「下一步：在图上点位置」→ 在**当前这张图**上点一下（示意图记底图坐标，3D 街景/卫星图记经纬度）→ 加完会再问下一个。";
+  body.appendChild(howto);
+
+  // 已添加的点位（可删）
+  if (customSpots.length) {
+    const listTitle = document.createElement("p");
+    listTitle.className = "field__label";
+    listTitle.textContent = "已添加的点位（可删）";
+    body.appendChild(listTitle);
+    const list = document.createElement("div");
+    list.className = "stack stack--sm";
+    for (const s of customSpots) {
+      const row = document.createElement("div");
+      row.className = "chip-row";
+      row.style.alignItems = "center";
+      const sp = document.createElement("span");
+      sp.className = "chip";
+      sp.textContent = s.label + (s.x_pct != null ? "（示意图）" : "（卫星）");
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "btn btn--quiet btn--sm";
+      del.textContent = "删除";
+      del.addEventListener("click", () => { removeSpot(s.id); sheet.close(); openAddSheet(); });
+      row.append(sp, del);
+      list.appendChild(row);
+    }
+    body.appendChild(list);
+  }
 
   const foot = document.createElement("div");
   foot.className = "stack stack--sm";
-  const startBtn = document.createElement("button");
-  startBtn.type = "button"; startBtn.className = "btn"; startBtn.textContent = "开始在图上标";
-  const expBtn = document.createElement("button");
-  expBtn.type = "button"; expBtn.className = "btn btn--ghost"; expBtn.textContent = "导出点位 JSON";
-  const doneBtn = document.createElement("button");
-  doneBtn.type = "button"; doneBtn.className = "btn btn--quiet"; doneBtn.textContent = "退出添加模式";
-  foot.append(startBtn, expBtn, doneBtn);
+  const next = document.createElement("button");
+  next.type = "button"; next.className = "btn"; next.textContent = "下一步：在图上点位置";
+  const exp = document.createElement("button");
+  exp.type = "button"; exp.className = "btn btn--ghost"; exp.textContent = "导出点位 JSON（发我固化）";
+  const done = document.createElement("button");
+  done.type = "button"; done.className = "btn btn--quiet"; done.textContent = "结束添加";
+  foot.append(next, exp, done);
   const sheet = createSheet({ title: "添加点位", iconName: "plus", body, footer: foot });
-  startBtn.addEventListener("click", () => {
-    satState.newPoint = { label: name.value.trim() || "新点位", category: cat.value, note: note.value.trim(), color: color.value };
+
+  next.addEventListener("click", () => {
+    satState.newPoint = {
+      label: name.value.trim(),
+      category: cat.value,
+      note: note.value.trim(),
+      color: color.value,
+      pano_scene: pano.value,
+    };
+    if (!satState.newPoint.label) { toast("先给这个点位起个名字", "danger"); name.focus(); return; }
     satState.addMode = true;
     satState.onlyPano = false;
-    useSatBase();
     updateSatTip();
     sheet.close();
-    toast("现在在卫星图上点位置（可连续点多个）");
+    toast("在图上点一下「" + satState.newPoint.label + "」的位置（示意图 / 卫星图都行）");
   });
-  doneBtn.addEventListener("click", () => { satState.addMode = false; satState.newPoint = null; updateSatTip(); sheet.close(); });
-  expBtn.addEventListener("click", () => {
-    const points = NODES.filter((n) => satState.coords[n.id]).map((n) => ({
-      id: n.id, label: n.label, category: n.category, note: n.desc || "", color: n.color || "", ...satState.coords[n.id],
-    }));
-    const txt = JSON.stringify({ points }, null, 2);
+  done.addEventListener("click", () => { satState.addMode = false; satState.newPoint = null; updateSatTip(); sheet.close(); });
+  exp.addEventListener("click", () => {
+    const txt = JSON.stringify({ points: customSpots }, null, 2);
     copyText(txt).then((ok) => {
-      if (ok) return toast("点位 JSON 已复制（" + points.length + " 个），发我即可固化");
+      if (ok) return toast("已复制 " + customSpots.length + " 个点位，发我即可固化");
       const a = document.createElement("a");
       a.href = URL.createObjectURL(new Blob([txt], { type: "application/json" }));
       a.download = "sat-coords.json"; a.click();
-      toast("已下载 sat-coords.json（" + points.length + " 个点位）");
+      toast("已下载 sat-coords.json（" + customSpots.length + " 个点位）");
     });
   });
   sheet.open();
@@ -1094,31 +1208,23 @@ function openAddSheet() {
     }
   }
 
-  if (anno && Array.isArray(anno.points)) {
-    for (const p of anno.points) {
-      const id = p.id || ("anno-" + Math.random().toString(36).slice(2, 8));
-      if (BG.points && typeof p.x_pct === "number") BG.points[id] = { x_pct: p.x_pct, y_pct: p.y_pct };
-      if (!NODES.some((n) => n.id === id)) {
-        NODES.push({
-          id, label: p.note || "人工标注", category: p.category || "service",
-          color: p.color || "", desc: p.note || "", lat: 0, lng: 0,
-        });
-      }
-    }
-  }
+  // 套用本地保存的自定义点位（刷新/切页都不丢）
+  applySpots();
   setupMapHud();
   setupMapZoom();
+
   // ⚠️ 口径：有实景 = 该节点能通过 pano_url 关联到 manifest 里的场景（不是拿节点 id 去猜场景 id）
   const panoCount = NODES.filter((n) => Boolean(sceneOf(n))).length;
   $("#source").textContent = (BG.attribution || "底图为示意截图，非在线地图服务") +
     " · 共 " + NODES.length + " 个点位，其中 " + panoCount + " 个已拍摄 360° 实景";
-  renderMarkers();
-  window.addEventListener("resize", avoidLabelOverlap); // 底图变宽 / 变窄后重算标签车道
-  setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
-  // 面板已下线：类别概览并进底图来源那一行
   const cats = [...new Set(NODES.map((n) => catLabel(n.category)))].join(" / ");
-  $("#source").textContent += cats ? "　·　类别：" + cats : "";
-})();
+  if (cats) $("#source").textContent += "　·　类别：" + cats;
+
+  renderMarkers();
+  window.addEventListener("resize", () => renderMarkers());
+  setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
+
+  })();
 </script>
 <footer class="site-footer" style="margin-top:32px">
   <div style="max-width:var(--page-max);margin:0 auto;padding:0 16px">

@@ -366,17 +366,23 @@ export function listMatches(taskId, limit = MAX_LIMIT) {
  * 最近的撮合记录（跨任务，按时间倒序）—— 门户「平均匹配得分」用
  * ⛔ 只读，不写库；只出昵称，不出 user_id / 联系方式
  */
-export function listRecentMatches(limit = DEFAULT_LIMIT) {
+export function listRecentMatches(limit = DEFAULT_LIMIT, opts = {}) {
+  const where = [];
+  const args = [];
+  if (opts.state) { where.push("m.state = ?"); args.push(String(opts.state)); }
+  if (opts.runner_handle) { where.push("u.handle = ?"); args.push(String(opts.runner_handle)); }
+  const clause = where.length ? "WHERE " + where.join(" AND ") : "";
   return getDb()
     .prepare(
       `SELECT m.id, m.task_id, m.score, m.state, m.created_at, u.handle AS runner_handle
          FROM matches m
          JOIN runners r ON r.id = m.runner_id
          JOIN users   u ON u.id = r.user_id
+         ${clause}
         ORDER BY m.created_at DESC, m.score DESC
         LIMIT ?`,
     )
-    .all(clampLimit(limit, DEFAULT_LIMIT, MAX_LIMIT))
+    .all(...args, clampLimit(limit, DEFAULT_LIMIT, MAX_LIMIT))
     .map((m) => ({
       match_id: m.id,
       task_id: m.task_id,
@@ -417,24 +423,28 @@ export function setMatchState(matchId, state) {
   if (!id) reject(CODES.NOT_FOUND, "match not found: 空 id");
 
   const next = typeof state === "string" ? state.trim() : "";
-  if (next !== "accepted" && next !== "declined") {
-    reject(CODES.SCHEMA_REJECTED, `state 只允许 accepted / declined（收到「${next || "空"}」）`);
+  if (next !== "accepted" && next !== "declined" && next !== "pushed") {
+    reject(CODES.SCHEMA_REJECTED, `state 只允许 accepted / declined / pushed（收到「${next || "空"}」）`);
   }
 
   const db = getDb();
   const row = db.prepare("SELECT id, task_id, state FROM matches WHERE id = ?").get(id);
   if (!row) reject(CODES.NOT_FOUND, `match not found: ${id}`);
-  if (row.state !== "pushed") {
+  // 状态机：pushed → accepted/declined（接单/拒单）；accepted → pushed（取消接单）
+  const allowedFrom = next === "pushed" ? "accepted" : "pushed";
+  if (row.state !== allowedFrom) {
     reject(
       CODES.SCHEMA_REJECTED,
-      `match ${id} 当前状态是 ${row.state}，只有 pushed 的记录可以被接单 / 拒单`,
+      next === "pushed"
+        ? `match ${id} 当前状态是 ${row.state}，只有 accepted 的记录可以取消接单`
+        : `match ${id} 当前状态是 ${row.state}，只有 pushed 的记录可以被接单 / 拒单`,
     );
   }
 
   // 带上 state='pushed' 条件：即使并发调用，也只有一个能把行改走
   const changed = db
-    .prepare("UPDATE matches SET state = ? WHERE id = ? AND state = 'pushed'")
-    .run(next, id).changes;
+    .prepare("UPDATE matches SET state = ? WHERE id = ? AND state = ?")
+    .run(next, id, allowedFrom).changes;   // 带上原状态：并发下只有一个能改走
   if (changed !== 1) {
     const now = db.prepare("SELECT state FROM matches WHERE id = ?").get(id);
     reject(

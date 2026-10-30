@@ -855,6 +855,26 @@ function paintAction(t) {
     c.appendChild(icon("circle-check", { size: 14 }));
     c.appendChild(el("span", "", who ? "接单人 " + who : "已接单"));
     box.appendChild(c);
+
+    // 取消接单（accepted → pushed，卡片回到"可接单"；状态在服务端，切页面也不会丢）
+    const cancel = el("button", "btn btn--quiet btn--sm");
+    cancel.type = "button";
+    cancel.appendChild(icon("x", { size: 14 }));
+    cancel.appendChild(el("span", "", "取消接单"));
+    cancel.addEventListener("click", async () => {
+      const matchId = state.acceptedMatch.get(t.task_id);
+      if (!matchId) { toast("这一单的接单记录还没同步到，刷新一下再试", "danger"); return; }
+      cancel.disabled = true;
+      const r = await api("/api/matches/" + encodeURIComponent(matchId) + "/cancel", { method: "POST", body: {} });
+      if (!r.ok) { cancel.disabled = false; return; }
+      state.accepted.delete(t.task_id);
+      state.mine.delete(t.task_id);
+      state.acceptedMatch.delete(t.task_id);
+      toast("已取消接单，这张单子回到「可接单」", "ok");
+      await refreshAccepted();
+      renderBoard();
+    });
+    box.appendChild(cancel);
     return;
   }
 
@@ -1092,7 +1112,7 @@ function renderBoard() {
     if (state.view === "mine") {
       box.appendChild(emptyArt(
         "你还没接过单",
-        "回「全部开放任务」找一张顺路的卡片，点「接这一单」。本页只记在当前会话里，⛔ 不写进服务器。",
+        "回「全部开放任务」找一张顺路的卡片，点「接这一单」。接单状态存在服务器上，切页面、刷新都不会丢。",
         "看全部开放任务",
         () => setView("all"),
       ));
@@ -1152,7 +1172,7 @@ function paintBoardCount() {
   if (!el0) return;
   if (state.view === "mine") {
     el0.textContent = state.mine.size
-      ? "本会话接过 " + state.mine.size + " 单（只记在当前页面会话）"
+      ? "已接 " + state.mine.size + " 单（状态存在服务器，切页面不丢；可在卡片上取消）"
       : "还没有接单记录";
   } else {
     el0.textContent = n
@@ -1176,10 +1196,14 @@ async function mapLimit(items, limit, fn) {
 /** 读一次最近撮合记录，把「已经接了」的任务 + 接单人标出来（比 5 分钟去重窗口更稳） */
 async function refreshAccepted() {
   try {
-    const recent = await api("/api/matches?limit=50");
+    // 只查 accepted：这样"我的接单"是**服务端状态**，切页面/刷新都不会丢（原来只存在内存里）
+    const recent = await api("/api/matches?state=accepted&limit=200");
     const list = (Array.isArray(recent) ? recent : []).filter((m) => m && m.state === "accepted");
     state.accepted = new Set(list.map((m) => m.task_id));
     state.acceptedBy = new Map(list.map((m) => [m.task_id, displayName(m.runner_handle || "")]));
+    // 服务端记着"已接单"的任务，一律算进「我的接单」（同一台机器上的演示身份）
+    state.mine = new Set(list.map((m) => m.task_id));
+    state.acceptedMatch = new Map(list.map((m) => [m.task_id, m.match_id]));
   } catch {
     state.accepted = new Set();
     state.acceptedBy = new Map();
@@ -1243,6 +1267,7 @@ async function acceptMatch(taskId, matchId) {
     }
     state.accepted.add(taskId);
     state.mine.add(taskId); // 「我的接单」视图用
+    if (data && data.match_id) state.acceptedMatch.set(taskId, data.match_id);
     const who = acceptedNameOf(taskId);
     toast("已接单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
     paintBoardCount();

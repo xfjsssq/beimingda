@@ -2171,17 +2171,22 @@ p, li, .card__desc, .lead { text-wrap: pretty; }
 .section--callout code.inline, .section--callout .kbd { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.28); }
 .section--callout .btn--light { background: #fff; color: var(--color-primary); }
 
-/* ---------- B11 标语：与整页字号体系对齐，别再是"一坨大字" ----------
-   问题：之前 36px/700 太抢，跟正文不是一套体系，看着没融合。
-   现在：走 .section 的内边距 + 字号收到 30px（窄屏 20px）、字重 600、行高 1.5，
-        颜色用正文色与 muted 的渐入，靠"逐词点亮"制造节奏而不是靠字号压人。 */
-.tagline { padding: 40px 0 8px; }
-.tagline p { font-size: 30px; line-height: 1.5; font-weight: 600; letter-spacing: -0.01em;
-  max-width: 680px; margin: 0; text-wrap: balance; color: var(--color-text); }
-.tagline .w { color: color-mix(in srgb, var(--color-text) 26%, transparent); margin-inline-end: 0; }
+/* ---------- B11 标语：与整页融合（2026-10-30 二次调整） ----------
+   用户反馈"字体还是有问题、没跟背景融合" → 现在：
+     · 不再是一块独立白卡，直接是页面的一段话（跟随 .section 的节奏）
+     · 字号 24px（窄屏 18px）、字重 600、行高 1.6 —— 与正文体系同一套
+     · 前半句用 muted 灰、结尾一句用主色，形成"读下来有个落点"的层次
+     · 逐词点亮保留，但节奏更轻（每词 400ms 颜色过渡） */
+.tagline { padding: 32px 0 8px; }
+.tagline__eyebrow { display: block; margin-bottom: 12px; font-size: 12px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-primary); }
+.tagline p { font-size: 24px; line-height: 1.6; font-weight: 600; letter-spacing: -0.005em;
+  max-width: 780px; margin: 0; text-wrap: pretty; color: var(--color-text); }
+.tagline .w { color: color-mix(in srgb, var(--color-text) 24%, transparent);
+  transition: color 400ms var(--ease); }
 .tagline .w.on { color: var(--color-text); }
-.tagline__hint { margin: 12px 0 0; font-size: 14px; color: var(--color-muted); }
-@media (max-width: 768px) { .tagline p { font-size: 20px; line-height: 1.6; } }
+.tagline .w.is-key.on { color: var(--color-primary); }
+@media (max-width: 768px) { .tagline p { font-size: 18px; line-height: 1.7; } .tagline { padding: 24px 0 8px; } }
 
 /* ---------- 地图：整幅布局 + 缩放控件（滑块方便手机端） ---------- */
 .layout--full { display: block; }
@@ -2436,3 +2441,13 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 /* ---------- 首页：功能卡片的选中提示 ---------- */
 .card__pick-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--color-muted); }
 .card.is-picked .card__pick-hint { color: var(--color-primary); }
+
+/* ---------- ⚠️ 选中态必须反白：之前背景是深蓝渐变但文字还是深色 → "被色块遮住" ---------- */
+.segmented__btn[aria-pressed="true"], .segmented__btn.is-on {
+  background: var(--btn-flat); color: #fff; border-color: var(--btn-flat);
+}
+.segmented__btn[aria-pressed="true"] .icon, .segmented__btn.is-on .icon { background-color: #fff; }
+.chip[aria-pressed="true"] { background: var(--btn-flat); color: #fff; border-color: var(--btn-flat); }
+.tab[aria-selected="true"] { color: #fff; }
+.map-hud .segmented__btn { color: var(--color-text); }
+.map-hud .segmented__btn[aria-pressed="true"] { color: #fff; }

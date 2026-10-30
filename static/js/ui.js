@@ -430,8 +430,9 @@ export function initTagline(root = document) {
   for (const n of nodes) {
     const words = String(n.dataset.words || "").split("|").filter(Boolean);
     n.textContent = "";
-    const spans = words.map((w) => {
-      const s = el("span", "w", w);
+    const keyFrom = Number(n.dataset.keyFrom || -1);   // 从这个下标起用主色（收尾那句）
+    const spans = words.map((w, i) => {
+      const s = el("span", "w" + (keyFrom >= 0 && i >= keyFrom ? " is-key" : ""), w);
       n.appendChild(s);
       return s;
     });

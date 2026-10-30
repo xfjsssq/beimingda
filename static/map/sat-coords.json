@@ -1,34 +1,5 @@
 {
-  "_comment": "点位在卫星图上的 WGS84 经纬度（站内自建卫星图层用）。用 /welcome 的「3D 街景」看效果，用「添加点位」在图上点位置并导出，覆盖本文件即生效 —— 无需改代码。",
-  "_format": "{ points: [ { id, label, lat, lng, category, note, color } ] }",
-  "_note_now": "下面 3 条是按校园示意图推算的**近似**坐标（明湖水域一带），只是为了先看到效果；你按实际位置重新标一次覆盖即可。",
-  "points": [
-    {
-      "id": "ming-lake-1",
-      "label": "明湖风光 1",
-      "lat": 38.4968,
-      "lng": 106.1048,
-      "category": "teaching",
-      "note": "明湖一带实拍（第一段素材）",
-      "color": "#2E8B76"
-    },
-    {
-      "id": "ming-lake-2",
-      "label": "明湖风光 2",
-      "lat": 38.49635,
-      "lng": 106.1056,
-      "category": "teaching",
-      "note": "明湖一带实拍（第二段素材，接缝匹配最好的一段）",
-      "color": "#2E8B76"
-    },
-    {
-      "id": "ming-lake-3",
-      "label": "明湖风光 3",
-      "lat": 38.4972,
-      "lng": 106.1052,
-      "category": "teaching",
-      "note": "明湖一带实拍（第三段素材）",
-      "color": "#2E8B76"
-    }
-  ]
+  "_comment": "点位在卫星图上的 WGS84 经纬度（站内自建卫星图层用）。用 /welcome 的「添加点位」在图上点位置并导出，覆盖本文件即生效。",
+  "_format": "{ points: [ { id, label, category, note, color, pano_scene, lat, lng } ] }",
+  "points": []
 }

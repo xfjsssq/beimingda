@@ -29,7 +29,7 @@ export function createMatchesRouter() {
 
   router.get("/", (req, res, next) => {
     try {
-      res.json(ok(listRecentMatches(req.query.limit)));
+      res.json(ok(listRecentMatches(req.query.limit, { state: req.query.state, runner_handle: req.query.runner })));
     } catch (e) {
       next(e);
     }
@@ -44,7 +44,16 @@ export function createMatchesRouter() {
     }
   });
 
-  // POST /api/matches/:id/decline —— 拒单（matches.state: pushed → declined）
+  // POST /api/matches/:id/cancel —— 取消接单（accepted → pushed，回到可接单）
+router.post("/:id/cancel", requireWriteToken, (req, res, next) => {
+  try {
+    res.json(ok(setMatchState(req.params.id, "pushed")));
+  } catch (e) {
+    next(e);
+  }
+});
+
+// POST /api/matches/:id/decline —— 拒单（matches.state: pushed → declined）
   router.post("/:id/decline", requireWriteToken, (req, res, next) => {
     try {
       res.json(ok(setMatchState(req.params.id, "declined")));
