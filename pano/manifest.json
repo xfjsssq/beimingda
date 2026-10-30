@@ -1,6 +1,6 @@
 {
-  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py v2）。",
-  "_note_attach": "把某个场景挂到点位上：在 static/map/sat-coords.json 里给该点位写 pano_scene=<场景 id>。",
+  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py）。",
+  "_note_attach": "把某个场景挂到点位上：在 static/map/sat-coords.json 里给该点位写 pano_url=\"/pano/pano-N.jpg\"、pano_yaw=<朝向>，页面就会在详情里给出「进入 3D 街景」。",
   "default": {
     "firstScene": "pano-1",
     "sceneFadeDuration": 800,
@@ -12,9 +12,9 @@
       "panorama": "/pano/pano-1.jpg",
       "title": "明湖风光 1",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -36,9 +36,9 @@
       "panorama": "/pano/pano-2.jpg",
       "title": "明湖风光 2",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -60,9 +60,9 @@
       "panorama": "/pano/pano-3.jpg",
       "title": "三号楼后方十字路口",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -84,9 +84,9 @@
       "panorama": "/pano/pano-4.jpg",
       "title": "明湖风光 3",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -108,9 +108,9 @@
       "panorama": "/pano/pano-5.jpg",
       "title": "主楼后方",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -132,9 +132,9 @@
       "panorama": "/pano/pano-6.jpg",
       "title": "图书馆正门右侧",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -156,9 +156,9 @@
       "panorama": "/pano/pano-7.jpg",
       "title": "图书馆正门左侧",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -180,9 +180,9 @@
       "panorama": "/pano/pano-8.jpg",
       "title": "网球场后方",
       "type": "equirectangular",
-      "hfov": 100,
+      "hfov": 72,
       "yaw": 0,
-      "pitch": 0,
+      "pitch": 4,
       "hotSpots": [
         {
           "pitch": -3,
@@ -200,5 +200,6 @@
         }
       ]
     }
-  }
+  },
+  "_view_note": "站长实测：水平视场 72° 观感最好，默认视线向上抬 4°；查看器里已锁死缩放（minHfov=maxHfov=72）"
 }

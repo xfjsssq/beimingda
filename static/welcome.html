@@ -233,13 +233,6 @@
   <div class="street-bar">
     <span class="title" id="panoTitle">3D 街景</span>
     <div class="street-pick" id="streetPick"></div>
-    <label class="pano-zoom" for="panoZoom" title="缩放（数值 = 水平视场角，越小越近）">
-      <span class="pano-zoom__btn" id="panoZoomOut" aria-hidden="true">−</span>
-      <input class="pano-zoom__range" id="panoZoom" type="range" min="55" max="140" step="1" value="100"
-             aria-label="街景缩放（水平视场角）" />
-      <span class="pano-zoom__btn" id="panoZoomIn" aria-hidden="true">+</span>
-      <span class="pano-zoom__val" id="panoZoomVal">100°</span>
-    </label>
     <button id="panoClose" type="button">关闭</button>
   </div>
   <div id="pano"></div>
@@ -620,24 +613,6 @@ function renderStreetPick() {
   }
 }
 
-/** 街景缩放：进度条 + 加减按钮，数值就是水平视场角（越小越近） */
-function setupPanoZoom() {
-  const range = $("#panoZoom");
-  const val = $("#panoZoomVal");
-  const apply = (hfov) => {
-    const v = Math.min(140, Math.max(55, Number(hfov)));
-    if (range) range.value = String(v);
-    if (val) val.textContent = Math.round(v) + "\u00b0";
-    if (streetViewer && streetViewer.setHfov) {
-      try { streetViewer.setHfov(v, 200); } catch { /* 查看器还没就绪就忽略 */ }
-    }
-  };
-  range?.addEventListener("input", () => apply(range.value));
-  $("#panoZoomIn")?.addEventListener("click", () => apply(Number(range?.value || 100) - 8));
-  $("#panoZoomOut")?.addEventListener("click", () => apply(Number(range?.value || 100) + 8));
-  return apply;
-}
-const panoZoomApply = setupPanoZoom();
 
 function openStreetScene(sceneId) {
   const scenes = MANIFEST.scenes || {};
@@ -656,14 +631,15 @@ function openStreetScene(sceneId) {
       scenes,
       autoLoad: true,
       showControls: true,
-      // 缩放：先用进度条自己调，站长定下最合适的数值后再锁（minHfov = maxHfov = 那个值）
-      hfov: 100, minHfov: 55, maxHfov: 140,
+      // ⭐ 站长实测：72° 观感最好（minHfov = maxHfov = 72 → 真的锁死，缩放条也撤掉了）；
+      //    并把默认视角往上抬 4°（视线稍向上，画面的天空/地面占比更舒服）
+      hfov: 72, minHfov: 72, maxHfov: 72,
+      pitch: 4, yaw: 0,
       showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true,
       // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
       minPitch: -18, maxPitch: 18, pitch: 0,
       compass: false,
     });
-    setTimeout(() => { try { panoZoomApply?.(streetViewer?.getHfov?.() ?? 100); } catch { /* 忽略 */ } }, 400);
   } catch (e) {
     streetViewer = null;
     showStreetEmpty("查看器启动失败：" + (e && e.message ? e.message : e));
