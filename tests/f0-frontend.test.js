@@ -148,14 +148,14 @@ test("/agent：复制出来的 MCP 配置是合法 JSON、令牌为占位符、U
   assert.equal(mcpConfig.resolveMcpUrl({ origin: "http://127.0.0.1:3000/", mode: "origin" }), "http://127.0.0.1:3000/mcp");
 });
 
-test("/agent：14 个工具名与 docs/MCP-TOOLS.md 完全一致（防文档漂移）", () => {
+test("/agent：15 个工具名与 docs/MCP-TOOLS.md 完全一致（防文档漂移）", () => {
   const doc = readText("docs/MCP-TOOLS.md");
-  const section = doc.split("## 14 个工具")[1].split("## 返回格式")[0];
+  const section = doc.split("## 15 个工具")[1].split("## 返回格式")[0];
   // 工具表是「3 列」：| `工具名` | 作用 | 关键约束 |（协议方法表只有 2 列，不会被匹配）
   const inDoc = [...section.matchAll(/^\|\s*`([a-z][a-z0-9_]*)`[^|]*\|[^|]*\|[^|]*\|/gm)].map((m) => m[1]);
   const inCode = mcpConfig.toolNames();
-  assert.equal(inDoc.length, 14, `docs 里解析到 ${inDoc.length} 个工具，应为 14`);
-  assert.equal(mcpConfig.toolCount(), 14);
+  assert.equal(inDoc.length, 15, `docs 里解析到 ${inDoc.length} 个工具，应为 15`);
+  assert.equal(mcpConfig.toolCount(), 15);
   assert.deepEqual([...inCode].sort(), [...inDoc].sort(), "前端工具清单与 docs/MCP-TOOLS.md 不一致");
   for (const g of mcpConfig.TOOLS_BY_MODULE) {
     assert.equal(g.tools.length, g.count, `${g.module} 的数量标注与实际不符`);

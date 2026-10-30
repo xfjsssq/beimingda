@@ -31,7 +31,7 @@
 
 ---
 
-## 14 个工具（分模块）
+## 15 个工具（分模块）
 
 **所有工具 `inputSchema.additionalProperties` 必须为 `false`** —— 多传一个字段即 `SCHEMA_REJECTED`。
 
@@ -72,6 +72,7 @@
 | `schedule_add` | 加一条日程 | `period_end >= period_start`，否则 `SCHEMA_REJECTED` |
 | `schedule_query` | 查日程 | 按 weekday、period_start 升序 |
 | `schedule_remove` | 删一条 | 不存在 → `NOT_FOUND` |
+| `app_open_view` ⭐ | 生成"帮忙打开某界面"的深链（可带某处 360° 实景） | 只读、不改状态；`view` ∈ welcome/takeout/buddy/schedule/agent；`pano` 只在 view=welcome 有效，场景不存在时返回可用的 `available_scenes` |
 
 ---
 

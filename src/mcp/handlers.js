@@ -10,6 +10,7 @@
  */
 
 import { registerMapTools } from "./handlers/map.js";
+import { registerAppTools } from "./handlers/app.js";
 import { registerBuddyTools } from "./handlers/buddy.js";
 import { registerTakeoutTools } from "./handlers/takeout.js";
 import { registerScheduleTools } from "./handlers/schedule.js";
@@ -24,6 +25,7 @@ const MODULE_REGISTRARS = [
   { module: "m2", register: registerBuddyTools },
   { module: "m3", register: registerMapTools },
   { module: "m4", register: registerScheduleTools },
+  { module: "app", register: registerAppTools },   // 跨模块：生成"帮忙打开某界面"的深链
 ];
 
 let loaded = false;

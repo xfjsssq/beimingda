@@ -1265,7 +1265,8 @@ async function loadDemoData() {
 
 async function refreshMine() {
   try {
-    serverMine = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
+    // shape=console：服务端给"我的申请三块"（我发布的帖含收到留言 / 我表达的意愿含回复 / 已互相同意）
+    serverMine = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()) + "&shape=console");
   } catch {
     serverMine = null;   // 接口失败不阻塞：本地/演示层照常显示
   }

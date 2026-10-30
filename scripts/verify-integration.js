@@ -156,7 +156,7 @@ try {
     acc[p] = (acc[p] || 0) + 1;
     return acc;
   }, {});
-  const EXPECT = { map: 2, task: 3, runner: 1, match: 1, buddy: 3, schedule: 4 };
+  const EXPECT = { map: 2, task: 3, runner: 1, match: 1, buddy: 3, schedule: 4, app: 1 };
   for (const [prefix, want] of Object.entries(EXPECT)) {
     const got = byPrefix[prefix] ?? 0;
     check("tools", `模块前缀 ${prefix}* 工具数 = ${want}`, got === want, `实际 ${got}`);

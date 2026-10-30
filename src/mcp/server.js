@@ -119,7 +119,7 @@ export function createMcpRouter() {
             responses.push(rpcErr(id, RPC.INVALID_PARAMS, "params.name is required"));
             break;
           }
-          const envelope = await callTool(name, args, { req, transport: "mcp" });
+          const envelope = await callTool(name, args, { req, transport: "mcp", host: req?.headers?.host || process.env.SITE_DOMAIN || "" });
           responses.push(
             rpcOk(id, {
               content: [{ type: "text", text: JSON.stringify(envelope) }],

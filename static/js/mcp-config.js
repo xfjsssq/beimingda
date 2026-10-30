@@ -59,7 +59,7 @@ export const SAMPLE_DIALOGUES = [
   { module: "M4 日程提醒", text: "周三下午要交实验报告，提前两小时提醒我" },
 ];
 
-/** 14 个 MCP 工具，按模块分组（与 docs/MCP-TOOLS.md 一一对应） */
+/** 15 个 MCP 工具，按模块分组（与 docs/MCP-TOOLS.md 一一对应） */
 export const TOOLS_BY_MODULE = [
   {
     module: "M1 · 代取撮合",
@@ -103,6 +103,14 @@ export const TOOLS_BY_MODULE = [
       { name: "schedule_remove", desc: "删除一条日程" },
     ],
   },
+  {
+    module: "跨模块 · 打开界面",
+    owner: "feat/frontend-ia",
+    count: 1,
+    tools: [
+      { name: "app_open_view", desc: "生成可直接打开的站点深链（含某处 360° 实景），把界面替用户打开；只读、不改状态" },
+    ],
+  },
 ];
 
 /** 一句话合规声明（contracts/frontend.md §3 区块六） */
@@ -110,12 +118,12 @@ export const COMPLIANCE_LINE =
   "不收集身份信息（姓名 / 学号 / 手机号 / 身份证 / 学生证照片 / 校园网账号口令都不收）；" +
   "不接入、不登录、不抓取学校任何内部系统；演示令牌限频 + 短周期轮换、只能操作演示数据。";
 
-/** 工具总数（应为 14） */
+/** 工具总数（应为 15） */
 export function toolCount() {
   return TOOLS_BY_MODULE.reduce((n, g) => n + g.tools.length, 0);
 }
 
-/** 扁平的 14 个工具名 */
+/** 扁平的 15 个工具名 */
 export function toolNames() {
   return TOOLS_BY_MODULE.flatMap((g) => g.tools.map((t) => t.name));
 }

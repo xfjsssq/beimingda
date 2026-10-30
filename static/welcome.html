@@ -1228,6 +1228,14 @@ function openAddSheet() {
   window.addEventListener("resize", () => renderMarkers());
   setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
 
+  // ⭐ 深链：?pano=<sceneId> 直接进 3D 街景（MCP 的 app_open_view 生成的就是这个）
+  const wantPano = new URLSearchParams(location.search).get("pano");
+  if (wantPano) {
+    useStreetView3D();
+    openStreetScene(wantPano);
+    toast("已按链接打开实景：" + wantPano);
+  }
+
   })();
 </script>
 <footer class="site-footer" style="margin-top:32px">
