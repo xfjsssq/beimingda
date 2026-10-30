@@ -504,9 +504,17 @@ async function useAmapBase() {
       : e.message === "NO_SDK_URL" ? "缺少 SDK 地址配置（/map/map-bg.json 的 jsapi.sdk_url_template）"
       : e.message === "TIMEOUT" ? "加载超时（网络不可达？）"
       : "加载失败（域名白名单不含当前域名？）";
-    amapTip("已留在截图底图：" + why);
+    // ⭐ 精确化：把"为什么打不开"和"下一步该怎么办"直接写清楚，并自动兜底到官方嵌入卫星图
+    const host = location.hostname || location.host;
+    const domainRelated = ["NO_AMAP", "LOAD_FAIL", "TIMEOUT"].includes(e.message);
+    const msg = domainRelated && window.__AMAP_KEY__
+      ? "高德 key 本身有效，但当前域名 " + host + " 不在该 key 的白名单里（高德返回 INVALID_USER_DOMAIN）。" +
+        "请到高德控制台把 " + host + " 加入白名单；现在先给你用官方嵌入的卫星图。"
+      : "已留在示意图底图：" + why;
+    amapTip(msg);
     setBasePressed("shot");
     amapState.active = false;
+    if (domainRelated && typeof openAmapEmbed === "function") openAmapEmbed();   // 兜底：照样能看卫星图
   }
 }
 
@@ -532,6 +540,24 @@ function useShotBase() {
   setBasePressed("shot");
   amapState.active = false;
   amapTip("");
+}
+
+/* ---------- 高德官方嵌入（零 key 卫星图）：既是独立入口，也是 JS API 被域名白名单拒绝时的兜底 ---------- */
+// 高德官方嵌入（零 key、卫星图）：既是独立入口，也是 JS API 失败时的兜底
+const iframeBtn = $("#openAmap");
+function openAmapEmbed() {
+  // ⚠️ 必须在调用时取 BG：它是 init 里异步加载的，模块求值时还是空的
+  const cfgAmap = (BG && BG.amap) || {};
+if (!cfgAmap || !cfgAmap.embed_url_template || !cfgAmap.center) return false;
+const url = cfgAmap.embed_url_template
+  .replace("{lng}", cfgAmap.center.lng).replace("{lat}", cfgAmap.center.lat)
+  .replace("{zoom}", cfgAmap.zoom || 17).replace("{maptype}", cfgAmap.maptype || "satellite");
+if (!$("#amapFrame").firstChild) {
+  $("#amapFrame").innerHTML = '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
+    'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
+}
+$("#amapOverlay").classList.add("on");
+return true;
 }
 
 /* ---------- 地图上的功能按键：示意图 / 卫星图 / 3D 街景 / 点位列表 ---------- */
@@ -575,21 +601,11 @@ function setupMapHud() {
   });
 
   // 高德「真实卫星图」iframe 兜底入口（零 key，联网可用）
-  const cfg = BG.amap;
-  const iframeBtn = $("#openAmap");
-  if (iframeBtn && cfg && cfg.enabled !== false && cfg.center) {
-    iframeBtn.hidden = false;
-    iframeBtn.addEventListener("click", () => {
-      const tpl = cfg.embed_url_template;
-      if (!tpl) return;                       // ⛔ 地址与坐标只从 /map/map-bg.json 读，不硬编码
-      const url = tpl
-        .replace("{lng}", cfg.center.lng).replace("{lat}", cfg.center.lat)
-        .replace("{zoom}", cfg.zoom || 17).replace("{maptype}", cfg.maptype || "satellite");
-      $("#amapFrame").innerHTML =
-        '<iframe src="' + url + '" loading="lazy" allowfullscreen ' +
-        'referrerpolicy="strict-origin-when-cross-origin"></iframe>';
-      $("#amapOverlay").classList.add("on");
-    });
+  const cfgAmap = (BG && BG.amap) || {};
+  const iframeBtn2 = $("#openAmap");
+  if (iframeBtn2 && cfgAmap.enabled !== false && cfgAmap.center) {
+    iframeBtn2.hidden = false;
+    iframeBtn2.addEventListener("click", openAmapEmbed);
   }
   const switchCfg = BG.jsapi || {};
   if (switchCfg.enabled === false) {
