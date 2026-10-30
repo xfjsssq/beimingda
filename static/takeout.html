@@ -5,22 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>代取撮合：看单、接单、跑腿登记</title>
 <!--
-  代取撮合页（M1）—— 2026-10-29 第三版：功能收进左侧常驻功能栏，主区只留看板
+  代取撮合页（M1）—— 2026-10-30 第四版：按「是不是我发的单」分成两套行为（权限模型）
 
   设计口径（来自用户原话）：
-    · 发布这种功能「完全可以弄侧边功能栏」：桌面端常驻在左，手机端收成一个「功能」按键，点开才滑出来
-    · 「整个界面主要还是查看已经发布的任务」：主区只有开放任务卡片列表，别的都收进功能栏
-    · 「避免过多功能都塞在同一个界面」：解释性长文案收进功能栏的「说明」，卡片只留信息层次
-      （楼栋路径大字 + 取件点/倒计时/报酬小字 + 状态徽章 + 一行候选入口）
-    · 令牌内置：/config.js 注入 window.__DEMO_TOKEN__，/js/api.js 自动带 X-Demo-Token；
-      页面上 ⛔ 没有任何令牌输入框，也不回显令牌
+    · 「必须是你发布的代取，你才能去选符合要求的人帮你接单」——
+      我发布的单：淡色底 + 左侧主色描边 + 「我发布的」徽章，候选直接列出来，每行右侧「选 TA 接单」（= 派单给这个人）
+      别人的单：普通白底 + 「XX 发布」徽章，卡片上没有候选、没有派单按钮，
+               主按钮是「我想接这一单」（= 表达意愿）→ 变成「已表达意愿 · 等发布者确认」+「撤回意愿」
+    · 「你发的单子要跟别人的单子有区别」—— 两套卡片底色 / 描边 / 徽章都不一样，一眼能分出来
+    · 用户要求：页面上认证相关的那一块「全部挪掉」—— 本页 ⛔ 不再出现任何凭据字样或控件
+    · 「发布代取的时候可以顺便发送图片」—— 发布侧栏可选一张取件照片，
+      前端压到 ≤120KB 的 dataURL 放进 payload.photo；卡片上显示 96px 缩略图，点击用 openModal 放大
 
   约定：
     · 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/demo.js、/js/ui.js
     · 图标一律 static/vendor/phosphor/icons/*.svg + .icon（⛔ 不用 emoji）
     · 字阶只用 12/14/16/18/20/24/30/36/48/60，间距只用 0/2/4/8/12/16/24/32/40/48/64/80/96
       （本页 <style> 里的取值都由单测钉死，见 tests/ui-takeout.test.js）
-    · ⛔ 不收姓名 / 学号 / 手机号；⛔ 截图原图不落盘；平台不参与交易、不代收款
+    · 演示身份固定为「同学A」；判断依据是任务的 publisher / owner_handle 字段
+    · ⛔ 不收姓名 / 学号 / 手机号；平台不参与交易、不代收款
 -->
 <link rel="stylesheet" href="/css/app.css" />
 <style>
@@ -68,8 +71,6 @@
     border-top:1px dashed var(--color-line); font-size: 12px; color:var(--color-muted); }
   .rail__note summary { cursor:pointer; font-weight:600; color:var(--color-text-soft); }
   .rail__note p { margin: var(--sp-75) 0 0; line-height:1.7; }
-  .rail__foot { display:flex; align-items:center; gap: var(--sp-50);
-    margin: var(--sp-100) 0 0; font-size: 12px; color:var(--color-muted); }
 
   @media (min-width:1024px) {
     /* 常驻：吸顶，跟随长看板一起滚 */
@@ -102,33 +103,56 @@
     margin-bottom: var(--sp-25); }
   .shell__head p { margin: var(--sp-25) 0 0; font-size: 12px; color:var(--color-muted); }
 
-  /* ---------- 任务卡：信息分层次（大字路径 / 小字信息 / 徽章 / 一行候选入口 / 一行操作） ---------- */
+  /* ---------- 任务卡：两套外观（我发布的 / 别人的） ---------- */
   .tk-card { gap: var(--sp-75); }
+  /* 我发布的单：左侧主色描边 + 淡色底 + 深色标题，和别人的单一眼分得开 */
+  .tk-card.card--mine { border-left: 3px solid var(--color-primary);
+    background: var(--color-primary-soft); }
+  .tk-card.card--mine .tk-card__route { color: var(--color-primary-dark); }
   .tk-card__top { display:flex; align-items:flex-start; justify-content:space-between;
     gap: var(--sp-75); flex-wrap:wrap; }
   .tk-card__route { margin:0; font-size: 20px; font-weight:600; line-height:1.35;
     color:var(--color-primary); overflow-wrap:anywhere; }
-  .tk-card__side { flex:0 0 auto; }
+  .tk-card__side { display:flex; align-items:center; gap: var(--sp-50); flex-wrap:wrap;
+    justify-content:flex-end; }
+  .badge--mine { background:var(--color-primary); border-color:var(--color-primary); color:#fff; }
   .tk-card__meta { display:flex; flex-wrap:wrap; gap: var(--sp-50); }
   .tk-card__note { margin:0; font-size: 14px; color:var(--color-muted); overflow-wrap:anywhere; }
   .tk-card__note.is-cut { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .tk-card__cands { min-width:0; }
-  .tk-toggle { max-width:100%; }
-  .tk-none, .tk-matching { display:flex; align-items:center; gap: var(--sp-50); margin:0;
+  .tk-cands-head { display:flex; align-items:center; gap: var(--sp-50); margin:0 0 var(--sp-75);
     font-size: 12px; color:var(--color-muted); }
+  .tk-none, .tk-matching, .tk-rule { display:flex; align-items:flex-start; gap: var(--sp-50);
+    margin:0; font-size: 12px; color:var(--color-muted); }
   .tk-card__foot { display:flex; align-items:center; justify-content:space-between;
     gap: var(--sp-75); flex-wrap:wrap; padding-top: var(--sp-75);
     border-top:1px dashed var(--color-line); }
   .tk-card__id { margin:0; font-family:var(--font-mono); font-size: 12px;
     color:var(--color-muted-soft); overflow-wrap:anywhere; }
-  .tk-card__action { flex:0 0 auto; }
+  .tk-card__action { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap;
+    justify-content:flex-end; flex:0 0 auto; }
+
+  /* 取件照片：卡片 96px 缩略图（点击放大） */
+  .tk-photo { margin:0; display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap; }
+  .tk-photo img { display:block; width: 96px; height: 96px; object-fit: cover;
+    border:1px solid var(--color-line); border-radius:var(--radius-md); cursor: zoom-in; background:#fff; }
+  .tk-photo figcaption { font-size: 12px; color:var(--color-muted); }
+  .photo-view { display:flex; flex-direction:column; gap: var(--sp-75); }
+  .photo-view img { display:block; max-width:100%; height:auto; border-radius:var(--radius-md); }
+
+  /* 发布侧栏里的照片预览 */
+  .photo-pick { display:flex; align-items:center; gap: var(--sp-100); flex-wrap:wrap; }
+  .photo-pick img { display:block; width: 96px; height: 96px; object-fit:cover;
+    border:1px solid var(--color-line); border-radius:var(--radius-md); background:#fff; }
+  .photo-pick__meta { display:flex; flex-direction:column; gap: var(--sp-25);
+    font-size: 12px; color:var(--color-muted); min-width:0; }
 
   /* 候选：一行一个（超出的收进「还有 N 位」） */
-  .cand-list { display:flex; flex-direction:column; gap: var(--sp-75); margin-top: var(--sp-100); }
+  .cand-list { display:flex; flex-direction:column; gap: var(--sp-75); }
   /* 注意：.cand-list 的 display 会盖掉浏览器默认的 [hidden]{display:none}，折叠态必须显式声明 */
   .cand-list[hidden] { display:none; }
   .cand { border:1px solid var(--color-line); border-radius:var(--radius-md);
-    background:var(--color-sunken); padding: var(--sp-100); min-width:0; }
+    background:var(--color-card); padding: var(--sp-100); min-width:0; }
   .cand.is-dim { opacity:.5; }
   .cand__line { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap; }
   .cand__name { font-size: 14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
@@ -143,16 +167,17 @@
   #publish-out, #register-out { margin-top: var(--sp-100); }
 
   @media (max-width:767px) {
-    /* 窄屏首屏尽量多露卡片：隐掉小标题与页头小字（说明在功能栏里），卡片内边距收紧一档 */
+    /* 窄屏首屏尽量多露卡片：隐掉小标题与页头小字，卡片内边距收紧一档 */
     .shell__head .eyebrow { display:none; }
     .page-head .lead { display:none; }
     .tk-card { padding: var(--sp-100); }
     .tk-card__route { font-size: 18px; }
+    .tk-card__action { justify-content:flex-start; }
   }
 </style>
-  <meta name="description" content="按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学，每个候选都带可解释理由。" />
+  <meta name="description" content="我发布的单可以挑人派单，别人的单只能表达意愿；按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学。" />
   <meta property="og:title" content="代取撮合：看单、接单、跑腿登记" />
-  <meta property="og:description" content="按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学，每个候选都带可解释理由。" />
+  <meta property="og:description" content="我发布的单可以挑人派单，别人的单只能表达意愿；每个候选都带可解释理由。" />
   <meta property="og:type" content="website" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
@@ -161,7 +186,7 @@
 <main id="main" class="page page--mid">
   <div class="page-head">
     <h1>代取看板</h1>
-    <p class="lead">看到顺路的单子直接接；发布、登记、我的接单都收在功能栏里。</p>
+    <p class="lead">我发布的单（淡蓝底）自己挑人派单；别人的单只能表达意愿，等发布者确认。</p>
   </div>
 
   <div class="shell">
@@ -182,7 +207,7 @@
           <span class="rail-item__count" id="count-all">0</span>
         </button>
         <button class="rail-item" id="view-mine" type="button" aria-pressed="false">
-          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/list-check.svg)" aria-hidden="true"></span>
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
           <span>我的接单</span>
           <span class="rail-item__count" id="count-mine">0</span>
         </button>
@@ -208,14 +233,12 @@
 
       <details class="rail__note">
         <summary>说明</summary>
-        <p>匹配结果直接铺在每张卡片里：点开「系统已为你找到 N 位顺路的同学」，就能看到每位候选的 score / 100
-           与 reason 原文（reason: 里的分值相加正好等于 score）。</p>
-        <p>打分口径：可达性 40 + 时段 30 + 报酬 30，阈值 60，低于 60 分一律不出现；
+        <p>发单的人才能挑人：我发布的单上直接列出候选（昵称 / score / reason），点「选 TA 接单」就是把
+           这一单派给他；别人的单看不到候选，只能点「我想接这一单」表达意愿，等发布者确认。</p>
+        <p>匹配结果由引擎算：可达性 40 + 时段 30 + 报酬 30，阈值 60，低于 60 分一律不出现；
            平台单任务同时最多推 3 名，其余先排队。</p>
         <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
       </details>
-
-      <p class="rail__foot" id="token-chip"></p>
     </aside>
 
     <!-- ───────────── 看板：主区只留它 ───────────── -->
@@ -246,7 +269,6 @@
 <footer class="site-footer">
   <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
-  <p>本页不需要你填任何令牌：写接口令牌已由服务端配置（<code class="inline">/config.js</code> 注入，前端自动带上）。</p>
 <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
     <a href="/legal.html">许可与素材来源</a>
@@ -256,39 +278,45 @@
 
 <script src="/config.js"></script>
 <script type="module">
-import { api, hasWriteToken, mcpRpc } from "/js/api.js";
+import { api, mcpRpc } from "/js/api.js";
 import { mountNav } from "/js/nav.js";
-import { initDemo, displayName } from "/js/demo.js";
-import { el, icon, createSheet, toast, showLoading, errorText } from "/js/ui.js";
+import { initDemo, displayName, aliasFor } from "/js/demo.js";
+import { el, icon, createSheet, openModal, toast, showLoading, errorText } from "/js/ui.js";
 
 const $ = (s) => document.querySelector(s);
 const money = (n) => (Number.isFinite(Number(n)) ? String(Number(n)) : "—");
 
-/* 看板状态（页面自己的视图缓存；⛔ 不落 localStorage、不缓存令牌） */
+/* 演示身份固定为「同学A」：判断「是不是我发的单」只看发布者字段（⛔ 不看演示别名） */
+const ME = "同学A";
+const publisherOf = (t) => String((t && (t.publisher ?? t.owner_handle)) || "").trim();
+const isMine = (t) => publisherOf(t) === ME;
+
+/* 看板状态（页面自己的视图缓存；⛔ 不落 localStorage） */
 const state = {
   tasks: [],                 // 从 /api/tasks 读到的全部开放任务
-  view: "all",               // 看板视图：all = 全部开放任务 / mine = 我的接单
-  mine: new Set(),           // 本会话里我点过接单的 task_id（⛔ 只存内存，刷新即清）
-  matches: new Map(),        // task_id → Match[]（含 reason 原文）；null = 撮合失败；undefined = 撮合中
+  view: "all",               // all = 全部开放任务 / mine = 我的接单（我作为跑腿者）
+  matches: new Map(),        // task_id → Match[]（只对我发布的单取候选）；null = 撮合失败；undefined = 撮合中
   matchErrors: new Map(),    // task_id → 错误对象
-  accepted: new Set(),       // 已经有 accepted 撮合记录的任务（跨 5 分钟去重窗口仍然准）
-  acceptedBy: new Map(),     // task_id → 接单人昵称（同上，来自只读口）
-  openSet: new Set(),        // 已展开候选列表的任务
+  accepted: new Set(),       // 已被派单（服务端有一条 accepted）的任务
+  acceptedBy: new Map(),     // task_id → 接单人昵称
+  myRuns: new Map(),         // task_id → { match_id, state }：我作为跑腿者（pushed = 已表达意愿 / accepted = 我被派单）
+  intents: new Map(),        // task_id → match_id：本会话里我表达过的意愿
+  intentFallback: new Set(), // 服务端意愿接口未就绪时，走会话态的那几单（界面上给一句灰字说明）
   moreOpen: new Set(),       // 已展开「还有 N 位」的任务
 };
 const cardRefs = new Map();      // task_id → { card, side, action, cands }
 const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
-const busyMatches = new Set();   // 正在提交的 match_id（防连点）
+const busy = new Set();          // 正在提交的 match_id / task_id（防连点）
 let boardLoading = false;
 
-/* 撮合结果缓存：同一任务 20 秒内不重复打写接口。
-   看板每张卡片都要撮合一次（写接口），单 IP 却只有 60 次/分钟 ——
-   缓存给「刷新」留出余量，避免演示现场连点几次就被限频（429）。 */
+/* 撮合结果缓存：同一任务 20 秒内不重复打写接口（单 IP 写接口 60 次/分钟留余量） */
 const MATCH_TTL_MS = 20_000;
 const matchCache = new Map();    // task_id → { list, error, at }
 
 /** 候选超过 3 位就折叠：「还有 N 位」 */
 const CAND_SHOWN = 3;
+/** 取件照片前端压缩上限（dataURL 字节数） */
+const PHOTO_MAX_BYTES = 120 * 1024;
 
 mountNav();
 
@@ -371,12 +399,8 @@ function localInput(ts) {
 /** 倒计时（距截止还有 XX 分钟；紧张 / 过期给醒目标记） */
 function countdownChip(t) {
   const ms = new Date(t.deadline_iso).getTime() - Date.now();
-  if (!Number.isFinite(ms)) {
-    return chip("clock", "截止时间未知", "chip--soon");
-  }
-  if (ms <= 0) {
-    return chip("alert-triangle", "已过期", "chip--urgent");
-  }
+  if (!Number.isFinite(ms)) return chip("clock", "截止时间未知", "chip--soon");
+  if (ms <= 0) return chip("alert-triangle", "已过期", "chip--urgent");
   const m = Math.floor(ms / 60000);
   const text = m < 120
     ? "距截止还有 " + m + " 分钟"
@@ -396,6 +420,32 @@ function tickCountdowns() {
     ref.parentNode.replaceChild(fresh, ref);
     countdownRefs.set(t.task_id, fresh);
   }
+}
+
+/** 取件照片：96px 缩略图，点击 openModal 放大 */
+function photoFigure(t) {
+  const src = typeof t.photo === "string" ? t.photo : "";
+  if (!src) return null;
+  const fig = el("figure", "tk-photo");
+  const img = el("img");
+  img.src = src;
+  img.alt = "取件照片缩略图";
+  img.setAttribute("loading", "lazy");
+  img.addEventListener("click", () => openPhoto(src, t));
+  fig.appendChild(img);
+  fig.appendChild(el("figcaption", "", "点击放大"));
+  return fig;
+}
+
+function openPhoto(src, t) {
+  const wrap = el("div", "photo-view");
+  const img = el("img");
+  img.src = src;
+  img.alt = "取件照片";
+  wrap.appendChild(img);
+  wrap.appendChild(el("p", "faint small",
+    (t ? t.from_building + " → " + t.to_building + "｜" : "") + "照片由发布者上传，仅在本页展示"));
+  openModal({ title: "取件照片", iconName: "package", body: wrap, confirmText: "关闭", cancelText: "取消" });
 }
 
 /* =====================================================================
@@ -463,7 +513,62 @@ async function loadNodes() {
 }
 
 /* =====================================================================
-   侧栏一 · 发布代取（点功能栏才出现）
+   取件照片：前端压缩到 ≤120KB 的 dataURL
+   ===================================================================== */
+function dataUrlBytes(dataUrl) {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) return 0;
+  return Math.round(((dataUrl.length - comma - 1) * 3) / 4);
+}
+
+async function decodeImage(file) {
+  if (typeof createImageBitmap === "function") {
+    try {
+      return await createImageBitmap(file);
+    } catch {
+      /* 落到下面的 <img> 退路 */
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("图片解码失败")); };
+    img.src = url;
+  });
+}
+
+/** 压到 ≤120KB 的 JPEG dataURL：逐档缩边 + 降质，取第一个达标的 */
+async function compressPhoto(file) {
+  if (typeof file.type === "string" && file.type && !/^image\//.test(file.type)) {
+    throw new Error("不是图片文件");
+  }
+  const src = await decodeImage(file);
+  const sw = src.width || 1;
+  const sh = src.height || 1;
+  const attempts = [
+    { edge: 1280, q: 0.72 }, { edge: 960, q: 0.6 },
+    { edge: 720, q: 0.5 }, { edge: 560, q: 0.42 },
+  ];
+  let out = null;
+  for (const a of attempts) {
+    const scale = Math.min(1, a.edge / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * scale));
+    const h = Math.max(1, Math.round(sh * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = w;
+    canvas.height = h;
+    canvas.getContext("2d").drawImage(src, 0, 0, w, h);
+    const dataUrl = canvas.toDataURL("image/jpeg", a.q);
+    out = { dataUrl, width: w, height: h, bytes: dataUrlBytes(dataUrl) };
+    if (out.bytes <= PHOTO_MAX_BYTES) break;
+  }
+  if (src.close) src.close();
+  return out;
+}
+
+/* =====================================================================
+   侧栏一 · 发布代取（点功能栏才出现；可顺便带一张取件照片）
    ===================================================================== */
 let publishSheet = null;
 
@@ -522,13 +627,14 @@ function buildPublishSheet() {
     '    <textarea id="p-note" rows="3" placeholder="例：小件，两个包裹"></textarea>',
     '  </div>',
     '  <div class="field">',
-    '    <label for="p-shot">取件截图（可选）</label>',
-    '    <input id="p-shot" type="file" accept="image/*" aria-label="取件截图（可选）" />',
+    '    <label for="p-shot">取件照片（可选）</label>',
+    '    <input id="p-shot" type="file" accept="image/*" aria-label="取件照片（可选）" />',
     '    <div class="form-actions">',
     '      <button class="btn btn--ghost btn--sm" id="btn-parse" type="button">识别截图字段</button>',
     '      <span class="hint">原图不落盘；只做字段理解，<b>不抽取收件人姓名 / 手机号 / 运单号</b>。</span>',
     '    </div>',
     '  </div>',
+    '  <div id="photo-out"></div>',
     '  <div id="parse-out"></div>',
     '  <div id="publish-out"></div>',
     '</div>',
@@ -546,6 +652,52 @@ function buildPublishSheet() {
 
   const sheet = createSheet({ title: "发布代取任务", iconName: "package", body, footer: foot });
 
+  /** 已压好的照片（提交时放进 payload.photo） */
+  let photo = null;
+
+  function paintPhoto() {
+    const box = $("#photo-out");
+    box.innerHTML = "";
+    if (!photo) return;
+    const wrap = el("div", "photo-pick");
+    const img = el("img");
+    img.src = photo.dataUrl;
+    img.alt = "取件照片预览";
+    const meta = el("div", "photo-pick__meta");
+    meta.appendChild(el("span", "", "已选照片：" + photo.name));
+    meta.appendChild(el("span", "",
+      photo.width + "×" + photo.height + " · " + Math.round(photo.bytes / 1024) + "KB（已压到 ≤120KB）"));
+    const del = el("button", "btn btn--quiet btn--sm", "移除");
+    del.type = "button";
+    del.addEventListener("click", () => {
+      photo = null;
+      $("#p-shot").value = "";
+      paintPhoto();
+    });
+    meta.appendChild(del);
+    wrap.append(img, meta);
+    box.appendChild(wrap);
+  }
+
+  $("#p-shot").addEventListener("change", async () => {
+    const f = $("#p-shot").files && $("#p-shot").files[0];
+    if (!f) { photo = null; paintPhoto(); return; }
+    mountNotice("#photo-out", "", "正在压缩照片…（前端压缩，原图不上传）");
+    try {
+      const out = await compressPhoto(f);
+      if (out.bytes > PHOTO_MAX_BYTES) {
+        photo = null;
+        mountNotice("#photo-out", "danger", "这张图压不到 120KB，本次提交会不带照片，其余字段照常。");
+        return;
+      }
+      photo = { ...out, name: f.name || "photo.jpg" };
+      paintPhoto();
+    } catch (e) {
+      photo = null;
+      mountNotice("#photo-out", "danger", "照片处理失败：" + e.message + "（不影响发布其余字段）");
+    }
+  });
+
   btnCancel.addEventListener("click", () => sheet.close());
 
   $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
@@ -553,7 +705,7 @@ function buildPublishSheet() {
   /* 识别截图（走 MCP 工具 task_parse_screenshot；图片只在本次请求内，不落盘） */
   $("#btn-parse").addEventListener("click", async () => {
     const f = $("#p-shot").files && $("#p-shot").files[0];
-    if (!f) { mountNotice("#parse-out", "danger", "先选一张截图。"); return; }
+    if (!f) { mountNotice("#parse-out", "danger", "先选一张取件照片。"); return; }
     if (f.size > 1.4 * 1024 * 1024) {
       mountNotice("#parse-out", "danger", "图片过大（≤1.4MB，请求体上限 2mb）。");
       return;
@@ -602,10 +754,11 @@ function buildPublishSheet() {
     box.appendChild(jsonNode(d));
   });
 
-  /* 发布任务（写接口自动带 X-Demo-Token；成功后 toast + 刷新看板） */
+  /* 发布任务（写接口自动带认证头；成功后 toast + 刷新看板）
+     photo 是可选字段：万一服务端还没放开这个字段，就去掉它重发一次，⛔ 不让照片挡住发布 */
   btnPublish.addEventListener("click", async () => {
     const dl = $("#p-deadline").value;
-    const payload = {
+    const base = {
       from_building: $("#p-from").value,
       to_building: $("#p-to").value,
       station: $("#p-station").value.trim(),
@@ -613,15 +766,28 @@ function buildPublishSheet() {
       reward_min: Number($("#p-rmin").value),
       reward_max: Number($("#p-rmax").value),
       note: $("#p-note").value.trim() || null,
-      screenshot_path: null, // ⛔ 截图原图不落服务器磁盘，所以发布时不带路径
+      screenshot_path: null, // ⛔ 截图原图不落服务器磁盘
       owner_handle: $("#p-owner").value.trim(),
     };
     btnPublish.disabled = true;
     try {
-      await api("/api/tasks", { method: "POST", body: payload });
-      toast("已发布代取任务，看板已刷新", "ok");
+      let withPhoto = Boolean(photo);
+      try {
+        await api("/api/tasks", { method: "POST", body: withPhoto ? { ...base, photo: photo.dataUrl } : base });
+      } catch (e) {
+        const text = String(e && e.message ? e.message : "") + " " + String(e && e.code ? e.code : "");
+        if (!withPhoto || !/SCHEMA_REJECTED|非法字段|photo/i.test(text)) throw e;
+        await api("/api/tasks", { method: "POST", body: base });
+        withPhoto = false;
+        toast("照片字段服务端还没放开，这次先只发了文字", "");
+      }
+      toast(withPhoto ? "已发布代取任务（带取件照片），看板已刷新" : "已发布代取任务，看板已刷新", "ok");
       $("#p-note").value = "";
       $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
+      photo = null;
+      $("#p-shot").value = "";
+      paintPhoto();
+      $("#photo-out").innerHTML = "";
       $("#parse-out").innerHTML = "";
       $("#publish-out").innerHTML = "";
       sheet.close();
@@ -770,15 +936,15 @@ function closeRail() {
 function paintViewUI() {
   const allBtn = $("#view-all");
   const mineBtn = $("#view-mine");
-  const mine = state.view === "mine";
-  allBtn.classList.toggle("is-active", !mine);
-  allBtn.setAttribute("aria-pressed", mine ? "false" : "true");
-  mineBtn.classList.toggle("is-active", mine);
-  mineBtn.setAttribute("aria-pressed", mine ? "true" : "false");
+  const mineView = state.view === "mine";
+  allBtn.classList.toggle("is-active", !mineView);
+  allBtn.setAttribute("aria-pressed", mineView ? "false" : "true");
+  mineBtn.classList.toggle("is-active", mineView);
+  mineBtn.setAttribute("aria-pressed", mineView ? "true" : "false");
   $("#count-all").textContent = String(state.tasks.length);
-  $("#count-mine").textContent = String(state.mine.size);
-  $("#board-title").textContent = mine ? "我的接单" : "待取看板";
-  $("#board-eyebrow").textContent = mine ? "本会话接过" : "开放任务";
+  $("#count-mine").textContent = String(myRunTasks().length);
+  $("#board-title").textContent = mineView ? "我的接单" : "待取看板";
+  $("#board-eyebrow").textContent = mineView ? "我表达过意愿 / 被派单的" : "开放任务 · 蓝底是我发布的";
 }
 
 function setView(view) {
@@ -790,11 +956,12 @@ function setView(view) {
 }
 
 /* =====================================================================
-   看板：卡片（主区唯一的可见内容）
+   看板：两套卡片（我发布的单 / 别人的单）
    ===================================================================== */
 
-const visibleTasks = () =>
-  state.view === "mine" ? state.tasks.filter((t) => state.mine.has(t.task_id)) : state.tasks;
+const myRunTasks = () => state.tasks.filter((t) => state.myRuns.has(t.task_id) || state.intents.has(t.task_id));
+
+const visibleTasks = () => (state.view === "mine" ? myRunTasks() : state.tasks);
 
 function pickableOf(list) {
   return (Array.isArray(list) ? list : []).filter((m) => m && m.match_id && m.state === "pushed");
@@ -808,16 +975,30 @@ function acceptedNameOf(taskId) {
   const list = state.matches.get(taskId);
   const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
   if (hit) return displayName(hit.runner_handle);
-  // 撮合接口只回 5 分钟窗口内的记录：窗口过期后仍能从只读口拿到接单人，卡片就不会丢掉他
+  // 撮合接口只回 5 分钟窗口内的记录：窗口过期后仍能从只读口拿到接单人
   return state.acceptedBy.get(taskId) || "";
 }
 
-/** 卡片右上角：状态徽章（已接单 / 可接单 / 暂时没人顺路 / 正在撮合） */
+/** 我在这单上的跑腿状态：'' / 'pushed'（已表达意愿）/ 'accepted'（我被派单） */
+function myRunStateOf(taskId) {
+  if (state.intents.has(taskId)) return "pushed";
+  const run = state.myRuns.get(taskId);
+  return run ? run.state : "";
+}
+
+/** 卡片右上角徽章：我发布的 / 已接单 / 谁发布的 / 候选情况 */
 function paintSide(t) {
   const refs = cardRefs.get(t.task_id);
   if (!refs) return;
   const box = refs.side;
   box.innerHTML = "";
+
+  if (isMine(t)) {
+    const mineBadge = el("span", "badge badge--mine");
+    mineBadge.appendChild(icon("tag", { size: 14 }));
+    mineBadge.appendChild(el("span", "", "我发布的"));
+    box.appendChild(mineBadge);
+  }
 
   const list = state.matches.get(t.task_id);
   const accepted = state.accepted.has(t.task_id);
@@ -828,61 +1009,85 @@ function paintSide(t) {
   let text = "正在撮合…";
   if (accepted) {
     cls = "badge badge--ok"; iconName = "circle-check"; text = "已接单 · 进行中";
-  } else if (list === null) {
-    cls = "badge badge--muted"; iconName = "alert-triangle"; text = "撮合没跑通";
-  } else if (list && pickable.length) {
-    iconName = "users"; text = "可接单";
-  } else if (list) {
-    cls = "badge badge--muted"; iconName = "clock"; text = "暂时没人顺路";
+  } else if (isMine(t)) {
+    if (list === null) { cls = "badge badge--muted"; iconName = "alert-triangle"; text = "撮合没跑通"; }
+    else if (list && pickable.length) { iconName = "users-three"; text = "有 " + pickable.length + " 位候选"; }
+    else if (list) { cls = "badge badge--muted"; iconName = "clock"; text = "暂时没人顺路"; }
+  } else {
+    cls = "badge badge--muted";
+    iconName = "user";
+    text = displayName(publisherOf(t) || "匿名") + " 发布";
   }
-
   const b = el("span", cls);
   b.appendChild(icon(iconName, { size: 14 }));
   b.appendChild(el("span", "", text));
   box.appendChild(b);
 }
 
-/** 卡片操作位：未接单 → 主按钮「接这一单」；已接单 → 接单人 */
+/** 卡片操作位：我发布的 → 派单结果；别人的 → 表达意愿 / 撤回意愿 */
 function paintAction(t) {
   const refs = cardRefs.get(t.task_id);
   if (!refs) return;
   const box = refs.action;
   box.innerHTML = "";
 
-  if (state.accepted.has(t.task_id)) {
-    const who = acceptedNameOf(t.task_id);
-    const c = el("span", "chip chip--brand");
-    c.appendChild(icon("circle-check", { size: 14 }));
-    c.appendChild(el("span", "", who ? "接单人 " + who : "已接单"));
-    box.appendChild(c);
+  if (isMine(t)) {
+    if (state.accepted.has(t.task_id)) {
+      const who = acceptedNameOf(t.task_id);
+      const c = el("span", "chip chip--brand");
+      c.appendChild(icon("circle-check", { size: 14 }));
+      c.appendChild(el("span", "", who ? "接单人 " + who : "已接单"));
+      box.appendChild(c);
+      const undo = el("button", "btn btn--quiet btn--sm", "取消接单");
+      undo.type = "button";
+      undo.title = "把这一单退回「可接单」状态";
+      undo.addEventListener("click", () => cancelAccepted(t.task_id));
+      box.appendChild(undo);
+    }
+    return; // 我发布的单：没有「我想接这一单」，派单动作在候选行上
+  }
+
+  const runState = myRunStateOf(t.task_id);
+  if (runState === "accepted") {
+    const b = el("span", "badge badge--ok");
+    b.appendChild(icon("circle-check", { size: 14 }));
+    b.appendChild(el("span", "", "已接单 · 进行中"));
+    box.appendChild(b);
+    const undo = el("button", "btn btn--quiet btn--sm", "取消接单");
+    undo.type = "button";
+    undo.addEventListener("click", () => cancelAccepted(t.task_id));
+    box.appendChild(undo);
     return;
   }
 
-  const list = state.matches.get(t.task_id);
-  const pickable = pickableOf(list);
+  if (runState === "pushed") {
+    const b = el("span", "badge");
+    b.appendChild(icon("hand-pointing", { size: 14 }));
+    b.appendChild(el("span", "", "已表达意愿 · 等发布者确认"));
+    box.appendChild(b);
+    if (state.intentFallback.has(t.task_id)) {
+      box.appendChild(el("span", "faint small", "（本页会话记录）"));
+    }
+    const undo = el("button", "btn btn--quiet btn--sm", "撤回意愿");
+    undo.type = "button";
+    undo.addEventListener("click", () => withdrawIntent(t.task_id));
+    box.appendChild(undo);
+    return;
+  }
+
   const btn = el("button", "btn btn--ok");
   btn.type = "button";
-  btn.appendChild(icon("list-check", { size: 16 }));
-  btn.appendChild(el("span", "", "接这一单"));
-
-  if (!pickable.length) {
-    btn.disabled = true;
-    btn.title = list === undefined
-      ? "系统正在找顺路的同学…"
-      : list === null
-        ? "撮合接口暂时不可用，先点「刷新」重试"
-        : "暂时没人顺路，等有同学登记跑腿能力后再来";
-  } else {
-    btn.title = "由当前最高分候选接单；想选别人就展开候选列表";
-    btn.addEventListener("click", () => acceptMatch(t.task_id, pickable[0].match_id));
-  }
+  btn.appendChild(icon("hand-pointing", { size: 16 }));
+  btn.appendChild(el("span", "", "我想接这一单"));
+  btn.title = "表达意愿后由发布者确认；别人的单不能替别人挑人";
+  btn.addEventListener("click", () => expressInterest(t));
   box.appendChild(btn);
 }
 
-/** 候选一行一个：昵称 / score / 动作 + reason 原文 */
+/** 候选一行一个（只有我发布的单才会渲染） */
 function candRow(t, m) {
   const row = el("div", "cand");
-  row.title = "match_id " + (m.match_id || "—") + "｜state " + m.state; // 核验用，不占版面
+  row.title = "match_id " + (m.match_id || "—") + "｜state " + m.state;
 
   const line = el("div", "cand__line");
   line.appendChild(el("span", "cand__name", displayName(m.runner_handle || "匿名")));
@@ -897,7 +1102,6 @@ function candRow(t, m) {
   const taker = acceptedNameOf(t.task_id);
 
   if (accepted) {
-    // 接过单的那位单独标出来（按昵称对齐，去重窗口过期也认得出来），其余候选置灰
     const isTaker = m.state === "accepted" || (Boolean(taker) && displayName(m.runner_handle || "匿名") === taker);
     if (isTaker) {
       const b = el("span", "badge badge--ok");
@@ -914,9 +1118,9 @@ function candRow(t, m) {
   } else if (usable) {
     const b = el("button", "btn btn--ok btn--sm");
     b.type = "button";
-    b.appendChild(icon("check", { size: 14 }));
+    b.appendChild(icon("selection", { size: 14 }));
     b.appendChild(el("span", "", "选 TA 接单"));
-    b.addEventListener("click", () => acceptMatch(t.task_id, m.match_id));
+    b.addEventListener("click", () => dispatchTo(t.task_id, m.match_id));
     line.appendChild(b);
   } else if (!m.match_id) {
     // 契约 §2：单任务同时最多推 3 名，超出部分只展示不落库 → 先排队
@@ -936,12 +1140,21 @@ function candRow(t, m) {
   return row;
 }
 
-/** 卡片下半部分：撮合中 / 暂时没人顺路 / 候选入口（默认折叠）→ 一行一个候选 + 「还有 N 位」 */
-function paintCands(t) {
+/** 卡片下半部分：我发布的单直接列候选；别人的单只给一句规则说明 */
+function paintCandidates(t) {
   const refs = cardRefs.get(t.task_id);
   if (!refs) return;
   const box = refs.cands;
   box.innerHTML = "";
+
+  if (!isMine(t)) {
+    const p = el("p", "tk-rule");
+    p.appendChild(icon("lock", { size: 14 }));
+    p.appendChild(el("span", "", "只有发布者能看候选、挑人派单。想跑这一单就点右侧「我想接这一单」表达意愿。"));
+    box.appendChild(p);
+    return;
+  }
+
   const list = state.matches.get(t.task_id);
 
   if (list === undefined) {
@@ -962,7 +1175,7 @@ function paintCands(t) {
         state.matches.delete(t.task_id);
         state.matchErrors.delete(t.task_id);
         matchCache.delete(t.task_id);
-        paintCands(t);
+        paintCandidates(t);
         paintAction(t);
         paintSide(t);
         void runMatch(t, { force: true });
@@ -980,17 +1193,12 @@ function paintCands(t) {
     return;
   }
 
-  const open = state.openSet.has(t.task_id);
-  const toggle = el("button", "btn btn--light btn--sm tk-toggle");
-  toggle.type = "button";
-  toggle.setAttribute("aria-expanded", open ? "true" : "false");
-  toggle.appendChild(icon("users", { size: 16 }));
-  toggle.appendChild(el("span", "", "系统已为你找到 " + list.length + " 位顺路的同学"));
-  const chev = icon(open ? "chevron-down" : "chevron-right", { size: 16 });
-  toggle.appendChild(chev);
+  const head = el("p", "tk-cands-head");
+  head.appendChild(icon("users-three", { size: 14 }));
+  head.appendChild(el("span", "", "系统已为你找到 " + list.length + " 位顺路的同学，挑一位派单："));
+  box.appendChild(head);
 
   const panel = el("div", "cand-list");
-  panel.hidden = !open;
   const shown = list.slice(0, CAND_SHOWN);
   const rest = list.slice(CAND_SHOWN);
   shown.forEach((m) => panel.appendChild(candRow(t, m)));
@@ -998,14 +1206,13 @@ function paintCands(t) {
   if (rest.length) {
     const moreOpen = state.moreOpen.has(t.task_id);
     const moreBox = el("div", "cand-list");
-    moreBox.style.marginTop = "0";
     moreBox.hidden = !moreOpen;
     rest.forEach((m) => moreBox.appendChild(candRow(t, m)));
     const moreBtn = el("button", "btn btn--quiet btn--sm tk-more");
     moreBtn.type = "button";
     moreBtn.setAttribute("aria-expanded", moreOpen ? "true" : "false");
     const mChev = icon(moreOpen ? "chevron-down" : "chevron-right", { size: 14 });
-    moreBtn.append(mChev, el("span", "", (moreOpen ? "收起" : "还有 " + rest.length + " 位顺路的同学")));
+    moreBtn.append(mChev, el("span", "", moreOpen ? "收起" : "还有 " + rest.length + " 位顺路的同学"));
     moreBtn.addEventListener("click", () => {
       const next = !state.moreOpen.has(t.task_id);
       if (next) state.moreOpen.add(t.task_id); else state.moreOpen.delete(t.task_id);
@@ -1018,28 +1225,20 @@ function paintCands(t) {
     panel.append(moreBox, moreBtn);
   }
 
-  toggle.addEventListener("click", () => {
-    const next = !state.openSet.has(t.task_id);
-    if (next) state.openSet.add(t.task_id); else state.openSet.delete(t.task_id);
-    panel.hidden = !next;
-    toggle.setAttribute("aria-expanded", next ? "true" : "false");
-    chev.style.setProperty("--icon",
-      "url(/vendor/phosphor/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
-  });
-
-  box.append(toggle, panel);
+  box.appendChild(panel);
 }
 
 function repaintCard(t) {
   paintSide(t);
   paintAction(t);
-  paintCands(t);
+  paintCandidates(t);
 }
 
 function buildCard(t) {
-  const card = el("article", "card tk-card");
+  const mine = isMine(t);
+  const card = el("article", "card tk-card" + (mine ? " card--mine" : ""));
 
-  // 第 1 层：路径大字 + 状态徽章
+  // 第 1 层：路径大字 + 徽章（我发布的 / 谁发布的 / 状态）
   const top = el("div", "tk-card__top");
   top.appendChild(el("h3", "tk-card__route", t.from_building + " → " + t.to_building));
   const side = el("div", "tk-card__side");
@@ -1061,14 +1260,18 @@ function buildCard(t) {
   if (t.note) note.title = t.note;
   card.appendChild(note);
 
-  // 第 4 层：候选入口（默认折叠）
+  // 第 3.5 层：取件照片缩略图（可选）
+  const photo = photoFigure(t);
+  if (photo) card.appendChild(photo);
+
+  // 第 4 层：候选（我发布的）或规则说明（别人的）
   const cands = el("div", "tk-card__cands");
   card.appendChild(cands);
 
-  // 第 5 层：task_id / 发布者 + 主按钮
+  // 第 5 层：task_id / 发布者 + 操作
   const foot = el("div", "tk-card__foot");
   foot.appendChild(el("p", "tk-card__id",
-    "task_id " + t.task_id + "｜发布者 " + displayName(t.owner_handle || "匿名")));
+    "task_id " + t.task_id + "｜发布者 " + (mine ? "我（" + ME + "）" : displayName(publisherOf(t) || "匿名"))));
   const action = el("div", "tk-card__action");
   foot.appendChild(action);
   card.appendChild(foot);
@@ -1092,7 +1295,7 @@ function renderBoard() {
     if (state.view === "mine") {
       box.appendChild(emptyArt(
         "你还没接过单",
-        "回「全部开放任务」找一张顺路的卡片，点「接这一单」。本页只记在当前会话里，⛔ 不写进服务器。",
+        "回「全部开放任务」，在别人的单子上点「我想接这一单」表达意愿；发布者确认后这里会出现。",
         "看全部开放任务",
         () => setView("all"),
       ));
@@ -1110,12 +1313,16 @@ function renderBoard() {
 }
 
 /* =====================================================================
-   撮合 + 接单
+   撮合（只对我发布的单跑） + 派单 / 表达意愿 / 撤回
    ===================================================================== */
 
-/** 逐张卡片触发撮合（并发 3；20 秒内用缓存，避免把单 IP 60 次/分钟的限频打满）
-    top_k=10：契约 §2 只落库 3 条，但接口能把 60 分以上的候选都列出来，超出部分标「排队中」 */
+/** 只对我发布的单触发撮合（别人的单：我既看不到候选，也不该替发布者撮合） */
 async function runMatch(t, { force = false } = {}) {
+  if (!isMine(t)) {
+    state.matches.delete(t.task_id);
+    repaintCard(t);
+    return;
+  }
   const cached = matchCache.get(t.task_id);
   if (!force && cached && Date.now() - cached.at < MATCH_TTL_MS) {
     state.matches.set(t.task_id, cached.list);
@@ -1124,7 +1331,7 @@ async function runMatch(t, { force = false } = {}) {
     repaintCard(t);
     return;
   }
-  if (cardRefs.has(t.task_id)) paintCands(t);
+  if (cardRefs.has(t.task_id)) paintCandidates(t);
   try {
     const list = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/match", {
       method: "POST",
@@ -1151,12 +1358,12 @@ function paintBoardCount() {
   const el0 = $("#board-count");
   if (!el0) return;
   if (state.view === "mine") {
-    el0.textContent = state.mine.size
-      ? "本会话接过 " + state.mine.size + " 单（只记在当前页面会话）"
-      : "还没有接单记录";
+    const k = myRunTasks().length;
+    el0.textContent = k ? "我参与 " + k + " 单（表达过意愿或被派单）" : "还没有参与记录";
   } else {
+    const mineN = state.tasks.filter(isMine).length;
     el0.textContent = n
-      ? "开放任务 " + n + " 条（只含 open 且未过期）｜已接单 " + countAccepted() + " 条"
+      ? "开放任务 " + n + " 条（我发布的 " + mineN + " 条 / 别人的 " + (n - mineN) + " 条）｜已接单 " + countAccepted() + " 条"
       : "当前没有开放任务";
   }
   paintViewUI();
@@ -1173,16 +1380,24 @@ async function mapLimit(items, limit, fn) {
   await Promise.all(workers);
 }
 
-/** 读一次最近撮合记录，把「已经接了」的任务 + 接单人标出来（比 5 分钟去重窗口更稳） */
-async function refreshAccepted() {
+/** 读最近撮合记录：已被派单的任务、接单人、我作为跑腿者的记录 */
+async function refreshMatchState() {
   try {
     const recent = await api("/api/matches?limit=50");
-    const list = (Array.isArray(recent) ? recent : []).filter((m) => m && m.state === "accepted");
-    state.accepted = new Set(list.map((m) => m.task_id));
-    state.acceptedBy = new Map(list.map((m) => [m.task_id, displayName(m.runner_handle || "")]));
+    const list = Array.isArray(recent) ? recent : [];
+    const accepted = list.filter((m) => m && m.state === "accepted");
+    state.accepted = new Set(accepted.map((m) => m.task_id));
+    state.acceptedBy = new Map(accepted.map((m) => [m.task_id, displayName(m.runner_handle || "")]));
+    // 我作为跑腿者：查询参数的服务端过滤可能还没落地，这里按昵称自己再兜一层
+    state.myRuns = new Map(
+      list
+        .filter((m) => m && m.runner_handle === ME && (m.state === "pushed" || m.state === "accepted"))
+        .map((m) => [m.task_id, { match_id: m.match_id, state: m.state }]),
+    );
   } catch {
     state.accepted = new Set();
     state.acceptedBy = new Map();
+    state.myRuns = new Map();
   }
 }
 
@@ -1213,11 +1428,12 @@ async function loadBoard({ force = false } = {}) {
     state.tasks = Array.isArray(tasks) ? tasks : [];
     state.matches = new Map();
     state.matchErrors = new Map();
-    await refreshAccepted();
+    await refreshMatchState();
 
     paintBoardCount();
     renderBoard();
-    await mapLimit(state.tasks, 3, (t) => runMatch(t, { force }));
+    // 只有我发布的单需要候选；别人的单不打写接口
+    await mapLimit(state.tasks.filter(isMine), 3, (t) => runMatch(t, { force }));
     paintBoardCount();
   } finally {
     boardLoading = false;
@@ -1225,58 +1441,129 @@ async function loadBoard({ force = false } = {}) {
   }
 }
 
-/** 接单：把一条 matches 从 pushed 改成 accepted（写接口，令牌由 /js/api.js 自动带上） */
-async function acceptMatch(taskId, matchId) {
-  if (!matchId || busyMatches.has(matchId)) return;
-  busyMatches.add(matchId);
+/** 派单：把一条 matches 从 pushed 改成 accepted（带 as=发布者；服务端会校验只有发布者能派单） */
+async function dispatchTo(taskId, matchId) {
+  if (!matchId || busy.has(matchId)) return;
+  busy.add(matchId);
   const refs = cardRefs.get(taskId);
-  // 先禁用当前卡片上的按钮，防连点；成功/失败后统一按服务端事实重画
   if (refs) [...refs.card.querySelectorAll("button")].forEach((b) => { b.disabled = true; });
   try {
     const r = await api("/api/matches/" + encodeURIComponent(matchId) + "/accept", {
       method: "POST",
-      body: {},
+      body: { as: ME },
     });
     const list = state.matches.get(taskId);
     if (Array.isArray(list)) {
       state.matches.set(taskId, list.map((m) => (m && m.match_id === r.match_id ? { ...m, state: r.state } : m)));
     }
     state.accepted.add(taskId);
-    state.mine.add(taskId); // 「我的接单」视图用
     const who = acceptedNameOf(taskId);
-    toast("已接单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
+    toast("已派单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
     paintBoardCount();
-    if (state.view === "mine") renderBoard(); // 视图里可能刚好多出一条
   } catch (e) {
     toast(errorText(e), "danger");
-    // 多半是别人先接走了（SCHEMA_REJECTED）：把这一单的最新状态重新取回来
     const t = taskOf(taskId);
     if (t) {
       state.matches.delete(taskId);
-      await refreshAccepted();
-      paintCands(t);
-      paintAction(t);
-      paintSide(t);
+      await refreshMatchState();
+      repaintCard(t);
       void runMatch(t, { force: true });
     }
   } finally {
-    busyMatches.delete(matchId);
+    busy.delete(matchId);
     for (const t of visibleTasks()) repaintCard(t);
   }
 }
 
-/* =====================================================================
-   令牌状态（只读展示；⛔ 页面上没有任何令牌输入框）
-   ===================================================================== */
-function paintTokenChip() {
-  const c = $("#token-chip");
-  if (!c) return;
-  c.innerHTML = "";
-  const has = hasWriteToken();
-  c.appendChild(icon(has ? "shield-check" : "alert-triangle", { size: 15 }));
-  c.appendChild(el("span", "", has
-    ? "写接口令牌已由服务端配置"
-    : "写接口令牌未配置：发布 / 接单会被服务端拒绝"));
+/** 表达意愿（别人的单）：优先走服务端 /interest；未就绪则留本页会话记录，⛔ 绝不替发布者撮合 */
+async function expressInterest(t) {
+  if (busy.has(t.task_id)) return;
+  busy.add(t.task_id);
+  const refs = cardRefs.get(t.task_id);
+  if (refs) [...refs.card.querySelectorAll("button")].forEach((b) => { b.disabled = true; });
+  try {
+    const r = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/interest", {
+      method: "POST",
+      body: { runner_handle: ME },
+    });
+    const matchId = r && r.match_id ? r.match_id : "";
+    state.intents.set(t.task_id, matchId);
+    state.intentFallback.delete(t.task_id);
+    if (matchId) state.myRuns.set(t.task_id, { match_id: matchId, state: "pushed" });
+    toast("已表达意愿 · 等发布者确认", "ok");
+  } catch (e) {
+    const missing = e && (e.code === "NOT_FOUND" || /no route|404/i.test(String(e.message || "")));
+    if (missing) {
+      // 依赖 POST /api/tasks/:id/interest（服务端还没就绪）→ 先留会话态，界面照常可演示
+      state.intents.set(t.task_id, "");
+      state.intentFallback.add(t.task_id);
+      toast("已在本页表达意愿（服务端意愿接口未就绪）", "");
+    } else {
+      toast(errorText(e), "danger");
+    }
+  } finally {
+    busy.delete(t.task_id);
+    const tt = taskOf(t.task_id);
+    if (tt) repaintCard(tt);
+    paintBoardCount();
+  }
+}
+
+/** 撤回意愿：服务端把这条 pushed 记录改成 declined */
+async function withdrawIntent(taskId) {
+  const matchId = state.intents.get(taskId);
+  if (matchId && !busy.has(matchId)) {
+    busy.add(matchId);
+    try {
+      await api("/api/matches/" + encodeURIComponent(matchId) + "/decline", { method: "POST", body: {} });
+    } catch (e) {
+      toast(errorText(e), "danger");
+      busy.delete(matchId);
+      return;
+    } finally {
+      busy.delete(matchId);
+    }
+  }
+  state.intents.delete(taskId);
+  state.intentFallback.delete(taskId);
+  state.myRuns.delete(taskId);
+  toast("已撤回意愿", "ok");
+  const t = taskOf(taskId);
+  if (t) repaintCard(t);
+  paintBoardCount();
+}
+
+/** 取消接单（accepted → pushed） */
+async function cancelAccepted(taskId) {
+  const run = state.myRuns.get(taskId);
+  let matchId = run && run.match_id ? run.match_id : "";
+  if (!matchId) {
+    const list = state.matches.get(taskId);
+    const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
+    matchId = hit ? hit.match_id : "";
+  }
+  if (!matchId) { toast("没找到这条接单记录，刷新一下再试", "danger"); return; }
+  if (busy.has(matchId)) return;
+  busy.add(matchId);
+  const who = acceptedNameOf(taskId);
+  try {
+    await api("/api/matches/" + encodeURIComponent(matchId) + "/cancel", { method: "POST", body: { as: ME } });
+    state.accepted.delete(taskId);
+    state.acceptedBy.delete(taskId);
+    state.myRuns.delete(taskId);
+    toast("已取消接单" + (who ? "（原接单人 " + who + "）" : ""), "ok");
+    await refreshMatchState();
+  } catch (e) {
+    toast(errorText(e), "danger");
+  } finally {
+    busy.delete(matchId);
+    const t = taskOf(taskId);
+    if (t) {
+      repaintCard(t);
+      if (isMine(t)) void runMatch(t, { force: true });
+    }
+    paintBoardCount();
+  }
 }
 
 /* =====================================================================
@@ -1299,9 +1586,10 @@ const railMq = window.matchMedia("(min-width:1024px)");
 });
 
 async function boot() {
-  paintTokenChip();
+  // 演示别名先把「我」占住同学A，别人的发布者才不会也被显示成「同学A」（否则分不清谁发的单）
+  aliasFor(ME, 0);
   showLoading("#board", "正在读取开放任务…");
-  // 两个侧栏先建好（默认是关着的）：这样「接单截图上传」控件始终在页面里，且点开按钮零延迟
+  // 两个侧栏先建好（默认是关着的）：这样「取件照片」控件始终在页面里，且点开按钮零延迟
   publishSheet = buildPublishSheet();
   registerSheet = buildRegisterSheet();
   await initDemo();   // ?demo=1：显示演示徽章 + 昵称假名 + 灌一次演示数据
