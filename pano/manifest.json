@@ -1,6 +1,6 @@
 {
-  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py）。",
-  "_note_attach": "把某个场景挂到校园点位上：在 config/map-nodes.json 里给该节点写 pano_url=\"/pano/pano-N.jpg\"、pano_yaw=<朝向>，页面就会在详情里给出「进入 3D 街景」。",
+  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py v2）。",
+  "_note_attach": "把某个场景挂到点位上：在 static/map/sat-coords.json 里给该点位写 pano_scene=<场景 id>。",
   "default": {
     "firstScene": "pano-1",
     "sceneFadeDuration": 800,
