@@ -184,6 +184,7 @@ export default {
   copyText,
   mountTabs,
   createSheet,
+  initCardPicker,
   initReveals,
   initTagline,
   openModal,
@@ -441,4 +442,47 @@ export function initTagline(root = document) {
     spans.forEach((s) => io.observe(s));
   }
   return nodes.length;
+}
+
+
+/* =============================================================================
+   首页「四个功能」卡片的选中有反馈（2026-10-30 · 用户要求）
+     点一张卡 → 它浮起+放大，其余卡片后退变暗，明确"我点中了哪个"；
+     再点同一张、点空白、或按 Esc 取消；键盘 Tab 上去也当选中（:focus-within 交给 CSS）。
+   ============================================================================= */
+export function initCardPicker(selector = "#features .card") {
+  const cards = [...document.querySelectorAll(selector)];
+  if (!cards.length) return 0;
+  let picked = null;
+  const apply = () => {
+    cards.forEach((c) => {
+      c.classList.toggle("is-picked", c === picked);
+      c.classList.toggle("is-receded", Boolean(picked) && c !== picked);
+    });
+  };
+  for (const c of cards) {
+    c.tabIndex = 0;
+    c.addEventListener("click", (e) => {
+      if (e.target.closest("a, button")) return;          // 点里面的按钮就让它跳转
+      picked = picked === c ? null : c;
+      apply();
+    });
+    c.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") {
+        if (e.target.closest("a, button")) return;
+        e.preventDefault();
+        picked = picked === c ? null : c;
+        apply();
+      }
+    });
+  }
+  document.addEventListener("click", (e) => {
+    if (!picked) return;
+    if (picked.contains(e.target) || e.target.closest(selector)) return;
+    picked = null; apply();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && picked) { picked = null; apply(); }
+  });
+  return cards.length;
 }

@@ -407,7 +407,7 @@ export function mountNav(opts = {}) {
     // 右上角调色盘（色调 / 圆角 / 背景），选择存 localStorage
     import("/js/theme.js").then((t) => t.initTheme?.()).catch(() => {});
     import("/js/ui.js")
-      .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); })
+      .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); ui.initCardPicker?.(); })
       .catch(() => {});   // 环境不支持 IntersectionObserver 时静默降级
 
     document.dispatchEvent(new CustomEvent(NAV_READY_EVENT, { detail: { activeId } }));

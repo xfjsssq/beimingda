@@ -104,6 +104,14 @@
     },
     "zoom": 16,
     "max_zoom": 19,
-    "labels_default_on": true
+    "labels_default_on": true,
+    "min_zoom": 14,
+    "bounds": {
+      "south": 38.4857,
+      "west": 106.0917,
+      "north": 38.5097,
+      "east": 106.1237
+    },
+    "_bounds_note": "限制在校园范围内，防止滑出去找不到学校；要放宽改这四个数字即可"
   }
 }

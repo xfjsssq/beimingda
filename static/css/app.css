@@ -2171,11 +2171,17 @@ p, li, .card__desc, .lead { text-wrap: pretty; }
 .section--callout code.inline, .section--callout .kbd { background: rgba(255,255,255,.16); color: #fff; border-color: rgba(255,255,255,.28); }
 .section--callout .btn--light { background: #fff; color: var(--color-primary); }
 
-/* ---------- B11 标语：字号收到 36px，行宽放开到 880px，避免大字号挤成难看的断行 ---------- */
-.tagline { padding: 64px 0 48px; }
-.tagline p { font-size: 36px; line-height: 1.3; max-width: 880px; }
-.tagline .w { margin-inline-end: 8px; }
-@media (max-width: 768px) { .tagline p { font-size: 24px; } }
+/* ---------- B11 标语：与整页字号体系对齐，别再是"一坨大字" ----------
+   问题：之前 36px/700 太抢，跟正文不是一套体系，看着没融合。
+   现在：走 .section 的内边距 + 字号收到 30px（窄屏 20px）、字重 600、行高 1.5，
+        颜色用正文色与 muted 的渐入，靠"逐词点亮"制造节奏而不是靠字号压人。 */
+.tagline { padding: 40px 0 8px; }
+.tagline p { font-size: 30px; line-height: 1.5; font-weight: 600; letter-spacing: -0.01em;
+  max-width: 680px; margin: 0; text-wrap: balance; color: var(--color-text); }
+.tagline .w { color: color-mix(in srgb, var(--color-text) 26%, transparent); margin-inline-end: 0; }
+.tagline .w.on { color: var(--color-text); }
+.tagline__hint { margin: 12px 0 0; font-size: 14px; color: var(--color-muted); }
+@media (max-width: 768px) { .tagline p { font-size: 20px; line-height: 1.6; } }
 
 /* ---------- 地图：整幅布局 + 缩放控件（滑块方便手机端） ---------- */
 .layout--full { display: block; }
@@ -2400,3 +2406,33 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 .leaflet-container { font: inherit; }
 .leaflet-control-attribution { font-size: 11px; background: rgba(255, 255, 255, 0.8); }
 .leaflet-bar a { border-radius: 6px; }
+
+/* 视图提示条：底部整条、压在 Leaflet 之上 */
+.map-badge { z-index: 800; }
+.map-badge--light { background: rgba(255, 255, 255, 0.96); color: #1f2a37;
+  border: 1px solid rgba(31, 78, 140, 0.18); box-shadow: 0 4px 14px rgba(16, 24, 40, 0.14); }
+.map-zoom[hidden] { display: none; }
+/* 卫星图里的点位弹卡：卡片式、白底 */
+.sat-pop { min-width: 190px; }
+
+
+/* ---------- 首页 ②：四个功能卡片的"选中有反馈" ----------
+   用户要求：点中的卡片要更明显地浮起来、放大一点，其余卡片往后退，突出选中的那个。 */
+.grid--cards, .card-grid { transition: none; }
+.card { transition: transform var(--dur-move) var(--ease), box-shadow var(--dur-move) var(--ease),
+                    opacity var(--dur-color) var(--ease), filter var(--dur-color) var(--ease); }
+.card.is-picked {
+  transform: translateY(-10px) scale(1.04);
+  box-shadow: 0 18px 40px -18px rgba(16, 24, 40, 0.38), 0 0 0 2px var(--color-primary) inset;
+  z-index: 3;
+}
+.card.is-receded { transform: scale(0.965) translateY(2px); opacity: 0.62; filter: saturate(0.85); }
+/* 键盘可达：聚焦也当选中 */
+.card:focus-within { outline: none; }
+@media (prefers-reduced-motion: reduce) {
+  .card.is-picked, .card.is-receded { transform: none; opacity: 1; }
+}
+
+/* ---------- 首页：功能卡片的选中提示 ---------- */
+.card__pick-hint { display: block; margin-top: 8px; font-size: 12px; color: var(--color-muted); }
+.card.is-picked .card__pick-hint { color: var(--color-primary); }

@@ -135,36 +135,36 @@
     },
     {
       "id": "ming-lake-1",
-      "label": "明湖实景点1",
+      "label": "明湖风光 1",
       "category": "teaching",
       "lat": 0,
       "lng": 0,
       "pano_url": "/pano/pano-1.jpg",
       "pano_yaw": 0,
       "sort": 210,
-      "desc": "明湖一带的实拍实景（第一段素材）。点「进入 3D 街景」可环视；后续会细分到具体楼栋。"
+      "desc": "明湖一带的实拍实景（第 1 段素材），点开可进 3D 街景环视。"
     },
     {
       "id": "ming-lake-2",
-      "label": "明湖实景点2",
+      "label": "明湖风光 2",
       "category": "teaching",
       "lat": 0,
       "lng": 0,
       "pano_url": "/pano/pano-2.jpg",
       "pano_yaw": 0,
       "sort": 220,
-      "desc": "明湖一带的实拍实景（第二段素材，两段重叠 33%、接缝匹配度最高的一段）。"
+      "desc": "明湖一带的实拍实景（第 2 段素材），点开可进 3D 街景环视。"
     },
     {
       "id": "ming-lake-3",
-      "label": "明湖实景点3",
+      "label": "明湖风光 3",
       "category": "teaching",
       "lat": 0,
       "lng": 0,
       "pano_url": "/pano/pano-3.jpg",
       "pano_yaw": 0,
       "sort": 230,
-      "desc": "明湖一带的实拍实景（第三段素材）。"
+      "desc": "明湖一带的实拍实景（第 3 段素材），点开可进 3D 街景环视。"
     }
   ]
 }
