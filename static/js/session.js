@@ -57,6 +57,17 @@ function save(s) {
 export async function ensureSession({ force = false } = {}) {
   if (cache && !force) return cache;
   const token = sessionToken();
+  // ⭐ 已经有 token（刚注册/登录过，或老会话）→ 先用它校验一下，别又开一个匿名身份
+  if (token && !force) {
+    try {
+      const res = await fetch("/api/me", { headers: { "X-Session-Token": token } });
+      const env = await res.json();
+      if (env?.ok) {
+        save({ token, uid: env.data.uid, nickname: env.data.nickname });
+        return cache;
+      }
+    } catch { /* 网络问题就往下走开户兜底 */ }
+  }
   try {
     const res = await fetch("/api/session", {
       method: "POST",

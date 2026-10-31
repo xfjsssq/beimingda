@@ -21,12 +21,14 @@
      // 探测结果按 sessionStorage 缓存，同一会话只探一次（5 分钟 TTL，模块合入后自愈）
    ============================================================================= */
 
-/** 冻版 6 页（顺序即导航顺序） */
+/** 冻版 6 页（顺序即导航顺序）
+ *  ⚠️ 顺序与 href 是契约冻版：不要动（f0-frontend.test.js 直接断言这两个字段）。
+ *     「导览」处在 6 项的正中，用 center:true 把它标成导航条里的视觉中心。 */
 export const PAGES = [
   { id: "index", href: "/", label: "首页", icon: "🏠", iconName: "home", desc: "功能聚合门户" },
   { id: "takeout", href: "/takeout", label: "代取", icon: "📦", iconName: "package", desc: "代取撮合看板" },
   { id: "buddy", href: "/buddy", label: "搭子", icon: "🤝", iconName: "users", desc: "搭子墙" },
-  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", iconName: "map-pin", desc: "迎新地图与全景" },
+  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", iconName: "map-pin", desc: "迎新地图与全景", center: true },
   { id: "schedule", href: "/schedule", label: "日程", icon: "⏰", iconName: "calendar-event", desc: "课表与提醒" },
   { id: "agent", href: "/agent", label: "Agent", icon: "🔌", iconName: "plug-connected", desc: "接入 WorkBuddy（评委页）" },
 ];
@@ -307,11 +309,12 @@ export async function decorateAvailability(opts = {}) {
    三、渲染
    --------------------------------------------------------------------------- */
 
-/** 单个导航项 HTML */
+/** 单个导航项 HTML。center 项（导览）多一个 class，样式见 navCenterCSS() */
 function linkHTML(page, activeId) {
   const active = page.id === activeId;
+  const centerCls = page.center ? " nav-link--center" : "";
   return (
-    `<a class="nav-link" href="${page.href}" data-nav="${page.id}"` +
+    `<a class="nav-link${centerCls}" href="${page.href}" data-nav="${page.id}"` +
     ` title="${page.desc}"${active ? ' aria-current="page"' : ""}>` +
     `<span class="icon icon--18 nav-link__icon" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/${page.iconName || "home"}.svg)"></span>` +
     `<span class="nav-link__label">${page.label}</span>` +
@@ -321,13 +324,14 @@ function linkHTML(page, activeId) {
 
 /** 页头 HTML（含演示模式徽章占位；徽章显示由 body[data-demo="1"] 控制） */
 export function navHTML(activeId) {
+  injectNavStyle(); // 「导览」特殊化样式（幂等注入，只在 head 里加一段）
   return (
     `<div class="site-header__inner">
         <button class="nav-handle" id="navHandle" type="button" aria-expanded="false" aria-controls="siteNav" aria-label="展开导航栏"><span class="icon icon--18" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/caret-up.svg)"></span></button>` +
     `<a class="brand" href="/">` +
     `<img class="brand__logo" src="/img/school-logo.png" alt="北方民族大学校徽" width="28" height="25" />` +
     `<span class="brand__text">北民大小助手</span>` +
-    `<span class="brand__tag">赛道 17</span>` +
+    `<span class="brand__tag">赛道一</span>` +
     `</a>` +
     `<nav class="site-nav" aria-label="主导航">${PAGES.map((p) => linkHTML(p, activeId)).join("")}</nav>` +
     `<span class="demo-badge" data-demo-badge title="当前为演示模式：数据均为虚构演示数据，姓名显示为「同学A / 同学B」">演示模式</span>` +
@@ -406,6 +410,10 @@ export function mountNav(opts = {}) {
     // B7/B11：滚动揭示 + 标语逐词（走共享层，六个页面共用，各页不用改）
     // 右上角调色盘（色调 / 圆角 / 背景），选择存 localStorage
     import("/js/theme.js").then((t) => t.initTheme?.()).catch(() => {});
+
+    // ⭐ 首次进入必须注册/登录（用户名全站唯一；之后凭用户名+密码登录）
+    //    引导层是全屏遮罩：不注册/登录就没法用站点；这里不阻塞页面脚本（同步函数里不能 await）
+    import("/js/onboard.js").then((m) => m.ensureIdentity?.()).catch(() => {});
 
     // 「这一页怎么用」小问号（用户要求：每个功能右上角一个，点开是教学）
     try {
