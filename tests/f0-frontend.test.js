@@ -10,7 +10,7 @@
  *   5. 无外部 CDN、无课表上传控件、无真实令牌
  *   6. api.js 行为：解信封 / 写接口带 X-Demo-Token / 未就绪安全降级返回 null
  *   7. nav.js 的 6 页导航与当前页高亮
- *   8. 14 个工具名与 docs/MCP-TOOLS.md 完全一致
+ *   8. 15 个工具名与 docs/MCP-TOOLS.md 完全一致
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";

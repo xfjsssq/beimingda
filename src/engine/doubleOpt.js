@@ -16,7 +16,7 @@
  * 落库与身份解析在 src/services/buddy.js，派生字段（reveal_status）也在这里。
  *
  * ⛔ 三条硬约束（评审对照用）
- *   1. 任何一方未同意时，绝不给出聊天入口（旧的中转码机制已废弃）
+ *   1. 任何一方未同意时，绝不给出聊天入口（旧的聊天入口机制已废弃）
  *   2. 绝不向一方暗示"对方已经同意了"（对外只给 pending / mutual）
  *   3. 不得把 anon_token 与真实身份关联后展示给另一方
  */
@@ -111,7 +111,7 @@ export function isSettled(row) {
  *    ⛔ 绝不直接信任 row.revealed 这一存储列。
  *
  * @param {object} row 迁移后的行
- * @param {string|null} contactCode 对方的中转码（仅在互相可见时才允许传入）
+ * @param {string|null} contactCode 对方的聊天入口（仅在互相可见时才允许传入）
  */
 export function toResponse(row, contactCode = null) {
   const r = normalizeConsent(row);
@@ -122,7 +122,7 @@ export function toResponse(row, contactCode = null) {
     seeker_ok: r.seeker_ok,
     revealed,
   };
-  // ⛔ 2026-10-31 起不再给"中转码"：双方都同意就**直接站内聊天**（服务器直连）
+  // ⛔ 2026-10-31 起不再给"聊天入口"：双方都同意就**直接站内聊天**（服务器直连）
   if (revealed === 1) base.chat_ready = true;
   return base;
 }

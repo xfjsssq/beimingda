@@ -29,7 +29,7 @@ export function createSessionRouter() {
       if (existing) {
         return res.json(ok({
           token: body.token, uid: existing.uid, nickname: existing.handle,
-          contact_code: existing.contact_code, resumed: true,
+          resumed: true,
         }));
       }
       // 带密码 = 注册 / 认领 / 登录（四合一）；不带密码 = 匿名开户（行为不变）

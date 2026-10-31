@@ -56,7 +56,7 @@ export const BUDDY_SEARCH = {
 export const BUDDY_CONSENT = {
   name: "buddy_consent",
   description:
-    "对某条搭子帖表决同意或拒绝（同一帖同一人只能表决一次）。只有**双方都同意**（revealed=1）才会返回 chat_ready；此后双方可在站内直接私聊（GET /api/threads 拿会话）。⛔ 不再下发任何联系方式，也没有「中转码」这一说。未揭示时 chat_ready 不会出现。",
+    "对某条搭子帖表决同意或拒绝（同一帖同一人只能表决一次）。只有**双方都同意**（revealed=1）才会返回 chat_ready；此后双方可在站内直接私聊（GET /api/threads 拿会话）。⛔ 不再下发任何联系方式；平台不交换、也不下发任何联系方式。未揭示时 chat_ready 不会出现。",
   inputSchema: {
     type: "object",
     properties: {

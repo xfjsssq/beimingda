@@ -11,7 +11,7 @@
  *
  *   ⛔ 三条红线（评审对照用）
  *     1. anon_token 随机生成，**不得由 user_id 派生**
- *     2. 未双选成功不返回 chat_ready（⛔ 也不再有"中转码"：双方同意后直接站内私聊）
+ *     2. 未双选成功不返回 chat_ready（⛔ 也不再有"站内私聊"：双方同意后直接站内私聊）
  *     3. 结果里不出现院系全名 / 班级 / 学号 / 宿舍号 / 真实姓名
  *        —— 对外字段一律走白名单投影（safePost / safeCandidate）
  */
@@ -87,7 +87,7 @@ export function anonToken() {
   return `anon_${crypto.randomBytes(6).toString("hex")}`;
 }
 
-/** 匿名中转码（不是手机号/微信，双选成功后下发的对接凭据） */
+/** 匿名站内私聊（不是手机号/微信，双选成功后下发的对接凭据） */
 export function newContactCode() {
   return `ct_${crypto.randomBytes(4).toString("hex")}`;
 }
@@ -123,7 +123,7 @@ export function ensureUser(handle) {
   const existed = findUser(handle);
   if (existed) return existed;
   getDb()
-    // ⛔ 2026-10-31 起不再生成"中转码"（机制已废弃：双方同意后直接站内私聊）
+    // ⛔ 2026-10-31 起不再生成"站内私聊"（机制已废弃：双方同意后直接站内私聊）
     .prepare("INSERT OR IGNORE INTO users(id,handle,created_at,demo) VALUES (?,?,?,1)")
     .run(newId("u"), handle, nowSec());
   const created = findUser(handle);
@@ -285,7 +285,7 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
       };
       if (status === "mutual") {
         // ⛔ 只有双方都同意（revealed=1）才附带 chat_ready / thread_id
-        // ⛔ 不再输出中转码：双方同意后可聊（candidate 里改为 chat_ready / thread_id，见下）
+        // ⛔ 不再输出站内私聊：双方同意后可聊（candidate 里改为 chat_ready / thread_id，见下）
       candidate.chat_ready = true;
     candidate.thread_id = threadIdForBuddy(row.id, seeker?.id) || null;
       }
@@ -309,7 +309,7 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
  *   ⛔ 同一 (post_id, seeker_id) 只能表决一次 —— 由 DB 的 UNIQUE(post_id, seeker_id) 保证
  *
  * @returns {{author_ok:number, seeker_ok:number, revealed:number, chat_ready?, thread_id?}}
- *          ⛔ revealed=0 时不出现 chat_ready / thread_id（旧的中转码已废弃）
+ *          ⛔ revealed=0 时不出现 chat_ready / thread_id（旧的站内私聊已废弃）
  */
 export function castConsent({ post_id, seeker_handle, agree } = {}) {
   const handle = assertHandle(seeker_handle, "seeker_handle");
@@ -329,7 +329,7 @@ export function castConsent({ post_id, seeker_handle, agree } = {}) {
 /**
  * 统一出口：状态机结果 + （双方同意时）站内私聊会话
  *   ⭐ 会话在这里建，MCP 与 HTTP 两条路都会建（之前在 HTTP 路由里建，MCP 就走不到）
- *   ⛔ 不再返回任何"中转码"：双方同意 → 直接给 thread_id 开聊
+ *   ⛔ 不再返回任何"站内私聊"：双方同意 → 直接给 thread_id 开聊
  */
 function responseWithChat(post, state, uid) {
   const out = toResponse(state);

@@ -17,7 +17,7 @@ import { registerScheduleTools } from "./handlers/schedule.js";
 
 /**
  * 各模块在合并进 main 后，请把自己的注册调用补进下面这个数组。
- * 已接入：M1（5 个）/ M2（3 个）/ M3（2 个）/ M4（4 个）→ **合计 14 个**。
+ * 已接入：M1（5 个）/ M2（3 个）/ M3（2 个）/ M4（4 个）→ **合计 15 个**。
  * ⛔ 只加自己模块那一行，不要动别人的行、不要重排顺序。
  */
 const MODULE_REGISTRARS = [

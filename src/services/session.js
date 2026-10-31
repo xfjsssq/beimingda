@@ -48,8 +48,9 @@ export function ensureSessionUser(handle) {
   if (existed) return existed;
   const id = newId("u");
   try {
-    db.prepare("INSERT INTO users(id,handle,contact_code,created_at,demo) VALUES (?,?,?,?,0)")
-      .run(id, handle, crypto.randomBytes(6).toString("hex"), nowSec());
+    // ⛔ 不再生成"中转码"（机制已废弃：双方同意后直接站内私聊）
+      db.prepare("INSERT INTO users(id,handle,created_at,demo) VALUES (?,?,?,0)")
+      .run(id, handle, nowSec());
   } catch (e) {
     if (!/UNIQUE/i.test(String(e?.message))) throw e;      // 并发重名 → 读回已有的
     const again = db.prepare("SELECT * FROM users WHERE handle = ?").get(handle);
@@ -78,7 +79,7 @@ export function createSession({ nickname } = {}) {
     token, uid: user.id, handle: user.handle, nickname: user.handle,
     created_at: toIso(user.created_at),
     has_password: Boolean(user.pass_hash),
-    // ⛔ 不再返回 contact_code（"中转码"已废弃：双方同意后直接站内聊天）
+    // ⛔ 不再返回 contact_code（旧的中转码机制已废弃：双方同意后直接站内私聊）
   };
 }
 
@@ -90,7 +91,7 @@ export function sessionFromToken(token) {
     const db = getDb();
     const hash = sha256(raw);
     const row = db
-      .prepare("SELECT s.token_hash, s.user_id, s.created_at, s.last_seen_at, u.handle, u.contact_code " +
+      .prepare("SELECT s.token_hash, s.user_id, s.created_at, s.last_seen_at, u.handle " +
                "FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = ?")
       .get(hash);
     if (!row) return null;

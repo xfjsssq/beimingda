@@ -14,7 +14,7 @@
  */
 import express from "express";
 import { requireWriteToken } from "../middleware/auth.js";
-import { ensureThreadForBuddy, threadIdForBuddy } from "../services/chat.js";   // 双方同意 → 站内私聊（替代旧"中转码"）
+import { ensureThreadForBuddy, threadIdForBuddy } from "../services/chat.js";   // 双方同意 → 站内私聊（替代旧"站内私聊"）
 import { ok } from "../util/envelope.js";
 import {
   castConsent,
@@ -72,7 +72,7 @@ export function createBuddiesRouter() {
       const me = req.session?.handle;   // ⭐ 有会话就用会话身份
       const r = castConsent({ post_id: req.params.id, seeker_handle: me ?? body.handle ?? body.seeker_handle ?? body.from_handle, agree: body.agree !== false });
       if (body.message) postMessage({ post_id: req.params.id, from_handle: me ?? body.handle ?? body.seeker_handle, body: body.message, kind: "message" });
-      // 双方都同意 → 直接把站内私聊会话给它（⛔ 不再给"中转码"）
+      // 双方都同意 → 直接把站内私聊会话给它（⛔ 不再给"站内私聊"）
       if (r && r.revealed === 1) {
         ensureThreadForBuddy(req.params.id);
         r.chat_ready = true;

@@ -193,7 +193,7 @@ test("/agent：分栏 3 的每条示例都标注了模块与真实存在的 MCP 
   const flat = mapping.flat();
   assert.ok(flat.length >= mapping.length, "每条示例至少要挂一个工具");
   for (const t of flat) {
-    assert.ok(known.has(t), `示例里标注的工具名 ${t} 不在 14 个工具清单里`);
+    assert.ok(known.has(t), `示例里标注的工具名 ${t} 不在 15 个工具清单里`);
   }
   // 5 条示例覆盖 4 个模块
   assert.equal(new Set(mcpConfig.SAMPLE_DIALOGUES.map((d) => d.module)).size, 4);
