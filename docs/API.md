@@ -3,7 +3,7 @@
 > **适用版本**：`main`（2026-10-31 起的会话/私聊版）｜**接口面**：REST + MCP（远程 Streamable HTTP）
 > **本文件的字段名与状态码都是对着运行中的服务实测抄下来的**（未实测的部分会明确标注"未实测"）。
 > ⛔ 全文令牌一律写作 `<DEMO_TOKEN>`；真实值只存在于服务器 `.env`。
-> **配套**：`docs/MCP-TOOLS.md`（MCP 工具细节，注意它内部"14 个"的旧注已过时，以本文 §7 的 **15 个**为准）、
+> **配套**：`docs/MCP-TOOLS.md`（MCP 工具细节，**15 个**工具）、
 > `docs/ARCHITECTURE.md`（分层）、`部署与运维.md`（部署与运维）。
 
 ---
@@ -133,7 +133,7 @@
 
 ## 5. 私聊（站内消息）
 
-> **设计**：以前的"双方都同意 → 给一串中转码，让人去别的软件加好友"被拿掉了。
+> **设计**：旧的那套「双方都同意 → 发一串中转码，让人去别的软件加好友」**已整体废弃（2026-10-31）**。
 > 现在 **双方都同意 → 站内直接开聊**（`chat_ready` + `thread_id`），⛔ 表里不存任何联系方式。
 
 ### 5.1 谁能聊（严格执行，service 层校验，不是前端藏按钮）
@@ -244,11 +244,15 @@
 // ③ 任一方重复表决 → 400 SCHEMA_REJECTED（UNIQUE(post_id,seeker_id) / 已表决过）
 ```
 
-> **关于 `contact_code`（"中转码"）**：2026-10-31 起**整体废弃**——
-> 出口按状态机推导（`src/engine/doubleOpt.js::toResponse`），`revealed=0` 时返回对象里**没有** `contact_code` 键；
-> `revealed=1` 时**也不再给中转码**，改为 `chat_ready:true` +（API 层附加的）`thread_id`，让双方**站内直接聊**。
+> **关于 `contact_code`（旧"中转码"机制，2026-10-31 起废弃）**——两件事要一起说清，别让人误会成"藏字段"：
+> ① **机制废弃**：出口按状态机推导（`src/engine/doubleOpt.js::toResponse`），`revealed=0` 时返回对象里**没有** `contact_code` 键；
+>    `revealed=1` 时**也不下发**，改为 `chat_ready:true` +（API 层附加的）`thread_id`，双方**站内直接聊**。
+> ② **列还在**：`users.contact_code` 这一列**保留在库里**，仅为兼容老数据/老会话；接口不输出、新流程不使用。
 > 候选列表同一口径：`reveal_status="mutual"` 时才带 `chat_ready` / `thread_id`。
 > 单方同意时 `GET /api/threads` **不会**出现该帖的会话（实测：0 条）；双方同意后才出现。
+> ℹ️ 代码里还剩两处**不影响对外行为**的残留（待清理，不阻塞演示）：`src/services/session.js::ensureSessionUser`
+> 仍会给新用户写一个随机串进该列；`src/api/session.js` 的"恢复会话"分支仍把 `existing.contact_code` 放进响应对象——
+> 但 `sessionFromToken()` 已不再返回该字段，所以 JSON 里实际不会出现（实测响应字段：`token/uid/nickname/resumed`）。
 
 ### 6.3 M3 地图（`/api/map`）
 
@@ -418,11 +422,12 @@ curl -fsS --max-time 10 -X POST https://demo.knowingly.dpdns.org/mcp \
 覆盖：会话三连、私聊全链路（含越权与边界）、四模块只读口、写接口鉴权、MCP `tools/list`、
 限频头、favicon 跳转与 404 分流。
 
-⚠️ **`contact_code` 相关结论是二次核对过的**：工作树在我探测期间被并行修改，
-第一次探测拿到的双选响应还带 `contact_code: null`（中间版本）；
-随后我重启服务、用当前代码重跑，确认现状是
-`{"author_ok":1,"seeker_ok":1,"revealed":1,"chat_ready":true,"thread_id":"th_…"}`
-（**没有 `contact_code`**），`POST /api/session` 也返回 `has_password` 而不是 `contact_code`——本文按**当前代码**写。
+⚠️ **`contact_code`（旧"中转码"）相关结论是二次核对过、并按当前代码复测的**：工作树曾在探测期间被并行修改，
+第一次探测拿到的双选响应还带 `contact_code: null`（中间版本）；随后重启服务、用当前代码重跑，确认现状是
+`{"author_ok":1,"seeker_ok":1,"revealed":1,"chat_ready":true,"thread_id":"th_…"}`（**没有 `contact_code`**）。
+会话侧同样实测：`POST /api/session`（新开户）返回 `token/uid/handle/nickname/created_at/has_password`；
+带旧 token 的"恢复会话"分支返回 `token/uid/nickname/resumed`；`GET /api/me` 返回 `uid/nickname/has_password/demo/created_at/stats`——
+三处都**不含 `contact_code`**。
 
 **未实测**（如需请自测）：真机多实例的共享限频、接入学校统一身份认证后的行为、
 以及 `POST /api/tasks/:id/interest` 在并发下的表现。

@@ -10,7 +10,7 @@
 - T0 骨架已合入 `main`
 
 ## 完成标准
-`contracts/m2-buddy.md` §8 自测清单全部勾上，外加断言测试覆盖「`revealed=0` 时返回对象里不含 `contact_code` 键」。
+`contracts/m2-buddy.md` §8 自测清单全部勾上，外加断言测试覆盖「`revealed=0` 时返回对象里不含 `chat_ready` / `thread_id` 键」。
 
 ## 不能碰什么
 - `src/db/schema.sql`、`contracts/` 下任何文件
@@ -19,14 +19,14 @@
 - ⛔ 把照片纳入评分、承接恋爱匹配需求
 
 ## 当前进度
-- [x] `src/engine/doubleOpt.js` 双选揭示状态机（单独文件，便于评审对照；`revealed=0` 时 `contact_code` 键根本不出现）
+- [x] `src/engine/doubleOpt.js` 双选揭示状态机（单独文件，便于评审对照；`revealed=0` 时 `chat_ready` / `thread_id` 键根本不出现）
 - [x] `src/engine/buddy.js` 画像抽取 + 评分（权重 35/30/20/15、阈值 60、一票否决）
 - [x] `src/services/buddy.js` 帖 CRUD + 候选检索 + 表决（`anon_token` 随机、白名单投影）
 - [x] MCP 3 工具注册与 handler（`src/mcp/handlers/buddy.js`；`handlers.js` 的 MODULE_REGISTRARS 只加 m2 一行）
 - [x] HTTP `/api/buddies`（`src/api/buddies.js`；`src/api/routes.js` 只加一行 `router.use("/buddies", ...)`）
 - [x] `static/buddy.html` 4 区块（页面自包含，主色 #1F4E8C）
 - [x] `fixtures/buddy-posts.json` 12 条（覆盖 5 种 kind + 3 组 must_have/deal_breaker 语义冲突）
-- [x] `tests/m2-buddy.test.js` 覆盖契约 §8 全 9 条（含「`revealed=0` 时返回对象不含 `contact_code` 键」）
+- [x] `tests/m2-buddy.test.js` 覆盖契约 §8 全 9 条（含「`revealed=0` 时返回对象不含 `chat_ready` / `thread_id` 键」）
 
 ### LLM 与降级（重要，评审对照）
 `.env` 未配置 `LLM_BASE_URL / LLM_API_KEY / LLM_MODEL` 时，本模块走**降级实现**（不是把功能删掉）：

@@ -1,5 +1,9 @@
 # 契约 · 核心层（数据库 / HTTP API / 目录结构）
 
+> **2026-10-31 修订：中转码（`contact_code`）机制已废弃 —— 双方都同意后改为站内私聊（`chat_ready` + `thread_id`，见 `docs/API.md` §5/§7）。**
+> 口径同时说清两点：① `users.contact_code` 这一列**保留在库里**，仅为兼容老数据/老会话；
+> ② **接口一律不再输出它**，也不再有「拿一串码去站外加好友」的流程（新的会话身份走 `X-Session-Token`）。
+
 ## 全局冻结项（每个模块文件都自带，便于单独开对话）
 
 | 项 | 值 |
@@ -118,6 +122,10 @@ beimingda/
 ## 2. 数据库表结构（冻版 · 字段名不得改）
 
 > ⚠️ 这张表在 `src/db/schema.sql` 里实现。**全站不允许出现可存储真实身份信息的字段**。
+>
+> ℹ️ 下面这段是**冻版快照**（9 张表）。现库共 **13 张表**：另加 `buddy_messages` / `sessions` / `threads` / `thread_messages`，
+> `users` 另有 `pass_hash` / `pass_salt`（昵称+密码登录用）。HTTP 侧另有 `POST /api/session`、`GET /api/me`、
+> `GET /api/threads*`（站内私聊）——**以 `src/db/schema.sql` 与 `docs/DB-SCHEMA.md` / `docs/API.md` 为准**。
 
 ```sql
 PRAGMA foreign_keys = ON;
@@ -126,7 +134,7 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE users (
   id            TEXT PRIMARY KEY,
   handle        TEXT NOT NULL UNIQUE,
-  contact_code  TEXT,
+  contact_code  TEXT,  -- 历史遗留列（旧"中转码"已废弃）：保留仅为兼容老库，⛔ 接口不再输出
   created_at    INTEGER NOT NULL,
   demo          INTEGER NOT NULL DEFAULT 0
 );
