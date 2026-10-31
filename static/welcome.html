@@ -161,6 +161,16 @@
   .map-badge, .map-credit, .map-zoom { z-index: 800; }
   #panoOverlay, #amapOverlay { z-index: 1200; }
   .sat-pop { min-width: 180px; }
+
+  /* ---------- 3D 街景：点位校准（双击加点） ---------- */
+  .sat-editor { position: absolute; left: 10px; bottom: 10px; z-index: 900; display: flex; align-items: center;
+    gap: 8px; padding: 6px 10px; border-radius: 9999px; background: rgba(255,255,255,.94);
+    border: 1px solid rgba(31,78,140,.18); box-shadow: 0 6px 20px -10px rgba(16,24,40,.4); }
+  .sat-editor__hint { font-size: 12px; color: var(--color-muted); }
+  .sat-editor__count { font-size: 13px; color: var(--color-primary); min-width: 34px; }
+  .sat-marker--draft .sat-marker__dot { background: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.28); }
+  .sat-marker--draft .sat-marker__label { border-color: rgba(124,58,237,.55); color: #5b21b6; }
+  .sat-marker--draft.is-dragging .sat-marker__dot { transform: scale(1.35); }
 </style>
   <meta name="description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
   <meta property="og:title" content="迎新导览：校园地图与 3D 街景" />
@@ -193,6 +203,14 @@
         <div class="map-wrap" id="satWrap" hidden>
           <div id="satMap"></div>
           <p class="map-credit" id="satCredit"></p>
+          <!-- ⭐ 校准工具条：双击地图即可按"还没用过的名字"加点位 -->
+          <div class="sat-editor" id="satEditor" hidden>
+            <span class="sat-editor__hint">双击地图 = 放下一个点位</span>
+            <b class="sat-editor__count" id="calibCount">0/8</b>
+            <button class="btn btn--sm" type="button" id="calibExport">导出 JSON</button>
+            <button class="btn btn--sm btn--ghost" type="button" id="calibUndo">撤销一个</button>
+            <button class="btn btn--sm btn--ghost" type="button" id="calibClear">清空</button>
+          </div>
         </div>
 
         <div class="map-zoom" role="group" aria-label="地图缩放">
@@ -265,7 +283,7 @@
 import { mountNav } from "/js/nav.js";
 import { initDemo } from "/js/demo.js";
 import { createSheet, toast } from "/js/ui.js";
-import { esc } from "/js/ui.js";
+import { el, esc, copyText } from "/js/ui.js";
 
 const $ = (s) => document.querySelector(s);
 const CAT_LABEL = { dorm: "宿舍楼", canteen: "食堂", teaching: "教学与自习", gate: "校门", service: "服务设施" };
@@ -822,8 +840,10 @@ function renderSatMarkers() {
   const shown = NODES.filter((x) => !satState.onlyPano || sceneOf(x)).filter((x) => satCoordsOf(x));
   const labelSlot = labelSlotsFor(shown);   // 先算好每个点标签朝哪边、错多少
   let placed = 0;
+  const calibrated = calibByName();
   for (const n of NODES) {
     if (satState.onlyPano && !sceneOf(n)) continue;      // 3D 街景视图只显示有实景的点位
+    if (calibrated.has(n.id)) continue;                  // ⭐ 这个点位已被重新校准 → 旧位置隐藏
     const c = satCoordsOf(n);
     if (!c) continue;
     placed++;
@@ -862,6 +882,8 @@ function renderSatMarkers() {
     }
   }
   satState.placed = placed;
+  renderCalibMarkers();          // ⭐ 画校准点（可拖动）
+  calibSyncUI();                 // 工具条只在 3D 街景视图显示，每次渲染都同步一次
   updateSatTip();
 }
 
@@ -923,6 +945,7 @@ function useSatBase() {
     }
     satState.group = L.layerGroup().addTo(satState.map);
     satState.map.on("click", onSatClick);
+    satState.map.on("dblclick", onSatDblClick);      // ⭐ 左键双击 = 放下一个点位
     const credit = $("#satCredit");
     if (credit) credit.textContent = cfg.attribution || "";
   }
@@ -939,23 +962,179 @@ function useStreetView3D() {
 }
 
 /** 图上点击：添加新点位 / 给现有点位定位 */
-function onSatClick(e) {
+function onSatClick() { /* 单点交给 Leaflet 默认行为（点开标记气泡）；加点走双击 */ }
+
+/* ============================================================================
+   点位校准：双击地图 → 从"还没用过的名字"里选 → 在该处放一个可拖动的点
+     · 名字沿用 sat-coords.json 里现有的 8 个，用过就不再出现（加完一个少一个）
+     · 拖完自动存 localStorage；点标记可复制坐标或删除
+     · 「导出 JSON」把结果给我，我固化进 static/map/sat-coords.json
+   ========================================================================== */
+const CALIB_KEY = "beimingda.calib";
+let calib = [];
+try { calib = JSON.parse(localStorage.getItem(CALIB_KEY) || "[]") || []; } catch { calib = []; }
+const calibByName = () => new Map(calib.map((c) => [c.id, c]));
+
+function calibSave() {
+  try { localStorage.setItem(CALIB_KEY, JSON.stringify(calib)); } catch { /* 隐私模式下本次会话仍生效 */ }
+  calibSyncUI();
+  renderSatMarkers();
+}
+
+function calibSyncUI() {
+  const bar = $("#satEditor");
+  if (bar) bar.hidden = !satState.onlyPano;   // 只在 3D 街景视图里显示校准工具条
+  const total = (satState.pool || []).length || 8;
+  const c = $("#calibCount");
+  if (c) c.textContent = calib.length + "/" + total;
+}
+
+/** 把 WGS84 反推成 GCJ-02（导出时附上，方便和站长给的高德坐标对齐） */
+function wgs2gcj(lng, lat) {
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  const dlat = (x, y) => {
+    let r = -100 + 2 * x + 3 * y + 0.2 * y * y + 0.1 * x * y + 0.2 * Math.sqrt(Math.abs(x));
+    r += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3;
+    r += (20 * Math.sin(y * Math.PI) + 40 * Math.sin(y / 3 * Math.PI)) * 2 / 3;
+    r += (160 * Math.sin(y / 12 * Math.PI) + 320 * Math.sin(y * Math.PI / 30)) * 2 / 3;
+    return r;
+  };
+  const dlng = (x, y) => {
+    let r = 300 + x + 2 * y + 0.1 * x * x + 0.1 * x * y + 0.1 * Math.sqrt(Math.abs(x));
+    r += (20 * Math.sin(6 * x * Math.PI) + 20 * Math.sin(2 * x * Math.PI)) * 2 / 3;
+    r += (20 * Math.sin(x * Math.PI) + 40 * Math.sin(x / 3 * Math.PI)) * 2 / 3;
+    r += (150 * Math.sin(x / 12 * Math.PI) + 300 * Math.sin(x / 30 * Math.PI)) * 2 / 3;
+    return r;
+  };
+  let dLat = dlat(lng - 105.0, lat - 35.0), dLng = dlng(lng - 105.0, lat - 35.0);
+  const rad = lat / 180.0 * Math.PI;
+  const magic = 1 - ee * Math.sin(rad) * Math.sin(rad);
+  const sq = Math.sqrt(magic);
+  dLat = dLat * 180.0 / ((a * (1 - ee) / (magic * sq)) * Math.PI);
+  dLng = dLng * 180.0 / ((a / sq) * Math.cos(rad) * Math.PI);
+  return { lat: lat + dLat, lng: lng + dLng };
+}
+
+/** 双击地图：选名字 → 落点 */
+function onSatDblClick(e) {
   const lat = Number(e.latlng.lat.toFixed(6)), lng = Number(e.latlng.lng.toFixed(6));
-  if (satState.addMode) {
-    const draft = satState.newPoint || { label: "新点位", category: "service", color: "" };
-    const id = "spot-" + Date.now().toString(36);
-    NODES.push({ id, label: draft.label, category: draft.category, desc: draft.note || "", color: draft.color || "", lat: 0, lng: 0 });
-    satState.coords[id] = { lat, lng };
-    renderSatMarkers();
-    toast("已添加「" + draft.label + "」。继续点下一个，或点「添加点位」导出。");
-    return;
+  const pool = satState.pool || [];
+  const usedIds = new Set(calib.map((c) => c.id));
+  const rest = pool.filter((p) => !usedIds.has(p.id));
+  if (!pool.length) { toast("点位名单还没加载好，稍等一下再双击"); return; }
+  if (!rest.length) { toast("8 个名字都用完了；要重来先点左下角「清空」"); return; }
+
+  const body = el("div", "stack stack--sm");
+  body.appendChild(el("p", "small muted",
+    "在这个位置放哪个点位？（名字沿用现有这 8 个，放过的就不再出现）"));
+  const grid = el("div", "chip-row");
+  rest.forEach((p) => {
+    const b = el("button", "chip", p.short || p.label);
+    b.type = "button";
+    b.title = p.label;
+    b.addEventListener("click", () => {
+      // 防重：同名点位已存在就"移动它"，不要加出两个同名点
+      const exist = calib.find((c) => c.id === p.id);
+      if (exist) { exist.lat = lat; exist.lng = lng; }
+      else calib.push({ id: p.id, label: p.label, short: p.short || "", pano_scene: p.pano_scene || null, lat, lng });
+      calibSave();
+      sheet.close();
+      const left = pool.length - calib.length;
+      toast("已放下「" + p.label + "」，还剩 " + left + " 个名字");
+    });
+    grid.appendChild(b);
+  });
+  body.appendChild(grid);
+  const tip = el("p", "small muted", "放下后可以直接**拖动**微调；点它可复制坐标或删除。");
+  body.appendChild(tip);
+  const sheet = createSheet({ title: "在这里放一个点位", iconName: "map-pin", body });
+  sheet.open();
+}
+
+/** 画校准点（可拖动）——已放过的名字，原来的旧点自动隐藏 */
+function renderCalibMarkers() {
+  if (!satState.map) return;
+  const byId = calibByName();
+  for (const c of calib) {
+    const icon = L.divIcon({
+      className: "sat-marker sat-marker--draft side-right",
+      html: '<span class="sat-marker__dot"></span><span class="sat-marker__label">' +
+            esc(c.short || c.label) + '</span>',
+      iconSize: [18, 18], iconAnchor: [9, 9],
+    });
+    const m = L.marker([c.lat, c.lng], { icon, draggable: true, title: c.label + "（拖动校准）" })
+      .addTo(satState.group);
+    m.on("dragstart", () => m.getElement()?.classList.add("is-dragging"));
+    m.on("dragend", () => {
+      const p = m.getLatLng();
+      c.lat = Number(p.lat.toFixed(6)); c.lng = Number(p.lng.toFixed(6));
+      calibSave();
+      toast("已更新「" + c.label + "」的位置");
+    });
+    m.bindPopup(
+      '<div class="sat-pop"><b>' + esc(c.label) + '</b>' +
+      '<p class="small muted">' + c.lat.toFixed(6) + ", " + c.lng.toFixed(6) + '</p>' +
+      '<p class="small muted">拖动这个点即可微调</p>' +
+      '<button class="btn btn--sm" data-copy-calib="' + c.id + '" type="button">复制坐标</button> ' +
+      '<button class="btn btn--sm btn--ghost" data-del-calib="' + c.id + '" type="button">删除</button></div>');
   }
-  if (satState.pendingId) {
-    satState.coords[satState.pendingId] = { lat, lng };
-    renderSatMarkers();
-    const n = NODES.find((x) => x.id === satState.pendingId);
-    toast("已给「" + (n ? n.label : satState.pendingId) + "」记下卫星坐标");
-  }
+  // 弹层里的两个按钮（Leaflet 弹层是动态生成，用事件委托）
+  satState.map.off("popupopen").on("popupopen", (ev) => {
+    const root = ev.popup.getElement();
+    root?.querySelector("[data-copy-calib]")?.addEventListener("click", async () => {
+      const c = calib.find((x) => x.id === root.querySelector("[data-copy-calib]").dataset.copyCalib);
+      if (!c) return;
+      const g = wgs2gcj(c.lng, c.lat);
+      const txt = c.lat.toFixed(6) + "," + c.lng.toFixed(6) + "  (GCJ " + g.lat.toFixed(6) + "," + g.lng.toFixed(6) + ")";
+      (await copyText(txt)) ? toast("坐标已复制：" + txt) : toast(txt);
+    });
+    root?.querySelector("[data-del-calib]")?.addEventListener("click", () => {
+      const id = root.querySelector("[data-del-calib]").dataset.delCalib;
+      calib = calib.filter((x) => x.id !== id);
+      satState.map.closePopup();
+      calibSave();
+      toast("已删掉这个校准点（名字回到可用列表）");
+    });
+  });
+}
+
+/** 导出 JSON（给站长/我固化） */
+function exportCalib() {
+  const total = (satState.pool || []).length || 8;
+  const points = calib.map((c) => {
+    const g = wgs2gcj(c.lng, c.lat);
+    return {
+      id: c.id, label: c.label, short: c.short || null,
+      category: (satState.pool.find((p) => p.id === c.id) || {}).category || "service",
+      note: c.label + "（实拍 360°）", color: "#2E8B76",
+      pano_scene: c.pano_scene, lat: c.lat, lng: c.lng,
+      gcj02: { lat: Number(g.lat.toFixed(6)), lng: Number(g.lng.toFixed(6)) },
+    };
+  });
+  const json = JSON.stringify({
+    _comment: "由 /welcome 的定位校准导出的点位坐标（WGS84 供本站卫星图层用；gcj02 供高德对照）",
+    _progress: calib.length + "/" + total,
+    points,
+  }, null, 2);
+  const body = el("div", "stack stack--sm");
+  body.appendChild(el("p", "small muted",
+    "已校准 " + calib.length + "/" + total + "。把下面这段发给管理员即可固化（也自动复制了一份到剪贴板）。"));
+  const pre = el("pre", "code code--scroll");
+  pre.textContent = json;
+  body.appendChild(pre);
+  const sheet = createSheet({ title: "导出校准结果", iconName: "export", body,
+    footer: (() => {
+      const f = el("div", "stack stack--sm");
+      const b = el("button", "btn", "复制 JSON");
+      b.type = "button";
+      b.addEventListener("click", async () => {
+        (await copyText(json)) ? toast("JSON 已复制") : toast("复制失败，请手动选中复制");
+      });
+      f.appendChild(b);
+      return f;
+    })() });
+  sheet.open();
+  copyText(json).catch(() => {});
 }
 
 /** 自定义点位：存在 localStorage，刷新/切视图都不丢；可删、可导出（导出后我固化） */
@@ -1035,6 +1214,11 @@ function removeSpot(id) {
 
   // ⭐ 卫星图点位坐标（「添加点位」导出后覆盖 static/map/sat-coords.json 即生效，无需改代码）
   const satCo = await getJson("/map/sat-coords.json", null);
+  // ⭐ 点位名字池：双击加点时"从没用过的名字里挑"，加完一个少一个
+  satState.pool = (satCo && Array.isArray(satCo.points) ? satCo.points : []).map((p) => ({
+    id: p.id, label: p.label, short: p.short || null,
+    category: p.category || "service", pano_scene: p.pano_scene || null,
+  }));
   if (satCo && Array.isArray(satCo.points)) {
     for (const p of satCo.points) {
       if (p.id && p.lat && p.lng) satState.coords[p.id] = { lat: Number(p.lat), lng: Number(p.lng) };
@@ -1076,6 +1260,21 @@ function removeSpot(id) {
   const panoCount = NODES.filter((n) => Boolean(sceneOf(n))).length;
   $("#source").textContent = (BG.attribution || "底图为示意截图") +
     " · 底图只做缩放浏览，点位标注已移到「3D 街景」（卫星底图）上，共 " + panoCount + " 处实景";
+
+  // ⭐ 点位校准工具条
+  $("#calibExport")?.addEventListener("click", exportCalib);
+  $("#calibUndo")?.addEventListener("click", () => {
+    if (!calib.length) { toast("还没有校准点"); return; }
+    const last = calib.pop();
+    calibSave();
+    toast("已撤销「" + last.label + "」，名字回到可用列表");
+  });
+  $("#calibClear")?.addEventListener("click", () => {
+    if (!calib.length) { toast("还没有校准点"); return; }
+    calib = []; calibSave();
+    toast("已清空校准点（8 个名字都可用了）");
+  });
+  calibSyncUI();
 
   setupCalibrate();                       // ?calibrate=1 时才生效（坐标由人对着底图点出来，不猜）
 
