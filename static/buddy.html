@@ -349,7 +349,7 @@
 <div class="buddy-rail__backdrop" id="railBackdrop" aria-hidden="true"></div>
 
 <footer class="site-footer">
-  <p>北民大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>北民大小助手 · 赛道一 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
   <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
   <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
@@ -504,7 +504,8 @@ const wallByAnon = new Map();
 let console3 = { posts: [], intents: [], mutual: [] };
 let threads = [];
 let view = "wall";                 // publish | wall | agreed | chat
-let wallSeg = "all";               // all | mine | posts | intents | mutual
+let wallSeg = "all";               // all | posts | intents | mutual
+let aggExpanded = false;          // 聚合列表是否展开（默认只显示最近几条）
 let chatNow = null;                // { thread, lastId, timer, seen }
 let seenMap = readJson(LS_SEEN, {});
 
@@ -684,7 +685,19 @@ function myIntents() {
 function myMutual() {
   const out = [];
   const add = (row) => { if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token)) out.push(row); };
-  for (const m of console3.mutual || []) add({ ...m, source: "server" });
+  // ① 我是申请方：接口 /mine 的 mutual（按 seeker_id 查）
+  for (const m of console3.mutual || []) add({ ...m, source: "server", role: "seeker" });
+  // ② 我是帖主：我发布的帖里，某条 consents 已经 mutual（按 author 侧看，接口不会放进 mutual）
+  for (const p of console3.posts || []) {
+    for (const c of p.consents || []) {
+      if (c.status !== "mutual") continue;
+      add({
+        anon_token: p.anon_token, post_id: p.post_id, kind: p.kind,
+        text: (p.profile && p.profile.wanted) || "", status: "mutual",
+        peer: c.seeker, source: "server", role: "author",
+      });
+    }
+  }
   for (const it of myIntents()) if (it.status === "accepted" || it.reveal_status === "mutual") add(it);
   for (const anon of local.accepted) {
     const post = wallByAnon.get(anon) || local.posts.find((p) => p.anon_token === anon);
@@ -865,10 +878,11 @@ function mineSegBar() {
     b.dataset.seg = s.k;
     b.addEventListener("click", () => {
       wallSeg = s.k;
+      aggExpanded = false;
       for (const other of seg.querySelectorAll(".buddy-seg__btn")) {
         other.setAttribute("aria-pressed", String(other === b));
       }
-      renderWallSeg();   // ⭐ 只重绘列表：段栏本身不重建、不消失
+      renderWallSeg();   // 只重绘列表：段栏本身不重建、不消失
     });
     seg.appendChild(b);
   }
@@ -909,10 +923,14 @@ function renderWallSeg(listHost) {
         : { title: "还没有表达过意愿", hint: "在「全部需求」里找一条合适的，点「表达意愿」留句话。", actionText: "看全部需求", onAction: () => { wallSeg = "all"; renderWall(); } });
       return;
     }
-    const shown = rows.slice(0, MAX_AGG_ROWS);
+    const shown = aggExpanded ? rows : rows.slice(0, MAX_AGG_ROWS);
     for (const r of shown) box.appendChild(mineRow(r, wallSeg === "mutual" ? "mutual" : "intent"));
-    if (rows.length > shown.length) {
-      box.appendChild(el("p", "buddy-note", "上面是最新的 " + shown.length + " 条（共 " + rows.length + " 条）：演示数据保持精简，全部记录仍可在「已同意」里查看。"));
+    if (rows.length > MAX_AGG_ROWS) {
+      const more = iconBtn("btn--ghost btn--sm", aggExpanded ? "caret-up" : "chevron-down",
+        aggExpanded ? " 只看最近 " + MAX_AGG_ROWS + " 条" : " 展开全部 " + rows.length + " 条");
+      more.addEventListener("click", () => { aggExpanded = !aggExpanded; renderWallSeg(); });
+      box.appendChild(more);
+      box.appendChild(el("p", "buddy-note", "默认只显示最近 " + MAX_AGG_ROWS + " 条，保持列表精简；需要时点上面的按钮展开。"));
     }
     return;
   }

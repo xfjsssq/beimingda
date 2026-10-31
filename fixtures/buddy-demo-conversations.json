@@ -94,9 +94,7 @@
           ]
         }
       ],
-      "accepted": [
-        "anon_4f7a2e9c5b31"
-      ]
+      "accepted": []
     }
   },
   "my": {
@@ -146,7 +144,7 @@
             "from_anon": "anon_7f2c5a9e3b64",
             "text": "周六下午两点到四点我有空，拍子我有两把，你不用带",
             "at": "2026-10-28T09:40:00Z",
-            "status": "accepted",
+            "status": "replied",
             "replies": [
               {
                 "id": "demo-my-p2-r1",
@@ -176,18 +174,6 @@
         "status": "replied",
         "reply_text": "行，我拉个时间表，先说好我不玩恐怖本",
         "reply_at": "2026-10-29T18:40:00Z"
-      },
-      {
-        "anon_token": "anon_2f6c9e3d8b54",
-        "kind": "sport",
-        "text": "我早上七点半就在操场跑步，跑完一起去球馆也行",
-        "at": "2026-10-30T00:30:00Z",
-        "status": "accepted",
-        "reply_text": "太好了，那我按你的时间来，明早七点半操场见",
-        "reply_at": "2026-10-30T00:44:00Z",
-        "reveal_status": "mutual",
-        "chat_ready": true,
-        "thread_id": "th_demo_2f6c9e3d8b54"
       }
     ],
     "mutual": [
