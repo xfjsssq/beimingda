@@ -132,8 +132,8 @@ test("/buddy：「我的申请」聚合三块：我发布的帖 / 我表达的�
   assert.match(MODULE, /node\.reply_text/, "② 展示对方回复内容");
   assert.match(MODULE, /对方已回复/, "② 展示对方已回复状态");
   assert.match(MODULE, /已互相同意/, "②/③ 展示已被接受状态");
-  assert.match(MODULE, /node\.contact_code/, "③ 互相可见时展示中转码");
-  assert.match(MODULE, /中转码（双方都同意才会下发）/, "并把口径写清楚");
+  assert.match(MODULE, /(chat_ready|thread_id)/, "③ 互相可见后应能直接开私聊（chat_ready / thread_id）");
+  assert.ok(!/中转码/.test(MODULE), "⛔ 页面上不该再出现「中转码」：双方同意后直接站内私聊");
 });
 
 /* ============================================================ 5) 详细度由用户选 */
@@ -184,7 +184,7 @@ test("数据：演示留言/回复是服务端数据文件，页面只读、⛔ 
   assert.ok(intents.length >= 2, "「我表达的意愿」演示数据至少 2 条");
   assert.ok(intents.filter((i) => i.reply_text).length >= 2, "至少 2 条意愿收到对方回复");
   const mutual = (DEMO.my && DEMO.my.mutual) || [];
-  assert.ok(mutual.length >= 1 && mutual[0].contact_code, "至少 1 对已互相同意（带中转码）");
+  assert.ok(mutual.length >= 1 && (mutual[0].chat_ready || mutual[0].thread_id), "至少 1 对已互相同意（可开私聊）");
   assert.ok(((DEMO.my && DEMO.my.posts) || []).length >= 1, "演示里要有「我发布的帖」");
 
   const anons = new Set(POSTS_FIXTURE.posts.map((p) => p.anon_token));
@@ -216,13 +216,13 @@ test("/buddy：令牌 UI 全部移除，凭据只走运行时链路", () => {
 
 /* ============================================================ 8) 红线 + 资源 + 样式纪律 */
 
-test("/buddy：红线 —— 不显示身份字段、未互相可见不得出现 contact_code、无上传控件", () => {
+test("/buddy：红线 —— 不显示身份字段、未互相可见不得给聊天入口、无上传控件", () => {
   for (const bad of ["author_id", "user_id", "院系", "班级", "学号", "宿舍号", "真实姓名", "手机号", "邮箱"]) {
     assert.ok(!MODULE.includes(bad), `渲染逻辑里不得出现 ${bad}`);
   }
-  assert.match(MODULE, /node\.contact_code/, "我的申请里的中转码");
+  assert.match(MODULE, /(chat_ready|thread_id)/, "我的申请里也要能开私聊");
   assert.match(MODULE, /node\.reveal_status === "mutual"/, "必须有 mutual 判据");
-  assert.match(MODULE, /m\.contact_code && !celebrated\.has/, "成功视觉只挑带中转码的（即互相可见的）");
+  assert.match(MODULE, /(chat_ready|revealed)/, "成功视觉只挑双方都同意的");
   assert.doesNotMatch(MODULE, /对方已同意|对方同意了/, "⛔ 不得暗示对方是否已同意");
   assert.equal((PAGE.match(/type="file"/g) || []).length, 0, "本页不许有上传控件（frontend.md §7）");
   assert.doesNotMatch(MODULE, /photo_path/, "页面不传照片参数");

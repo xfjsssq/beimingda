@@ -1,4 +1,4 @@
--- 北名大小助手 · 数据库表结构（冻版）
+-- 北民大小助手 · 数据库表结构（冻版）
 -- 来源：contracts/core.md §2 —— ⛔ 字段名不得改，改这里必须先提 PR 到 main 并在群里说一声。
 -- ⛔ 全站不允许出现可存储真实身份信息的字段（无姓名 / 学号 / 手机号 / 身份证 / 校园网账号）。
 
@@ -8,7 +8,9 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   handle        TEXT NOT NULL UNIQUE,
-  contact_code  TEXT,
+  contact_code  TEXT,                            -- 历史遗留字段（"中转码"已废弃，不再对外输出）
+  pass_hash     TEXT,                            -- scrypt 哈希（⛔ 绝不存明文；匿名用户为空）
+  pass_salt     TEXT,
   created_at    INTEGER NOT NULL,
   demo          INTEGER NOT NULL DEFAULT 0
 );
@@ -138,3 +140,29 @@ CREATE TABLE IF NOT EXISTS sessions (
   last_seen_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- 私聊（2026-10-31）：**双方都同意之后**才有会话；有服务器直连，不再用"中转码"那套
+--   kind='task'  → ref_id 是 tasks.id（发布者 ↔ 接单者，matches.state='accepted' 才建）
+--   kind='buddy' → ref_id 是 buddy_posts.id（发布者 ↔ 搭子，buddy_consents.revealed=1 才建）
+--   ⛔ 表里没有任何联系方式字段：聊天就在站内，不需要交换手机号/微信号
+CREATE TABLE IF NOT EXISTS threads (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  ref_id     TEXT NOT NULL,
+  a_uid      TEXT NOT NULL REFERENCES users(id),
+  b_uid      TEXT NOT NULL REFERENCES users(id),
+  created_at INTEGER NOT NULL,
+  UNIQUE(kind, ref_id, a_uid, b_uid)
+);
+CREATE INDEX IF NOT EXISTS idx_threads_a ON threads(a_uid);
+CREATE INDEX IF NOT EXISTS idx_threads_b ON threads(b_uid);
+
+CREATE TABLE IF NOT EXISTS thread_messages (
+  id         TEXT PRIMARY KEY,
+  thread_id  TEXT NOT NULL REFERENCES threads(id),
+  from_uid   TEXT NOT NULL REFERENCES users(id),
+  body       TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'text',      -- text / emoji
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_thread_msg ON thread_messages(thread_id, created_at);

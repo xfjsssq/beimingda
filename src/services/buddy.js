@@ -11,7 +11,7 @@
  *
  *   ⛔ 三条红线（评审对照用）
  *     1. anon_token 随机生成，**不得由 user_id 派生**
- *     2. 未双选成功不返回 contact_code（且 revealed=0 时该键根本不出现在返回对象里）
+ *     2. 未双选成功不返回 chat_ready（⛔ 也不再有"中转码"：双方同意后直接站内私聊）
  *     3. 结果里不出现院系全名 / 班级 / 学号 / 宿舍号 / 真实姓名
  *        —— 对外字段一律走白名单投影（safePost / safeCandidate）
  */
@@ -294,8 +294,10 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
         parts: result.parts,
       };
       if (status === "mutual") {
-        // ⛔ 只有双方都同意（revealed=1）才附带 contact_code
-        candidate.contact_code = ensureContactCode(findUserById(row.author_id));
+        // ⛔ 只有双方都同意（revealed=1）才附带 chat_ready / thread_id
+        // ⛔ 不再输出中转码：双方同意后可聊（candidate 里改为 chat_ready / thread_id，见下）
+      candidate.chat_ready = true;
+    candidate.thread_id = threadIdForBuddy(row.id, seeker?.id) || null;
       }
       if (seeker) cacheSet(pairScoreCache, `${row.id}:${seeker.id}`, result.score);
       return candidate;
@@ -334,6 +336,19 @@ export function castConsent({ post_id, seeker_handle, agree } = {}) {
   return seekerVote(post, actor, author, handle, agree);
 }
 
+/**
+ * 统一出口：状态机结果 + （双方同意时）站内私聊会话
+ *   ⭐ 会话在这里建，MCP 与 HTTP 两条路都会建（之前在 HTTP 路由里建，MCP 就走不到）
+ *   ⛔ 不再返回任何"中转码"：双方同意 → 直接给 thread_id 开聊
+ */
+function responseWithChat(post, state, uid) {
+  const out = toResponse(state);
+  if (out.chat_ready) {
+    try { out.thread_id = threadIdForBuddy(post.id, uid); } catch { out.thread_id = null; }
+  }
+  return out;
+}
+
 /** 寻找方表决：落 buddy_consents 一行（含拒绝 —— 拒绝即终止） */
 function seekerVote(post, actor, author, handle, agree) {
   const db = getDb();
@@ -369,7 +384,7 @@ function seekerVote(post, actor, author, handle, agree) {
   }
 
   // 寻找方单独同意时 author_ok 保持 0 => revealed 必为 0 => 不返回 contact_code
-  return toResponse(next, next.revealed === 1 ? ensureContactCode(author) : null);
+  return responseWithChat(post, next, actor.id);   // 双方同意 → 直接给私聊会话
 }
 
 /** 进程内：作者对某条意愿只能表态一次（同意态另有 author_ok=1 的持久化判据） */
@@ -405,7 +420,7 @@ function authorVote(post, author, agree) {
   authorVoted.add(voteKey);
 
   const seekerUser = findUserById(target.seeker_id);
-  return toResponse(next, next.revealed === 1 ? ensureContactCode(seekerUser) : null);
+  return responseWithChat(post, next, author.id);  // 双方同意 → 直接给私聊会话
 }
 
 /** 我发出的意愿（页面区块四）：⛔ 不暴露对方的个人表决位，只给 pending / mutual */

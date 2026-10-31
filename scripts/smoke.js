@@ -106,6 +106,8 @@ try {
     "scrub_audit",
     "sessions",
     "tasks",
+    "thread_messages",
+    "threads",
     "users",
   ].sort();
   check(

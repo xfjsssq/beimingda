@@ -77,7 +77,8 @@ export function createSession({ nickname } = {}) {
   return {
     token, uid: user.id, handle: user.handle, nickname: user.handle,
     created_at: toIso(user.created_at),
-    contact_code: user.contact_code,
+    has_password: Boolean(user.pass_hash),
+    // ⛔ 不再返回 contact_code（"中转码"已废弃：双方同意后直接站内聊天）
   };
 }
 
@@ -95,7 +96,7 @@ export function sessionFromToken(token) {
     if (!row) return null;
     db.prepare("UPDATE sessions SET last_seen_at = ? WHERE token_hash = ?").run(nowSec(), hash);
     return {
-      uid: row.user_id, handle: row.handle, contact_code: row.contact_code,
+      uid: row.user_id, handle: row.handle,
       created_at: toIso(row.created_at), last_seen_at: toIso(row.last_seen_at),
     };
   } catch {
@@ -127,7 +128,7 @@ export function meView(uid) {
   return {
     uid: user.id,
     nickname: user.handle,
-    contact_code: user.contact_code,
+    has_password: Boolean(user.pass_hash),
     demo: Boolean(user.demo),
     created_at: toIso(user.created_at),
     stats: {
@@ -140,4 +141,138 @@ export function meView(uid) {
   };
 }
 
-export default { createSession, sessionFromToken, renameSessionUser, meView, validateNickname, ensureSessionUser };
+/* ============================================================================
+   账号密码（2026-10-31）
+     · 密码只存 **scrypt 加盐哈希**（Node 内置，不引依赖）；库里没有明文、也没有可逆材料
+     · 三种入口共用一套逻辑：
+         匿名进（不带密码，行为不变） / 注册（昵称不存在→建号） /
+         认领（昵称是匿名用户、还没设密码 → 首次设密码即认领） / 登录（已有密码 → 校验）
+     · 连续失败限频：同一昵称 5 次/5 分钟 → 429
+     · 依然不收集姓名/学号/手机号：账号只有"昵称 + 密码哈希"
+   ========================================================================== */
+const SCRYPT = { N: 16384, r: 8, p: 1 };
+const PW_MIN = 6;
+const PW_MAX = 64;
+const loginFails = new Map();          // nickname -> { count, until }
+
+/** 密码规则：6~64 位，不能全是空白；不强制复杂度（校园场景别为难用户），但不能太短 */
+export function validatePassword(raw) {
+  const s = String(raw ?? "");
+  if (!s.trim()) reject(CODES.SCHEMA_REJECTED, "密码不能为空");
+  if (s.length < PW_MIN || s.length > PW_MAX) reject(CODES.SCHEMA_REJECTED, `密码请控制在 ${PW_MIN}~${PW_MAX} 位`);
+  return s;
+}
+
+export function hashPassword(password, salt) {
+  const useSalt = salt || crypto.randomBytes(16).toString("hex");
+  const hash = crypto.scryptSync(String(password), useSalt, 64, SCRYPT).toString("hex");
+  return { salt: useSalt, hash };
+}
+
+export function verifyPassword(password, salt, hash) {
+  if (!salt || !hash) return false;
+  try {
+    const got = crypto.scryptSync(String(password), salt, 64, SCRYPT);
+    const want = Buffer.from(hash, "hex");
+    return got.length === want.length && crypto.timingSafeEqual(got, want);
+  } catch {
+    return false;
+  }
+}
+
+function throttled(nickname) {
+  const rec = loginFails.get(nickname);
+  if (!rec) return false;
+  if (rec.until && rec.until > Date.now()) return true;
+  loginFails.delete(nickname);
+  return false;
+}
+
+function noteFail(nickname) {
+  const rec = loginFails.get(nickname) || { count: 0, until: 0 };
+  rec.count += 1;
+  if (rec.count >= 5) rec.until = Date.now() + 5 * 60 * 1000;
+  loginFails.set(nickname, rec);
+}
+
+function clearFail(nickname) {
+  loginFails.delete(nickname);
+}
+
+function issueSession(user) {
+  const db = getDb();
+  const token = crypto.randomBytes(24).toString("hex");
+  db.prepare("INSERT INTO sessions(token_hash,user_id,created_at,last_seen_at) VALUES (?,?,?,?)")
+    .run(sha256(token), user.id, nowSec(), nowSec());
+  return { token, uid: user.id, handle: user.handle, nickname: user.handle,
+           has_password: Boolean(user.pass_hash), created_at: toIso(user.created_at) };
+}
+
+/**
+ * 注册 / 认领 / 登录 / 匿名，四合一。
+ *   不传密码 → 匿名开户（与原来完全一致）
+ *   传密码 + 昵称不存在 → 注册
+ *   传密码 + 昵称是匿名用户（没密码）→ 认领（设置密码）
+ *   传密码 + 昵称已有密码 → 登录校验（错 5 次/5 分钟 → 429）
+ */
+export function registerOrLogin({ nickname, password } = {}) {
+  const db = getDb();
+  if (!password) return createSession({ nickname });          // 匿名路径不变
+
+  const pw = validatePassword(password);
+  const name = nickname ? validateNickname(nickname) : "";
+  if (!name) reject(CODES.SCHEMA_REJECTED, "设置密码时必须同时给昵称");
+  if (throttled(name)) reject(CODES.QUOTA, "密码错误次数过多，请 5 分钟后再试");
+
+  const user = db.prepare("SELECT * FROM users WHERE handle = ?").get(name);
+  if (!user) {                                                // 注册
+    const created = ensureSessionUser(name);
+    const { salt, hash } = hashPassword(pw);
+    db.prepare("UPDATE users SET pass_hash = ?, pass_salt = ? WHERE id = ?").run(hash, salt, created.id);
+    return issueSession({ ...created, pass_hash: hash });
+  }
+  if (!user.pass_hash) {                                      // 认领匿名昵称
+    const { salt, hash } = hashPassword(pw);
+    db.prepare("UPDATE users SET pass_hash = ?, pass_salt = ? WHERE id = ?").run(hash, salt, user.id);
+    return issueSession({ ...user, pass_hash: hash });
+  }
+  if (!verifyPassword(pw, user.pass_salt, user.pass_hash)) {   // 登录失败
+    noteFail(name);
+    reject(CODES.SCHEMA_REJECTED, "昵称或密码不对");
+  }
+  clearFail(name);
+  return issueSession(user);
+}
+
+/** 显式登录：必须已注册（给"换设备找回"用，错误信息更明确） */
+export function loginWithPassword({ nickname, password } = {}) {
+  const db = getDb();
+  const name = validateNickname(nickname);
+  const pw = validatePassword(password);
+  if (throttled(name)) reject(CODES.QUOTA, "密码错误次数过多，请 5 分钟后再试");
+  const user = db.prepare("SELECT * FROM users WHERE handle = ?").get(name);
+  if (!user || !user.pass_hash) reject(CODES.NOT_FOUND, "这个昵称还没有设过密码（可以直接用昵称+新密码注册/认领）");
+  if (!verifyPassword(pw, user.pass_salt, user.pass_hash)) {
+    noteFail(name);
+    reject(CODES.SCHEMA_REJECTED, "昵称或密码不对");
+  }
+  clearFail(name);
+  return issueSession(user);
+}
+
+/** 改密码：已设过密码的要先给旧密码；没设过的（匿名用户）可直接设 */
+export function setPassword(uid, { password, old_password } = {}) {
+  const db = getDb();
+  const user = db.prepare("SELECT * FROM users WHERE id = ?").get(uid);
+  if (!user) reject(CODES.NOT_FOUND, "用户不存在");
+  const pw = validatePassword(password);
+  if (user.pass_hash && !verifyPassword(String(old_password ?? ""), user.pass_salt, user.pass_hash)) {
+    reject(CODES.SCHEMA_REJECTED, "旧密码不对");
+  }
+  const { salt, hash } = hashPassword(pw);
+  db.prepare("UPDATE users SET pass_hash = ?, pass_salt = ? WHERE id = ?").run(hash, salt, uid);
+  return { ...meView(uid), has_password: true };
+}
+
+export default { createSession, sessionFromToken, renameSessionUser, meView, validateNickname, ensureSessionUser,
+  registerOrLogin, loginWithPassword, setPassword, validatePassword, hashPassword, verifyPassword };

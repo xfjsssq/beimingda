@@ -1,5 +1,5 @@
 /* =============================================================================
-   北名大小助手 · 共用导航  static/js/nav.js
+   北民大小助手 · 共用导航  static/js/nav.js
    契约：contracts/frontend.md §1（冻版 6 页）、§7（6 页可访问、无 404）
 
    行为：
@@ -326,7 +326,7 @@ export function navHTML(activeId) {
         <button class="nav-handle" id="navHandle" type="button" aria-expanded="false" aria-controls="siteNav" aria-label="展开导航栏"><span class="icon icon--18" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/caret-up.svg)"></span></button>` +
     `<a class="brand" href="/">` +
     `<img class="brand__logo" src="/img/school-logo.png" alt="北方民族大学校徽" width="28" height="25" />` +
-    `<span class="brand__text">北名大小助手</span>` +
+    `<span class="brand__text">北民大小助手</span>` +
     `<span class="brand__tag">赛道 17</span>` +
     `</a>` +
     `<nav class="site-nav" aria-label="主导航">${PAGES.map((p) => linkHTML(p, activeId)).join("")}</nav>` +

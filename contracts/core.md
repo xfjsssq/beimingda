@@ -6,7 +6,7 @@
 |---|---|
 | 比赛 | 第一届"银移杯"校园 AI Agent 创新大赛 · **赛道 17 智慧校园 Agent 创意赛道** |
 | 队伍 | **啊对对**（TM202610160004，李天齐 / 曹津源） |
-| 项目名 | **北名大小助手**（名内禁止半角 `-`） |
+| 项目名 | **北民大小助手**（名内禁止半角 `-`） |
 | 站点 | `https://demo.knowingly.dpdns.org` |
 | **提交截止** | **2026-10-31 23:59:59** |
 
@@ -87,8 +87,8 @@ beimingda/
 │   │   ├── task.js  runner.js  buddy.js  schedule.js  map.js  scrub.js
 │   ├── mcp/
 │   │   ├── server.js             MCP Streamable HTTP 端点
-│   │   ├── tools.js              ★ 14 个工具 schema（additionalProperties:false）
-│   │   └── handlers.js           14 个工具处理器
+│   │   ├── tools.js              ★ 15 个工具 schema（additionalProperties:false）
+│   │   └── handlers.js           15 个工具处理器
 │   ├── api/
 │   │   └── routes.js             HTTP API 路由
 │   └── middleware/

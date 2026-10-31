@@ -303,6 +303,18 @@ export function matchForTask(taskId, opts = {}) {
   let pushed = 0;
   let skipped = 0;
 
+  // ⭐ 先把"本人主动表达意愿"的行放进候选：否则发布者在 /match 里看不到谁想接这一单
+  //    （source='interest' 由 POST /api/tasks/:id/interest 写入）
+  const interestRows = db.prepare(
+    `SELECT m.id AS match_id, m.state, m.score, m.created_at, r.id AS runner_id, u.handle AS runner_handle
+     FROM matches m
+     JOIN runners r ON r.id = m.runner_id
+     JOIN users u   ON u.id = r.user_id
+     WHERE m.task_id = ? AND m.source = 'interest' AND m.state IN ('pushed','accepted')
+     ORDER BY m.created_at ASC`,
+  ).all(row.id);
+  const inList = new Set();
+
   for (const [i, c] of candidates.entries()) {
     if (i >= topK) break;
     const entry = {
@@ -337,10 +349,31 @@ export function matchForTask(taskId, opts = {}) {
       }
     }
     matches.push(entry);
+    inList.add(c.runner_id);
   }
+
+  // ⭐ 追加意愿行（不在引擎候选里的）：reason 如实写"本人主动表达意愿"
+  let interestAdded = 0;
+  for (const it of interestRows) {
+    if (inList.has(it.runner_id)) continue;                 // 引擎已经推过同一个人 → 不重复
+    matches.push({
+      runner_id: it.runner_id,
+      runner_handle: it.runner_handle,
+      score: it.score,
+      reason: "本人主动表达意愿：主动点了「我想接这一单」（等发布者确认）",
+      pushed: true,
+      match_id: it.match_id,
+      state: it.state,
+      skip_reason: null,
+      source: "interest",
+    });
+    interestAdded += 1;
+  }
+  matches.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   return {
     task_id: row.id,
+    interest_added: interestAdded,
     task: toTaskView(row),
     threshold: PUSH_THRESHOLD,
     dedupe_window_seconds: DEDUPE_WINDOW_SECONDS,
@@ -754,7 +787,8 @@ function ensureRunnerForHandle(handle, taskRow) {
     user_id: userId,
     reachable: JSON.stringify([taskRow.from_building, taskRow.to_building]),
     floor: taskRow.reward_min ?? 0,
-    windows: JSON.stringify([{ from: taskRow.created_at, to: taskRow.deadline_ts }]),
+    // ⚠️ 键名必须是 start/end：引擎按 w.start / w.end 判时间重叠（写成 from/to 会被判完全不重叠）
+    windows: JSON.stringify([{ start: taskRow.created_at, end: taskRow.deadline_ts }]),
     created_at: nowSec(),
   });
   return db.prepare("SELECT * FROM runners WHERE id = ?").get(runnerId);

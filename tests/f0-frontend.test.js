@@ -427,7 +427,7 @@ test("HTTP：/ 与 /agent 及全部共用资源 200，JS 的 MIME 必须是 java
       const r = await fetch(base + p);
       assert.equal(r.status, 200, `${p} 应 200`);
       const html = await r.text();
-      assert.ok(html.includes("北名大小助手"), `${p} 内容不对`);
+      assert.ok(html.includes("北民大小助手"), `${p} 内容不对`);
     }
 
     const assets = ["/css/app.css", "/js/api.js", "/js/nav.js", "/js/demo.js", "/js/mcp-config.js", "/config.js"];

@@ -13,7 +13,10 @@
 import express from "express";
 import { ok } from "../util/envelope.js";
 import { requireSession } from "../middleware/session.js";
-import { createSession, meView, renameSessionUser, sessionFromToken } from "../services/session.js";
+import {
+  createSession, loginWithPassword, meView, registerOrLogin,
+  renameSessionUser, sessionFromToken, setPassword,
+} from "../services/session.js";
 
 export function createSessionRouter() {
   const router = express.Router();
@@ -29,7 +32,31 @@ export function createSessionRouter() {
           contact_code: existing.contact_code, resumed: true,
         }));
       }
+      // 带密码 = 注册 / 认领 / 登录（四合一）；不带密码 = 匿名开户（行为不变）
+      if (body.password) {
+        return res.json(ok(registerOrLogin({ nickname: body.nickname, password: body.password })));
+      }
       res.json(ok(createSession({ nickname: body.nickname })));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // 显式登录（换设备找回自己的单与聊天）
+  router.post("/session/login", (req, res, next) => {
+    try {
+      const b = req.body ?? {};
+      res.json(ok(loginWithPassword({ nickname: b.nickname, password: b.password })));
+    } catch (e) {
+      next(e);
+    }
+  });
+
+  // 改密码：已设过密码的要给旧密码；匿名用户可直接设
+  router.patch("/me/password", requireSession, (req, res, next) => {
+    try {
+      const b = req.body ?? {};
+      res.json(ok(setPassword(req.session.uid, { password: b.password, old_password: b.old_password })));
     } catch (e) {
       next(e);
     }

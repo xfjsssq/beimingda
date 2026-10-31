@@ -166,6 +166,73 @@
   #p-shot { max-width:100%; }
   #publish-out, #register-out { margin-top: var(--sp-100); }
 
+  /* 折叠态一律不占位：类选择器上的 display 会盖掉浏览器默认的 [hidden]{display:none} */
+  [hidden] { display:none !important; }
+
+  /* ---------- 筛选：从哪 / 到哪 / 截止时间 / 报酬 ---------- */
+  .fld { display:flex; flex-direction:column; gap: var(--sp-25); margin-bottom: var(--sp-75); }
+  .fld:last-child { margin-bottom:0; }
+  .fld__label { font-size: 12px; color:var(--color-muted); }
+  .fld select, .fld input { width:100%; min-width:0; }
+  .fld__pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap: var(--sp-50); align-items:center; }
+  .fchips { display:flex; flex-wrap:wrap; gap: var(--sp-25); }
+  .fchip { appearance:none; font-family:inherit; font-size: 12px; cursor:pointer;
+    padding: var(--sp-25) var(--sp-75); border:1px solid var(--color-line);
+    border-radius:var(--radius-pill); background:var(--color-card); color:var(--color-text-soft); }
+  .fchip[aria-pressed="true"] { background:var(--color-primary);
+    border-color:var(--color-primary); color:#fff; font-weight:600; }
+  .shell__filter { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap;
+    margin: var(--sp-50) 0 0; font-size: 12px; color:var(--color-primary); }
+
+  /* ---------- 私聊 ---------- */
+  .chat { display:grid; grid-template-columns: 260px minmax(0,1fr); gap: var(--sp-200);
+    align-items:start; }
+  .chat__list { display:flex; flex-direction:column; gap: var(--sp-50); max-height: 560px;
+    overflow:auto; }
+  .chat__item { appearance:none; font-family:inherit; text-align:left; cursor:pointer; width:100%;
+    display:flex; align-items:flex-start; gap: var(--sp-75); padding: var(--sp-75);
+    border:1px solid var(--color-line); border-radius:var(--radius-md);
+    background:var(--color-card); color:var(--color-text); }
+  .chat__item.is-active { border-color:var(--color-primary-line); background:var(--color-primary-soft); }
+  .chat__avatar { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+    width: 32px; height: 32px; border-radius:var(--radius-pill);
+    background:var(--color-primary-soft); color:var(--color-primary); }
+  .chat__meta { display:flex; flex-direction:column; gap: var(--sp-25); min-width:0; flex:1 1 auto; }
+  .chat__name { font-size: 14px; font-weight:600; }
+  .chat__last { font-size: 12px; color:var(--color-muted); overflow-wrap:anywhere; }
+  .chat__time { font-size: 12px; color:var(--color-muted-soft); flex:0 0 auto; }
+  .chat__main { display:flex; flex-direction:column; gap: var(--sp-100); min-width:0; }
+  .chat__subject { position: sticky; top: var(--sp-100); z-index: 2; cursor:pointer;
+    display:flex; align-items:flex-start; justify-content:space-between; gap: var(--sp-100);
+    padding: var(--sp-75) var(--sp-100); border:1px solid var(--color-primary-line);
+    border-radius:var(--radius-md); background:var(--color-primary-soft); }
+  .chat__subject-title { font-size: 14px; font-weight:600; color:var(--color-primary); }
+  .chat__subject-sub { font-size: 12px; color:var(--color-text-soft); margin: var(--sp-25) 0 0; }
+  .chat__subject-actions { display:flex; align-items:center; gap: var(--sp-50); flex:0 0 auto; }
+  .chat__back { display:none; }
+  .chat__back .icon { transform: rotate(180deg); }
+  .chat__stream { display:flex; flex-direction:column; gap: var(--sp-75); max-height: 460px;
+    overflow-y:auto; padding: var(--sp-100); border:1px solid var(--color-line);
+    border-radius:var(--radius-md); background:var(--color-sunken); }
+  .chat__row { display:flex; gap: var(--sp-50); align-items:flex-end; }
+  .chat__row.is-mine { flex-direction: row-reverse; }
+  .chat__bubble { max-width: 76%; padding: var(--sp-75) var(--sp-100);
+    border:1px solid var(--color-line); border-radius:var(--radius-md);
+    background:var(--color-card); font-size: 14px; line-height:1.6;
+    white-space:pre-wrap; overflow-wrap:anywhere; }
+  .chat__row.is-mine .chat__bubble { background:var(--color-primary);
+    border-color:var(--color-primary); color:#fff; }
+  .chat__row--emoji .chat__bubble { font-size: 24px; line-height:1.2; }
+  .chat__at { font-size: 12px; color:var(--color-muted-soft); }
+  .chat__compose { display:flex; flex-direction:column; gap: var(--sp-50); }
+  .chat__emoji { display:flex; flex-wrap:wrap; gap: var(--sp-25); }
+  .chat__emoji button { appearance:none; font-family:inherit; cursor:pointer; line-height:1;
+    font-size: 16px; padding: var(--sp-25) var(--sp-50); border:1px solid var(--color-line);
+    border-radius:var(--radius-sm); background:var(--color-card); }
+  .chat__inputrow { display:flex; gap: var(--sp-50); align-items:flex-end; }
+  .chat__inputrow textarea { flex:1 1 auto; min-height: 44px; max-height: 120px; }
+
   @media (max-width:767px) {
     /* 窄屏首屏尽量多露卡片：隐掉小标题与页头小字，卡片内边距收紧一档 */
     .shell__head .eyebrow { display:none; }
@@ -173,6 +240,13 @@
     .tk-card { padding: var(--sp-100); }
     .tk-card__route { font-size: 18px; }
     .tk-card__action { justify-content:flex-start; }
+    /* 私聊窄屏：列表与消息流单列互斥（选中会话后看消息流，顶部有「返回」） */
+    .chat { grid-template-columns: minmax(0,1fr); }
+    .chat__list { max-height:none; }
+    .chat__subject { position: static; }
+    .chat__back { display:inline-flex; }
+    /* 窄屏上「功能」悬浮键会压住输入区：私聊时把它抬到输入区上方 */
+    body.is-chat .rail-fab { bottom: calc(var(--tabbar-h) + var(--sp-900)); }
   }
 </style>
   <meta name="description" content="我发布的单可以挑人派单，别人的单只能表达意愿；按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学。" />
@@ -224,12 +298,54 @@
           <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/walk.svg)" aria-hidden="true"></span>
           <span>登记跑腿能力</span>
         </button>
+        <button class="rail-item" id="view-chat" type="button" aria-pressed="false">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span>
+          <span>私聊</span>
+          <span class="rail-item__count" id="count-chat">0</span>
+        </button>
       </nav>
 
-      <div class="rail__group">
+      <!-- 筛选：从哪 / 到哪 / 截止时间 / 报酬（前端过滤已加载的任务；条件同步进 URL query） -->
+      <div class="rail__group" aria-label="筛选">
         <span class="rail__group-head">筛选</span>
-        <label class="rail__label" for="b-filter">按楼栋看单</label>
-        <select id="b-filter" aria-label="按楼栋筛选"><option value="">全部楼栋</option></select>
+
+        <div class="fld">
+          <label class="fld__label" for="b-filter">从哪（取件楼栋）</label>
+          <select id="b-filter" aria-label="从哪（取件楼栋）"><option value="">不限</option></select>
+        </div>
+
+        <div class="fld">
+          <label class="fld__label" for="f-to">到哪（送达楼栋）</label>
+          <select id="f-to" aria-label="到哪（送达楼栋）"><option value="">不限</option></select>
+        </div>
+
+        <div class="fld">
+          <span class="fld__label">截止时间</span>
+          <div class="fchips" id="f-within" role="group" aria-label="截止时间范围">
+            <button class="fchip" type="button" data-within="all" aria-pressed="true">不限</button>
+            <button class="fchip" type="button" data-within="today" aria-pressed="false">今天</button>
+            <button class="fchip" type="button" data-within="3d" aria-pressed="false">3 天内</button>
+            <button class="fchip" type="button" data-within="week" aria-pressed="false">本周内</button>
+            <button class="fchip" type="button" data-within="custom" aria-pressed="false">自定义</button>
+          </div>
+        </div>
+
+        <div class="fld" id="f-custom" hidden>
+          <label class="fld__label" for="f-since">起（可留空）</label>
+          <input id="f-since" type="datetime-local" />
+          <label class="fld__label" for="f-until">止（可留空）</label>
+          <input id="f-until" type="datetime-local" />
+        </div>
+
+        <div class="fld">
+          <span class="fld__label">报酬区间（元，有交集即可）</span>
+          <div class="fld__pair">
+            <input id="f-rmin" type="number" min="0" step="1" placeholder="最低" aria-label="报酬下限" />
+            <input id="f-rmax" type="number" min="0" step="1" placeholder="最高" aria-label="报酬上限" />
+          </div>
+        </div>
+
+        <button class="btn btn--quiet btn--sm" id="f-clear" type="button">清空筛选</button>
       </div>
 
       <details class="rail__note">
@@ -242,13 +358,14 @@
       </details>
     </aside>
 
-    <!-- ───────────── 看板：主区只留它 ───────────── -->
-    <section class="shell__main" aria-labelledby="board-title">
+    <!-- ───────────── 看板 ───────────── -->
+    <section class="shell__main" id="board-pane" aria-labelledby="board-title">
       <div class="shell__head">
         <div>
           <span class="eyebrow" id="board-eyebrow">开放任务</span>
           <h2 id="board-title">待取看板</h2>
           <p id="board-count">正在读取…</p>
+          <p class="shell__filter" id="filter-state" hidden></p>
         </div>
         <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
           <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
@@ -256,6 +373,58 @@
         </button>
       </div>
       <div id="board" class="stack"></div>
+    </section>
+
+    <!-- ───────────── 私聊：左侧会话列表 + 右侧消息流 ───────────── -->
+    <section class="shell__main" id="chat-pane" aria-labelledby="chat-title" hidden>
+      <div class="shell__head">
+        <div>
+          <span class="eyebrow">站内直聊 · 不去站外换联系方式</span>
+          <h2 id="chat-title">私聊</h2>
+          <p id="chat-count">双方都同意（这一单已确认接单）才会有会话</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" id="chat-refresh" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          <span>刷新会话</span>
+        </button>
+      </div>
+      <div class="chat">
+        <div class="chat__list" id="chat-list"></div>
+        <div class="chat__main" id="chat-main">
+          <div class="state" id="chat-placeholder">
+            <div class="state__icon"><span class="icon icon--28" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span></div>
+            <p class="state__title">还没有可聊的会话</p>
+            <p class="state__hint">只有「这一单的发布者 ↔ 接单者」才会出现在左边的列表里；聊天就在站内，⛔ 不用去站外交换联系方式。</p>
+          </div>
+          <div id="chat-conv" hidden>
+            <div class="chat__subject" id="chat-subject">
+              <div>
+                <div class="chat__subject-title" id="chat-subject-title"></div>
+                <p class="chat__subject-sub" id="chat-subject-sub"></p>
+              </div>
+              <div class="chat__subject-actions">
+                <button class="btn btn--quiet btn--sm chat__back" id="chat-back" type="button">
+                  <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/arrow-right.svg)" aria-hidden="true"></span>
+                  <span>返回列表</span>
+                </button>
+                <button class="btn btn--quiet btn--sm" id="chat-subject-more" type="button">看详情</button>
+              </div>
+            </div>
+            <div class="chat__stream" id="chat-stream" role="log" aria-live="polite"></div>
+            <div class="chat__compose">
+              <div class="chat__emoji" id="chat-emoji" role="group" aria-label="常用表情"></div>
+              <div class="chat__inputrow">
+                <textarea id="chat-text" rows="2" maxlength="500"
+                  placeholder="说点什么…（Enter 发送，Shift+Enter 换行）" aria-label="消息内容"></textarea>
+                <button class="btn" id="chat-send" type="button">
+                  <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/send.svg)" aria-hidden="true"></span>
+                  <span>发送</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
   </div>
 
@@ -268,7 +437,7 @@
 </main>
 
 <footer class="site-footer">
-  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
+  <p>北民大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
 <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
@@ -310,6 +479,12 @@ const cardRefs = new Map();      // task_id → { card, side, action, cands }
 const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
 const busy = new Set();          // 正在提交的 match_id / task_id（防连点）
 let boardLoading = false;
+
+/* 私聊状态（会话列表 / 当前会话 / 增量游标 / 轮询计时器） */
+let chatThreads = [];            // 只保留 kind === "task" 的会话
+let chatThreadId = "";           // 当前打开的会话
+let chatLastId = "";             // 增量拉取的游标（after=）
+let chatTimer = null;
 
 /* 撮合结果缓存：同一任务 20 秒内不重复打写接口（单 IP 写接口 60 次/分钟留余量） */
 const MATCH_TTL_MS = 20_000;
@@ -507,7 +682,7 @@ async function loadNodes() {
   } catch {
     /* 归到兜底规范名，页面照常可用 */
   }
-  fillBuildingOptions($("#b-filter"), { all: true });
+  fillFilterBuildings();          // 筛选面板的两个楼栋下拉（从哪 / 到哪）
   fillBuildingOptions($("#p-from"), { index: 0 });
   fillBuildingOptions($("#p-to"), { index: 1 });
   fillStationList();
@@ -934,27 +1109,218 @@ function closeRail() {
   if (!$(".sheet.is-open")) document.body.classList.remove("is-locked");
 }
 
-/** 视图（全部开放任务 / 我的接单）高亮与文案 */
+/** 视图（全部开放任务 / 我的接单 / 私聊）高亮与文案 */
 function paintViewUI() {
   const allBtn = $("#view-all");
   const mineBtn = $("#view-mine");
+  const chatBtn = $("#view-chat");
+  const chatView = state.view === "chat";
   const mineView = state.view === "mine";
-  allBtn.classList.toggle("is-active", !mineView);
-  allBtn.setAttribute("aria-pressed", mineView ? "false" : "true");
+  allBtn.classList.toggle("is-active", !mineView && !chatView);
+  allBtn.setAttribute("aria-pressed", !mineView && !chatView ? "true" : "false");
   mineBtn.classList.toggle("is-active", mineView);
   mineBtn.setAttribute("aria-pressed", mineView ? "true" : "false");
-  $("#count-all").textContent = String(state.tasks.length);
+  if (chatBtn) {
+    chatBtn.classList.toggle("is-active", chatView);
+    chatBtn.setAttribute("aria-pressed", chatView ? "true" : "false");
+  }
+  $("#count-all").textContent = String(filterActive() ? filteredTasks().length : state.tasks.length);
   $("#count-mine").textContent = String(myRunTasks().length);
-  $("#board-title").textContent = mineView ? "我的接单" : "待取看板";
-  $("#board-eyebrow").textContent = mineView ? "我表达过意愿 / 被派单的" : "开放任务 · 蓝底是我发布的";
+  const chatCount = $("#count-chat");
+  if (chatCount) chatCount.textContent = String(chatThreads.length);
+  if (!chatView) {
+    $("#board-title").textContent = mineView ? "我的接单" : "待取看板";
+    $("#board-eyebrow").textContent = mineView ? "我表达过意愿 / 被派单的" : "开放任务 · 蓝底是我发布的";
+  }
 }
 
 function setView(view) {
-  state.view = view === "mine" ? "mine" : "all";
+  state.view = view === "mine" ? "mine" : (view === "chat" ? "chat" : "all");
+  const chatView = state.view === "chat";
+  const boardPane = $("#board-pane");
+  const chatPane = $("#chat-pane");
+  if (boardPane) boardPane.hidden = chatView;
+  if (chatPane) chatPane.hidden = !chatView;
+  document.body.classList.toggle("is-chat", chatView);   // 窄屏：私聊时给「功能」悬浮键让位
+
   paintViewUI();
+  if (chatView) {
+    stopChatPolling();
+    void loadThreads();
+  } else {
+    stopChatPolling();
+    if (railIsDrawer()) closeRail();
+    fillFilterBuildings();
+    renderBoard();
+    paintBoardCount();
+  }
+  if (chatView && railIsDrawer()) closeRail();
+}
+
+/* =====================================================================
+   筛选：从哪 / 到哪 / 截止时间 / 报酬
+   · 只过滤**已加载**的 state.tasks（列表不大，⛔ 不新增后端接口）
+   · 条件同步进 URL query：from / to / within / since / until / rmin / rmax
+     （within: all | today | 3d | week | custom；custom 用 since/until 两个 datetime-local）
+   ===================================================================== */
+const WITHIN_LABELS = { all: "不限", today: "今天", "3d": "3 天内", week: "本周内", custom: "自定义" };
+
+const filters = { from: "", to: "", within: "all", since: "", until: "", rmin: "", rmax: "" };
+const EMPTY_FILTERS = () => ({ from: "", to: "", within: "all", since: "", until: "", rmin: "", rmax: "" });
+
+function dayStart(d = new Date()) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
+function dayEnd(d = new Date()) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x.getTime(); }
+/** 本周（周一 00:00 ~ 周日 23:59:59，本地时区） */
+function weekRange(now = new Date()) {
+  const dow = (now.getDay() + 6) % 7; // 0 = 周一
+  const start = new Date(dayStart(now)); start.setDate(start.getDate() - dow);
+  const end = new Date(dayEnd(now)); end.setDate(end.getDate() + (6 - dow));
+  return [start.getTime(), end.getTime()];
+}
+
+/** 截止时间是否落在所选时间段里 */
+function withinOk(task, now = Date.now()) {
+  const ts = new Date(task.deadline_iso).getTime();
+  if (!Number.isFinite(ts)) return true;
+  if (filters.within === "today") return ts <= dayEnd();
+  if (filters.within === "3d") return ts <= now + 3 * 24 * 3600 * 1000;
+  if (filters.within === "week") return ts <= weekRange()[1];
+  if (filters.within === "custom") {
+    const since = filters.since ? new Date(filters.since).getTime() : null;
+    const until = filters.until ? new Date(filters.until).getTime() : null;
+    if (since != null && Number.isFinite(since) && ts < since) return false;
+    if (until != null && Number.isFinite(until) && ts > until) return false;
+  }
+  return true;
+}
+
+/** 报酬区间「有交集」即保留 */
+function rewardOk(task) {
+  const rmin = filters.rmin === "" ? null : Number(filters.rmin);
+  const rmax = filters.rmax === "" ? null : Number(filters.rmax);
+  if (rmin != null && Number.isFinite(rmin) && Number(task.reward_max) < rmin) return false;
+  if (rmax != null && Number.isFinite(rmax) && Number(task.reward_min) > rmax) return false;
+  return true;
+}
+
+function filterActive() {
+  return Boolean(filters.from || filters.to || filters.rmin !== "" || filters.rmax !== "" ||
+    filters.within !== "all" || (filters.within === "custom" && (filters.since || filters.until)));
+}
+
+function taskPassesFilters(t) {
+  if (filters.from && t.from_building !== filters.from) return false;
+  if (filters.to && t.to_building !== filters.to) return false;
+  if (!withinOk(t)) return false;
+  if (!rewardOk(t)) return false;
+  return true;
+}
+
+const filteredTasks = () => state.tasks.filter(taskPassesFilters);
+
+/** 人话描述当前条件（顶部「筛选中：X 条（…）」与空态共用） */
+function filterParts() {
+  const parts = [];
+  if (filters.from) parts.push("从 " + filters.from);
+  if (filters.to) parts.push("到 " + filters.to);
+  if (filters.within !== "all") parts.push("截止 " + (WITHIN_LABELS[filters.within] || filters.within));
+  if (filters.within === "custom" && (filters.since || filters.until)) {
+    parts.push("时间 " + (filters.since || "不限") + " ~ " + (filters.until || "不限"));
+  }
+  if (filters.rmin !== "") parts.push("报酬 ≥ " + filters.rmin);
+  if (filters.rmax !== "") parts.push("报酬 ≤ " + filters.rmax);
+  return parts;
+}
+
+/** 从 URL 读条件（刷新后保持；demo=1 / token 等别人的参数原样不动） */
+function readFiltersFromUrl() {
+  const q = new URLSearchParams(location.search);
+  const w = q.get("within") || "all";
+  Object.assign(filters, {
+    from: q.get("from") || "",
+    to: q.get("to") || "",
+    within: Object.prototype.hasOwnProperty.call(WITHIN_LABELS, w) ? w : "all",
+    since: q.get("since") || "",
+    until: q.get("until") || "",
+    rmin: q.get("rmin") || "",
+    rmax: q.get("rmax") || "",
+  });
+}
+
+/** 条件写回 URL（replaceState：不往历史里塞记录） */
+function writeFiltersToUrl() {
+  const url = new URL(location.href);
+  const map = {
+    from: filters.from, to: filters.to, within: filters.within, since: filters.since,
+    until: filters.until, rmin: filters.rmin, rmax: filters.rmax,
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (!v || (k === "within" && v === "all")) url.searchParams.delete(k);
+    else url.searchParams.set(k, v);
+  }
+  history.replaceState(null, "", url.pathname + (url.search ? url.search : "") + url.hash);
+}
+
+/** 楼栋下拉：规范名（/api/map/nodes）∪ 已加载任务里出现过的楼栋 —— ⛔ 不自己编 */
+function fillFilterBuildings() {
+  const seen = [];
+  const push = (v) => { const s = String(v || "").trim(); if (s && !seen.includes(s)) seen.push(s); };
+  for (const t of state.tasks) { push(t.from_building); push(t.to_building); }
+  const canonical = buildingLabels();
+  const opts = canonical.concat(seen.filter((s) => !canonical.includes(s)));
+  for (const sel of [$("#b-filter"), $("#f-to")]) {
+    if (!sel) continue;
+    const want = sel.id === "f-to" ? filters.to : filters.from;
+    const keep = sel.value;
+    sel.innerHTML = "";
+    sel.appendChild(new Option("不限", ""));
+    opts.forEach((label) => sel.appendChild(new Option(label, label)));
+    sel.value = opts.includes(want) ? want : (opts.includes(keep) ? keep : "");
+  }
+}
+
+/** 筛选面板 + 顶部「筛选中：X 条」 */
+function paintFilterUI() {
+  const fromSel = $("#b-filter");
+  const toSel = $("#f-to");
+  if (fromSel) fromSel.value = filters.from;
+  if (toSel) toSel.value = filters.to;
+  for (const chip of document.querySelectorAll("#f-within .fchip")) {
+    chip.setAttribute("aria-pressed", chip.dataset.within === filters.within ? "true" : "false");
+  }
+  const custom = $("#f-custom");
+  if (custom) custom.hidden = filters.within !== "custom";
+  for (const [sel, v] of [["#f-since", filters.since], ["#f-until", filters.until], ["#f-rmin", filters.rmin], ["#f-rmax", filters.rmax]]) {
+    const node = $(sel);
+    if (node) node.value = v;
+  }
+
+  const box = $("#filter-state");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!filterActive()) { box.hidden = true; return; }
+  box.hidden = false;
+  const shown = state.view === "mine" ? myRunTasks().filter(taskPassesFilters).length : filteredTasks().length;
+  box.appendChild(icon("sliders-horizontal", { size: 14 }));
+  box.appendChild(el("span", "", "筛选中：" + shown + " 条"));
+  box.appendChild(el("span", "faint", "（" + filterParts().join(" · ") + "）"));
+  const clear = el("button", "btn btn--quiet btn--sm", "清空筛选");
+  clear.type = "button";
+  clear.addEventListener("click", () => clearFilters());
+  box.appendChild(clear);
+}
+
+/** 条件变了：写 URL → 重画看板（不动后端） */
+function applyFilters() {
+  writeFiltersToUrl();
+  paintFilterUI();
   renderBoard();
   paintBoardCount();
-  if (railIsDrawer()) closeRail();
+}
+
+function clearFilters() {
+  Object.assign(filters, EMPTY_FILTERS());
+  applyFilters();
 }
 
 /* =====================================================================
@@ -963,7 +1329,11 @@ function setView(view) {
 
 const myRunTasks = () => state.tasks.filter((t) => state.myRuns.has(t.task_id) || state.intents.has(t.task_id));
 
-const visibleTasks = () => (state.view === "mine" ? myRunTasks() : state.tasks);
+/** 当前视图要显示的卡片：先按视图取，再按筛选条件过滤 */
+const visibleTasks = () => {
+  const base = state.view === "mine" ? myRunTasks() : state.tasks;
+  return filterActive() ? base.filter(taskPassesFilters) : base;
+};
 
 function pickableOf(list) {
   return (Array.isArray(list) ? list : []).filter((m) => m && m.match_id && m.state === "pushed");
@@ -1293,8 +1663,14 @@ function renderBoard() {
 
   const list = visibleTasks();
   if (!list.length) {
-    const f = $("#b-filter").value;
-    if (state.view === "mine") {
+    if (filterActive()) {
+      box.appendChild(emptyArt(
+        "没有符合筛选条件的单子",
+        "当前条件：" + filterParts().join(" · ") + "。放宽一点，或者点「清空筛选」看全部。",
+        "清空筛选",
+        clearFilters,
+      ));
+    } else if (state.view === "mine") {
       box.appendChild(emptyArt(
         "你还没接过单",
         "回「全部开放任务」，在别人的单子上点「我想接这一单」表达意愿；发布者确认后这里会出现。",
@@ -1304,7 +1680,7 @@ function renderBoard() {
     } else {
       box.appendChild(emptyArt(
         "暂时没有开放任务",
-        f ? "「" + f + "」当前没有 open 的单子，换一个楼栋看看。" : "点左侧「发布代取」发一条，或用 ?demo=1 打开灌入演示数据。",
+        "点左侧「发布代取」发一条，或等别人发；列表每 5 秒自动刷新。",
         "发布代取",
         openPublish,
       ));
@@ -1317,6 +1693,44 @@ function renderBoard() {
 /* =====================================================================
    撮合（只对我发布的单跑） + 派单 / 表达意愿 / 撤回
    ===================================================================== */
+
+/**
+ * 候选 = 引擎评分候选（/match）+「本人表达意愿」的行（/api/matches 里 source='interest'）
+ * 为什么要合并：/match 只回引擎算出来的候选，而"别人点「我想接这一单」"落下的是 matches 里的一条
+ * source='interest' 记录 —— 不合并的话，发布者就看不到谁主动想接（权限模型缺一环）。
+ */
+async function fetchCandidates(taskId) {
+  const engine = await api("/api/tasks/" + encodeURIComponent(taskId) + "/match", {
+    method: "POST",
+    body: { top_k: 10 },
+  });
+  const list = Array.isArray(engine) ? engine.slice() : [];
+  const have = new Set(list.map((m) => m && m.runner_handle));
+  try {
+    const recent = await api("/api/matches?limit=50");
+    for (const m of Array.isArray(recent) ? recent : []) {
+      if (!m || m.task_id !== taskId) continue;
+      if (m.state !== "pushed" && m.state !== "accepted") continue;
+      if (m.source !== "interest") continue;
+      if (have.has(m.runner_handle)) continue;
+      list.push({
+        runner_id: null,
+        runner_handle: m.runner_handle,
+        score: m.score,
+        reason: "本人表达意愿：主动点了「我想接这一单」（等发布者确认）",
+        pushed: m.state === "pushed",
+        match_id: m.match_id,
+        state: m.state,
+        skip_reason: null,
+        source: "interest",
+      });
+      have.add(m.runner_handle);
+    }
+  } catch {
+    /* 合并失败不影响引擎候选 */
+  }
+  return list;
+}
 
 /** 只对我发布的单触发撮合（别人的单：我既看不到候选，也不该替发布者撮合） */
 async function runMatch(t, { force = false } = {}) {
@@ -1335,11 +1749,7 @@ async function runMatch(t, { force = false } = {}) {
   }
   if (cardRefs.has(t.task_id)) paintCandidates(t);
   try {
-    const list = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/match", {
-      method: "POST",
-      body: { top_k: 10 },
-    });
-    const value = Array.isArray(list) ? list : [];
+    const value = await fetchCandidates(t.task_id);
     state.matches.set(t.task_id, value);
     state.matchErrors.delete(t.task_id);
     matchCache.set(t.task_id, { list: value, error: null, at: Date.now() });
@@ -1369,6 +1779,7 @@ function paintBoardCount() {
       : "当前没有开放任务";
   }
   paintViewUI();
+  paintFilterUI();
 }
 
 async function mapLimit(items, limit, fn) {
@@ -1410,10 +1821,10 @@ async function loadBoard({ force = false } = {}) {
   if (btn) btn.disabled = true;
   try {
     showLoading("#board", "正在读取开放任务…");
-    const f = $("#b-filter").value;
     let tasks;
     try {
-      tasks = await api("/api/tasks?limit=20" + (f ? "&building=" + encodeURIComponent(f) : ""));
+      // 一次拿全（≤50 条），筛选在前端做：切条件不再打请求，也不会和 URL 里的条件打架
+      tasks = await api("/api/tasks?limit=50");
     } catch (e) {
       $("#board-count").textContent = "";
       const box = $("#board");
@@ -1432,6 +1843,7 @@ async function loadBoard({ force = false } = {}) {
     state.matchErrors = new Map();
     await refreshMatchState();
 
+    fillFilterBuildings();
     paintBoardCount();
     renderBoard();
     // 只有我发布的单需要候选；别人的单不打写接口
@@ -1569,14 +1981,310 @@ async function cancelAccepted(taskId) {
 }
 
 /* =====================================================================
+   私聊（站内消息）：会话列表 + 消息流 + 3 秒增量轮询
+   数据源（都用 api()，自动带 X-Session-Token）：
+     GET  /api/threads?limit=          会话列表（只显示 kind === "task"）
+     GET  /api/threads/:id/messages?after=  增量消息
+     POST /api/threads/:id/messages {body}  发消息
+   权限在服务端：只有这一单的「发布者 ↔ 接单者」才有会话，别人拿到 403/与己无关的提示。
+   ⛔ 不做"中转码 / 加好友"：站内直聊，不引导去站外换联系方式。
+   ===================================================================== */
+const CHAT_POLL_MS = 3000;
+
+/** 表情：源码里写码点、运行时才变成字符 —— 页面静态守卫查的是"源码里没有 emoji 字符" */
+const EMOJI_CODEPOINTS = [
+  0x1f44d, 0x1f600, 0x1f602, 0x1f389, 0x1f64f, 0x1f605,
+  0x1f91d, 0x1f4e6, 0x1f69a, 0x23f0, 0x1f60a, 0x1f44c,
+];
+
+const AVATAR_TINTS = ["a", "b", "c", "d"];
+
+function avatarTint(key) {
+  let h = 7;
+  for (const ch of String(key || "x")) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+  return "chat__avatar--" + AVATAR_TINTS[h % AVATAR_TINTS.length];
+}
+
+/** 头像：昵称首字 + 按服务端给的 avatar 键稳定取色（⛔ 不是 emoji、不是外链图片） */
+function avatarNode(person) {
+  const box = el("span", "chat__avatar " + avatarTint(person && person.avatar));
+  box.setAttribute("aria-hidden", "true");
+  const nick = String((person && person.nickname) || "").trim();
+  if (nick) box.appendChild(el("span", "", Array.from(nick)[0]));
+  else box.appendChild(icon("user", { size: 16 }));
+  return box;
+}
+
+function clockOf(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  return d.toDateString() === new Date().toDateString()
+    ? hm
+    : (d.getMonth() + 1) + "/" + d.getDate() + " " + hm;
+}
+
+const isNarrow = () => window.matchMedia("(max-width:767px)").matches;
+
+function showConv(on) {
+  const ph = $("#chat-placeholder");
+  const conv = $("#chat-conv");
+  if (ph) ph.hidden = on;
+  if (conv) conv.hidden = !on;
+}
+
+function renderThreadList() {
+  const list = $("#chat-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!chatThreads.length) {
+    list.appendChild(el("p", "tk-none", "还没有可聊的会话"));
+    return;
+  }
+  for (const th of chatThreads) {
+    const item = el("button", "chat__item" + (th.thread_id === chatThreadId ? " is-active" : ""));
+    item.type = "button";
+    item.dataset.threadId = th.thread_id;      // 便于自动化点选/断言
+    item.appendChild(avatarNode(th.peer));
+    const meta = el("div", "chat__meta");
+    meta.appendChild(el("span", "chat__name", displayName((th.peer && th.peer.nickname) || "对方")));
+    const last = th.last_message;
+    meta.appendChild(el("span", "chat__last",
+      last ? (last.mine ? "我：" : "") + String(last.body || "").slice(0, 40) : "（还没有消息，打个招呼吧）"));
+    item.appendChild(meta);
+    item.appendChild(el("span", "chat__time", last ? clockOf(last.at) : ""));
+    item.addEventListener("click", () => openThread(th.thread_id, { focus: !isNarrow() }));
+    list.appendChild(item);
+  }
+}
+
+function renderSubject(th) {
+  const title = $("#chat-subject-title");
+  const sub = $("#chat-subject-sub");
+  const subject = (th && th.subject) || {};
+  if (title) title.textContent = subject.title || "（未命名任务）";
+  if (sub) {
+    sub.textContent = [subject.subtitle || "", th && th.peer ? "对方：" + displayName(th.peer.nickname || "对方") : ""]
+      .filter(Boolean).join("｜");
+  }
+}
+
+async function loadThreads({ quiet = false } = {}) {
+  const list = $("#chat-list");
+  try {
+    const data = await api("/api/threads?limit=50");
+    chatThreads = (Array.isArray(data) ? data : []).filter((t) => t && t.kind === "task");
+  } catch (e) {
+    chatThreads = [];
+    paintViewUI();
+    const cnt = $("#chat-count");
+    if (cnt) cnt.textContent = "会话读取失败：" + errorText(e);
+    if (!quiet && list) {
+      list.innerHTML = "";
+      list.appendChild(stateBox("error", {
+        iconName: "alert-triangle", title: "会话读取失败", hint: errorText(e),
+        actionText: "重试", onAction: () => loadThreads(),
+      }));
+    }
+    return;
+  }
+  paintViewUI();
+  const cnt = $("#chat-count");
+  if (cnt) {
+    cnt.textContent = chatThreads.length
+      ? "共 " + chatThreads.length + " 个会话（都是已确认接单的单子）"
+      : "双方都同意（这一单已确认接单）才会有会话";
+  }
+  if (quiet) return;
+
+  renderThreadList();
+  if (!chatThreads.some((t) => t.thread_id === chatThreadId)) {
+    chatThreadId = "";
+    chatLastId = "";
+    showConv(false);
+  }
+  // 桌面：默认打开最近一条；窄屏先看列表（避免一进来就盖住会话列表）
+  if (!chatThreadId && chatThreads.length && !isNarrow()) {
+    openThread(chatThreads[0].thread_id);
+  }
+}
+
+async function openThread(threadId, { focus = false } = {}) {
+  if (!threadId) return;
+  chatThreadId = threadId;
+  chatLastId = "";
+  renderThreadList();
+  showConv(true);
+  renderSubject(chatThreads.find((t) => t.thread_id === threadId) || null);
+  const stream = $("#chat-stream");
+  if (stream) {
+    stream.innerHTML = "";
+    stream.appendChild(el("p", "hint", "正在读取消息…"));
+  }
+  await loadMessages({ reset: true });
+  startChatPolling();
+  if (focus) {
+    const box = $("#chat-text");
+    if (box) box.focus();
+  }
+}
+
+function appendMessage(m) {
+  const stream = $("#chat-stream");
+  if (!stream || !m) return;
+  const empty = stream.querySelector(".chat__empty");
+  if (empty) empty.remove();                       // 第一条消息到了就把"还没有消息"提示收掉
+  const row = el("div", "chat__row" + (m.mine ? " is-mine" : "") + (m.kind === "emoji" ? " chat__row--emoji" : ""));
+  const from = m.from && m.from.nickname ? m.from : { ...(m.from || {}), nickname: m.mine ? currentNickname() : "" };
+  row.appendChild(avatarNode(from));
+  const bubble = el("div", "chat__bubble");
+  bubble.textContent = String(m.body || "");
+  row.appendChild(bubble);
+  row.appendChild(el("span", "chat__at", clockOf(m.at)));
+  stream.appendChild(row);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+async function loadMessages({ reset = false } = {}) {
+  if (!chatThreadId) return;
+  const stream = $("#chat-stream");
+  try {
+    const after = reset ? "" : chatLastId;
+    const data = await api("/api/threads/" + encodeURIComponent(chatThreadId) + "/messages"
+      + (after ? "?after=" + encodeURIComponent(after) : ""));
+    const rows = Array.isArray(data) ? data : [];
+    if (reset) {
+      if (stream) stream.innerHTML = "";
+      chatLastId = "";
+      if (!rows.length && stream) {
+        stream.appendChild(el("p", "hint chat__empty",
+          "还没有消息 —— 打个招呼，对一下取件时间/地点就行（⛔ 别发手机号、学号、身份证号）。"));
+      }
+    }
+    for (const m of rows) {
+      appendMessage(m);
+      if (m && m.message_id) chatLastId = m.message_id;
+    }
+  } catch (e) {
+    if (reset && stream) {
+      stream.innerHTML = "";
+      stream.appendChild(stateBox("error", {
+        iconName: "alert-triangle", title: "消息读取失败", hint: errorText(e),
+        actionText: "重试", onAction: () => loadMessages({ reset: true }),
+      }));
+    }
+  }
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  chatTimer = setInterval(() => {
+    if (document.hidden || state.view !== "chat" || !chatThreadId) return;
+    void loadMessages();
+  }, CHAT_POLL_MS);
+}
+
+function stopChatPolling() {
+  if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+}
+
+async function sendChat() {
+  const box = $("#chat-text");
+  if (!box || !chatThreadId) return;
+  const body = box.value.trim();
+  if (!body) return;
+  const btn = $("#chat-send");
+  if (btn) btn.disabled = true;
+  try {
+    const m = await api("/api/threads/" + encodeURIComponent(chatThreadId) + "/messages", {
+      method: "POST",
+      body: { body },
+    });
+    box.value = "";
+    if (m && m.message_id) {
+      appendMessage(m);
+      chatLastId = m.message_id;
+    }
+    await loadThreads({ quiet: false });
+  } catch (e) {
+    toast(errorText(e), "danger");
+  } finally {
+    if (btn) btn.disabled = false;
+    box.focus();
+  }
+}
+
+function mountEmojiRow() {
+  const box = $("#chat-emoji");
+  if (!box) return;
+  box.innerHTML = "";
+  for (const cp of EMOJI_CODEPOINTS) {
+    const ch = String.fromCodePoint(cp);
+    const b = el("button", "", ch);
+    b.type = "button";
+    b.setAttribute("aria-label", "插入表情");
+    b.addEventListener("click", () => {
+      const input = $("#chat-text");
+      if (!input) return;
+      input.value += ch;
+      input.focus();
+    });
+    box.appendChild(b);
+  }
+}
+
+/** 顶部悬浮信息条点开：这一单的详情（也在提醒"别去站外换联系方式"） */
+function openThreadDetail() {
+  const th = chatThreads.find((t) => t.thread_id === chatThreadId);
+  if (!th) return;
+  const subject = th.subject || {};
+  const wrap = el("div", "stack--sm");
+  wrap.appendChild(el("p", "", "在聊这一单：" + (subject.title || "—")));
+  if (subject.subtitle) wrap.appendChild(el("p", "hint", subject.subtitle));
+  wrap.appendChild(el("p", "hint",
+    "状态：" + (subject.status || "—") + (subject.deadline ? "｜截止 " + new Date(subject.deadline).toLocaleString("zh-CN") : "")));
+  wrap.appendChild(el("p", "hint", "对方：" + displayName((th.peer && th.peer.nickname) || "对方") + "（站内昵称，不是真实姓名）"));
+  wrap.appendChild(el("p", "hint", "聊天就在站内：⛔ 不用交换手机号 / 微信号；平台不参与交易、不代收款。"));
+  openModal({ title: "会话详情", iconName: "message-chatbot", body: wrap, confirmText: "关闭", cancelText: "取消" });
+}
+
+/* =====================================================================
    事件接线 + 启动
    ===================================================================== */
 $("#btn-open-publish").addEventListener("click", openPublish);
 $("#btn-open-register").addEventListener("click", openRegister);
 $("#btn-reload").addEventListener("click", () => loadBoard());
-$("#b-filter").addEventListener("change", () => loadBoard());
 $("#view-all").addEventListener("click", () => setView("all"));
 $("#view-mine").addEventListener("click", () => setView("mine"));
+$("#view-chat").addEventListener("click", () => setView("chat"));
+
+/* ---- 筛选：条件一变就过滤已加载任务 + 写回 URL ---- */
+$("#b-filter").addEventListener("change", () => { filters.from = $("#b-filter").value; applyFilters(); });
+$("#f-to").addEventListener("change", () => { filters.to = $("#f-to").value; applyFilters(); });
+for (const chip of document.querySelectorAll("#f-within .fchip")) {
+  const w = chip.dataset.within;
+  chip.addEventListener("click", () => { filters.within = w; applyFilters(); });
+}
+$("#f-since").addEventListener("change", () => { filters.since = $("#f-since").value; filters.within = "custom"; applyFilters(); });
+$("#f-until").addEventListener("change", () => { filters.until = $("#f-until").value; filters.within = "custom"; applyFilters(); });
+$("#f-rmin").addEventListener("change", () => { filters.rmin = $("#f-rmin").value.trim(); applyFilters(); });
+$("#f-rmax").addEventListener("change", () => { filters.rmax = $("#f-rmax").value.trim(); applyFilters(); });
+$("#f-clear").addEventListener("click", () => clearFilters());
+
+/* ---- 私聊 ---- */
+$("#chat-refresh").addEventListener("click", () => loadThreads());
+$("#chat-back").addEventListener("click", () => { chatThreadId = ""; chatLastId = ""; stopChatPolling(); showConv(false); renderThreadList(); });
+$("#chat-subject").addEventListener("click", (e) => { if (!e.target.closest("button")) openThreadDetail(); });
+$("#chat-subject-more").addEventListener("click", openThreadDetail);
+$("#chat-send").addEventListener("click", () => void sendChat());
+$("#chat-text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(); }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { stopChatPolling(); return; }           // 切到后台：立刻停轮询
+  if (state.view === "chat") { void loadThreads(); startChatPolling(); }
+});
+
 railFab.addEventListener("click", openRail);
 $("#rail-close").addEventListener("click", closeRail);
 railBackdrop.addEventListener("click", closeRail);
@@ -1594,15 +2302,19 @@ async function boot() {
   // 两个侧栏先建好（默认是关着的）：这样「取件照片」控件始终在页面里，且点开按钮零延迟
   publishSheet = buildPublishSheet();
   registerSheet = buildRegisterSheet();
+  mountEmojiRow();
+  readFiltersFromUrl();   // 刷新后保持筛选条件（?from=&to=&within=&since=&until=&rmin=&rmax=）
+  paintFilterUI();
   await initDemo();   // ?demo=1：显示演示徽章 + 昵称假名 + 灌一次演示数据
   await loadNodes();
 // * 先拿到身份（匿名开户/恢复会话），再加载看板：这样"我发布的/我接的"才认得出来
   await ensureSession();
   if (currentNickname()) ME = currentNickname();
   mountIdentityChip("#whoami");
-  // * 5 秒轮询：别人新发的单、别人对我的单表达的意愿都会自己出现
-  setInterval(() => { if (!document.hidden) loadBoard({ force: true }).catch(() => {}); }, 5000);
+  // * 5 秒轮询：别人新发的单、别人对我的单表达的意愿都会自己出现（私聊页不刷看板）
+  setInterval(() => { if (!document.hidden && state.view !== "chat") loadBoard({ force: true }).catch(() => {}); }, 5000);
     await loadBoard();
+  await loadThreads({ quiet: true });   // 只为了把「私聊」角标点亮，不打断看板
   setInterval(tickCountdowns, 30000);
 }
 

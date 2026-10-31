@@ -1,5 +1,5 @@
 /* =============================================================================
-   北名大小助手 · 演示模式  static/js/demo.js
+   北民大小助手 · 演示模式  static/js/demo.js
    契约：contracts/frontend.md §5、contracts/core.md §合规红线 4
 
    `?demo=1` 时：

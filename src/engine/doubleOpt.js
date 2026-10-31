@@ -122,7 +122,8 @@ export function toResponse(row, contactCode = null) {
     seeker_ok: r.seeker_ok,
     revealed,
   };
-  if (revealed === 1) base.contact_code = contactCode ?? null;
+  // ⛔ 2026-10-31 起不再给"中转码"：双方都同意就**直接站内聊天**（服务器直连）
+  if (revealed === 1) base.chat_ready = true;
   return base;
 }
 

@@ -1,5 +1,5 @@
 /* =============================================================================
-   北名大小助手 · MCP 接入配置生成  static/js/mcp-config.js
+   北民大小助手 · MCP 接入配置生成  static/js/mcp-config.js
    契约：contracts/frontend.md §3（/agent 页）、contracts/core.md §鉴权、docs/MCP-TOOLS.md
 
    为什么单独一个模块：

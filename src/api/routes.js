@@ -27,6 +27,7 @@ import { getDb } from "../db/index.js";
 import { requireWriteToken } from "../middleware/auth.js";
 import { withSession } from "../middleware/session.js";
 import { createSessionRouter } from "./session.js";
+import { createChatRouter } from "./chat.js";
 import { addScheduleItem, getScheduleItem, listScrubAudit, querySchedule } from "../services/schedule.js";
 import { createMapRouter } from "./map.js";
 import { createDemoRouter } from "./demo.js";
@@ -45,6 +46,7 @@ export function createApiRouter() {
   router.use(withSession);
   router.use("/", createSessionRouter());
 
+  router.use("/", createChatRouter());      // 私聊：双方都同意才有会话
   // ---------- 核心：健康检查 ----------
   router.get("/health", (req, res) => {
     res.json(
