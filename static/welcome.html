@@ -268,8 +268,9 @@
   <div id="pano"></div>
   <!-- ⭐ 入口编辑器：在画面里双击 = 放一个「去某个点位」的入口，可拖动微调 -->
   <div class="hs-editor" id="hsEditor" hidden>
-    <span class="hs-editor__hint">双击画面 = 在这里放去别处的入口</span>
+    <span class="hs-editor__hint">右键画面 = 在这里放去别处的入口</span>
     <b class="hs-editor__count" id="hsCount">0</b>
+    <button class="btn btn--sm" type="button" id="hsAddCenter">中心 +1</button>
     <button class="btn btn--sm" type="button" id="hsExport">导出 JSON</button>
     <button class="btn btn--sm btn--ghost" type="button" id="hsUndo">撤销</button>
     <button class="btn btn--sm btn--ghost" type="button" id="hsClear">清空本场景</button>
@@ -686,6 +687,8 @@ function openStreetScene(sceneId) {
       if (el2 && !el2.__hsBound) {
         el2.__hsBound = true;
         el2.addEventListener("dblclick", onPanoDblClick);
+        // ⭐ 主要入口：右键（左键被 Pannellum 的拖动环视占用了，双击到不了这里）
+        el2.addEventListener("contextmenu", (ev) => { ev.preventDefault(); onPanoDblClick(ev); });
       }
       // 热点点击会在查看器内部切场景 → 监听场景变化，重新应用该场景的入口
       try {
@@ -829,11 +832,25 @@ function hsApply(sceneId) {
   hsSyncUI();
 }
 
-/** 双击画面：选目标点位 → 在当前方向生成入口 */
+/** 当前视角中心（center +1 用） */
+function hsCenterCoords() {
+  try {
+    const p = streetViewer.getPitch(), y = streetViewer.getYaw();
+    return [Number(p.toFixed(2)), Number(y.toFixed(2))];
+  } catch { return null; }
+}
+
+/** 画面事件（右键/双击）→ 取坐标 → 开选单 */
 function onPanoDblClick(ev) {
   if (!streetViewer || !streetScene) return;
-  const co = hsCoordsFrom(ev);
+  const co = hsCoordsFrom(ev) || hsCenterCoords();
   if (!co) return;
+  hsOpenPicker(co);
+}
+
+/** 给定 pitch/yaw，弹"去哪个点位"的选单 */
+function hsOpenPicker(co) {
+  if (!streetViewer || !streetScene) return;
   const targets = Object.keys(MANIFEST.scenes || {}).filter((id) => id !== streetScene);
   if (!targets.length) { toast("只有这一个场景，没有别处可去"); return; }
   const body = el("div", "stack stack--sm");
@@ -1482,6 +1499,11 @@ function removeSpot(id) {
     " · 底图只做缩放浏览，点位标注已移到「3D 街景」（卫星底图）上，共 " + panoCount + " 处实景";
 
   // ⭐ 街景入口编辑器工具条
+  $("#hsAddCenter")?.addEventListener("click", () => {
+    const co = hsCenterCoords();
+    if (!co) { toast("查看器还没就绪"); return; }
+    hsOpenPicker(co);
+  });
   $("#hsExport")?.addEventListener("click", hsExport);
   $("#hsUndo")?.addEventListener("click", () => {
     const arr = streetScene ? hsIndexOf(streetScene) : [];
