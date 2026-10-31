@@ -16,10 +16,11 @@
 /** 15 个工具的一句话能力（与 docs/MCP-TOOLS.md、TOOLS_BY_MODULE 对齐） */
 export const CAPABILITIES = [
   "代取：task_publish 发布代取 / match_find_for_task 找顺路的跑腿同学（只推 60 分以上并给理由）/ runner_register 登记跑腿能力 / task_list_open 看开放单子 / task_parse_screenshot 从取件截图里抽楼栋与时间（不抽姓名手机号）",
-  "搭子：buddy_publish 发一条搭子需求（匿名）/ buddy_search 按描述找搭子 / buddy_consent 双选表决（双方都同意才互相可见联系方式）",
+  "搭子：buddy_publish 发一条搭子需求（匿名）/ buddy_search 按描述找搭子 / buddy_consent 双选表决（双方都同意才开通站内私聊）",
   "导览：map_list_nodes 列校园地点（可分类）/ map_get_node 看某个地点的详情与是否有 360° 实景",
   "日程：schedule_import 导入课表（可直接贴文本；夹带的老师/学号等身份字段会被丢弃并记审计）/ schedule_add 加一条 / schedule_query 查 / schedule_remove 删",
   "打开界面：app_open_view 生成可点的深链，把某个界面或某处 360° 实景直接替用户打开",
+  "账号：首次进入要设置用户名 + 密码（用户名全站唯一）；网页身份走 X-Session-Token，MCP 仍用 Bearer 令牌",
 ];
 
 export function buildAgentPrompt({ origin = "", mcpUrl = "", tokenPlaceholder = "<DEMO_TOKEN>" } = {}) {
@@ -49,7 +50,7 @@ export function buildAgentPrompt({ origin = "", mcpUrl = "", tokenPlaceholder = 
     `3) 自检：让对话方列出工具（tools/list）应看到 15 个；或直接请求 ${site}/api/health 应返回 ok:true。`,
     "⚠️ 写操作（发布、接单、表决、导入课表）需要上面那个 Bearer 令牌；只读操作也需要它（服务端统一鉴权）。",
     "",
-    "## 三、接上之后能做什么（15 个工具，按模块）",
+    "## 三、接上之后能做什么（15 个工具 + 账号体系）",
     ...CAPABILITIES.map((c) => `- ${c}`),
     "",
     "## 四、这个站点的注意事项（重要，别踩）",

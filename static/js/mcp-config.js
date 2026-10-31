@@ -80,7 +80,7 @@ export const TOOLS_BY_MODULE = [
     tools: [
       { name: "buddy_publish", desc: "发布搭子帖，服务端抽画像，anon_token 随机生成" },
       { name: "buddy_search", desc: "搜索搭子候选，只回 score ≥ 60，不含任何联系方式" },
-      { name: "buddy_consent", desc: "双选表决：双方都点头（revealed=1）才揭示联系方式" },
+      { name: "buddy_consent", desc: "双选表决：双方都点头才开通站内私聊（chat_ready=1）" },
     ],
   },
   {
@@ -193,7 +193,7 @@ export function toMcpConfigJson(opts = {}) {
   return JSON.stringify(buildMcpConfig(opts), null, 2);
 }
 
-/** 当前环境下的 14 个工具（静态清单；页面可选再用 /mcp tools/list 实时核对） */
+/** 当前环境下的 15 个工具（静态清单；页面可选再用 /mcp tools/list 实时核对） */
 export function currentToolNames() {
   return toolNames();
 }

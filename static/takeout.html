@@ -1757,7 +1757,7 @@ async function cancelAccepted(taskId) {
      GET  /api/threads/:id/messages?after=  增量消息
      POST /api/threads/:id/messages {body}  发消息
    权限在服务端：只有这一单的「发布者 ↔ 接单者」才有会话，别人拿到 403/与己无关的提示。
-   ⛔ 不做"中转码 / 加好友"：站内直聊，不引导去站外换联系方式。
+   ⛔ 不做"加好友 / 换联系方式"：站内直聊，不引导去站外换联系方式。
    ===================================================================== */
 const CHAT_POLL_MS = 3000;
 

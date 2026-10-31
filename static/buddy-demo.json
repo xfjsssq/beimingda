@@ -31,15 +31,15 @@
       "at": "ISO",
       "status": "sent|replied|accepted",
       "reply_text": "对方的回复（可选）",
-      "reply_at": "ISO（可选）",
-      "contact_code": "互相可见时才有的中转码（可选，仅演示）"
+      "reply_at": "ISO（可选）"
     },
     "my.mutual[]": {
       "anon_token": "…",
       "kind": "…",
       "text": "…",
-      "contact_code": "ct_…",
-      "reveal_status": "mutual"
+      "reveal_status": "mutual",
+      "chat_ready": true,
+      "thread_id": "th_…"
     }
   },
   "threads": {
