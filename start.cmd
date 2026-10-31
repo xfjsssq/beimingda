@@ -16,8 +16,11 @@ setlocal
 cd /d "%~dp0"
 
 set "PORT=%PORT%"
-set "PORT=%PORT: =%"
-if "%PORT%"=="" set "PORT=3080"   rem trim spaces: a trailing space would break the URL
+if not defined PORT set "PORT=3080"
+rem NOTE: trim spaces only when PORT is defined - when it is undefined,
+rem       %PORT: =% expands to a single space and would break the URL.
+if defined PORT set "PORT=%PORT: =%"
+if "%PORT%"=="" set "PORT=3080"
 set "URL=http://127.0.0.1:%PORT%/"
 
 echo.
@@ -67,7 +70,7 @@ echo     health check: %URL%api/health
 echo     stop: Ctrl+C or close this window
 echo.
 
-set "NO_BROWSER=%NO_BROWSER: =%"
+if defined NO_BROWSER set "NO_BROWSER=%NO_BROWSER: =%"
 if /i "%NO_BROWSER%"=="1" goto nobrowser
 start "" "%URL%"
 
