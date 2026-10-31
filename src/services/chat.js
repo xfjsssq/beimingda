@@ -54,7 +54,7 @@ export function ensureThreads(uid) {
   }
 }
 
-/** 按"搭子帖 + 双方都同意"物化会话（返回 thread_id 或 null）——替代旧的"中转码" */
+/** 按"搭子帖 + 双方都同意"物化会话（返回 thread_id 或 null）——替代旧的中转码机制（已废弃） */
 export function ensureThreadForBuddy(postId) {
   const db = getDb();
   const rows = db.prepare(

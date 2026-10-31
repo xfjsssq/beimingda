@@ -53,7 +53,8 @@ export const SAFE_CANDIDATE_KEYS = Object.freeze([
   "reason",
   "reveal_status",
   "parts",
-  "contact_code",
+  "chat_ready",
+  "thread_id",
 ]);
 
 /** publishPost 允许的入参（HTTP 侧 additionalProperties:false 的等价实现） */
@@ -114,7 +115,7 @@ function assertKind(kind) {
 }
 
 export function findUser(handle) {
-  return getDb().prepare("SELECT id, handle, contact_code FROM users WHERE handle = ?").get(handle) ?? null;
+  return getDb().prepare("SELECT id, handle FROM users WHERE handle = ?").get(handle) ?? null;
 }
 
 /** 写入路径用：昵称不存在则建（user_id 随机，与昵称无推导关系） */
@@ -122,27 +123,16 @@ export function ensureUser(handle) {
   const existed = findUser(handle);
   if (existed) return existed;
   getDb()
-    .prepare("INSERT OR IGNORE INTO users(id,handle,contact_code,created_at,demo) VALUES (?,?,?,?,1)")
-    .run(newId("u"), handle, newContactCode(), nowSec());
+    // ⛔ 2026-10-31 起不再生成"中转码"（机制已废弃：双方同意后直接站内私聊）
+    .prepare("INSERT OR IGNORE INTO users(id,handle,created_at,demo) VALUES (?,?,?,1)")
+    .run(newId("u"), handle, nowSec());
   const created = findUser(handle);
   if (!created) reject(CODES.INTERNAL, "用户创建失败");
   return created;
 }
 
-/** 懒生成中转码（seeded 用户 contact_code 为 NULL，首次揭示时补上） */
-function ensureContactCode(user) {
-  if (!user) return null;
-  if (user.contact_code) return user.contact_code;
-  const db = getDb();
-  db.prepare("UPDATE users SET contact_code = ? WHERE id = ? AND contact_code IS NULL").run(
-    newContactCode(),
-    user.id,
-  );
-  return db.prepare("SELECT contact_code FROM users WHERE id = ?").get(user.id)?.contact_code ?? null;
-}
-
 const findUserById = (id) =>
-  getDb().prepare("SELECT id, handle, contact_code FROM users WHERE id = ?").get(id) ?? null;
+  getDb().prepare("SELECT id, handle FROM users WHERE id = ?").get(id) ?? null;
 
 // ──────────────────────────── 进程内缓存（表决时复用打分上下文） ────────────────────────────
 
@@ -249,7 +239,7 @@ function normalizeTopK(v) {
 
 /**
  * 检索候选：kind 一致 + 未被一票否决 + score >= 60（契约 §2 阈值）
- * @returns {{candidates:Array<{post_id,anon_token,kind,score,reason,reveal_status,parts,contact_code?}>}}
+ * @returns {{candidates:Array<{post_id,anon_token,kind,score,reason,reveal_status,parts,chat_ready?,thread_id?}>}}
  */
 export async function searchBuddies({ seeker_handle, kind, text_profile, top_k } = {}) {
   const handle = assertHandle(seeker_handle, "seeker_handle");
@@ -318,8 +308,8 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
  *     · 其它昵称        -> 记为寻找方表决（seeker_ok），落一行 buddy_consents
  *   ⛔ 同一 (post_id, seeker_id) 只能表决一次 —— 由 DB 的 UNIQUE(post_id, seeker_id) 保证
  *
- * @returns {{author_ok:number, seeker_ok:number, revealed:number, contact_code?}}
- *          ⛔ revealed=0 时 contact_code 这个键根本不出现在返回对象里
+ * @returns {{author_ok:number, seeker_ok:number, revealed:number, chat_ready?, thread_id?}}
+ *          ⛔ revealed=0 时不出现 chat_ready / thread_id（旧的中转码已废弃）
  */
 export function castConsent({ post_id, seeker_handle, agree } = {}) {
   const handle = assertHandle(seeker_handle, "seeker_handle");
@@ -383,7 +373,7 @@ function seekerVote(post, actor, author, handle, agree) {
     throw e;
   }
 
-  // 寻找方单独同意时 author_ok 保持 0 => revealed 必为 0 => 不返回 contact_code
+  // 寻找方单独同意时 author_ok 保持 0 => revealed 必为 0 => 不给聊天入口
   return responseWithChat(post, next, actor.id);   // 双方同意 → 直接给私聊会话
 }
 

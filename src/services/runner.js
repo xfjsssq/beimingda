@@ -179,7 +179,7 @@ export function toRunnerView(row) {
 
 /**
  * 对外（页面/门户）用的脱敏视图：
- *   ⛔ 不含 user_id（内部主键）、不含 contact_code（那是 M2 双选揭示后才有资格出现的东西）
+ *   ⛔ 不含 user_id（内部主键）、不含任何联系方式（双方同意后由平台开通站内私聊）
  *   active 用 1/0 表达（门户统计直接 `Number(r.active) === 1` 计数）
  */
 export function toPublicRunnerView(row) {
