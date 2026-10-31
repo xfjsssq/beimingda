@@ -33,7 +33,9 @@ export function createTaskRouter() {
   // POST /api/tasks （写接口）
   router.post("/", requireWriteToken, (req, res, next) => {
     try {
-      res.json(ok(publishTask(req.body ?? {})));
+      const body0 = req.body ?? {};
+    // 有会话就用会话身份发布（谁发的 = 谁）；无会话保留 body 里的 handle（MCP/老调用不受影响）
+    res.json(ok(publishTask({ ...body0, owner_handle: req.session?.handle ?? body0.owner_handle })));
     } catch (e) {
       next(e);
     }
@@ -43,7 +45,7 @@ export function createTaskRouter() {
   // POST /api/tasks/:id/interest —— 表达意愿（别人对我发布的单说"我想接"；不改变任务归属）
 router.post("/:id/interest", requireWriteToken, (req, res, next) => {
   try {
-    res.json(ok(expressInterest(req.params.id, req.body?.runner_handle)));
+    res.json(ok(expressInterest(req.params.id, req.session?.handle ?? req.body?.runner_handle)));
   } catch (e) {
     next(e);
   }

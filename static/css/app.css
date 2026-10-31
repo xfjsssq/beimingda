@@ -2542,3 +2542,11 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 .sheet { z-index: 2001 !important; }
 .modal-backdrop { z-index: 2000 !important; }
 .modal { z-index: 2001 !important; }
+
+/* ---------- 匿名身份小条（我是 XX · 改名） ---------- */
+.whoami { display: inline-flex; align-items: center; gap: 8px; margin: 6px 0 0; padding: 4px 10px;
+  border-radius: 9999px; background: rgba(31,78,140,.07); border: 1px solid rgba(31,78,140,.14);
+  font-size: 13px; color: var(--color-text); }
+.whoami__nick { font-weight: 600; }
+.whoami__edit { appearance: none; border: 0; background: none; color: var(--color-primary); cursor: pointer;
+  font-size: 13px; text-decoration: underline; padding: 0; }

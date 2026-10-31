@@ -147,8 +147,10 @@ test("/takeout：看板卡片分层次，候选一行一个，超 3 位折叠成
 });
 
 test("/takeout：权限模型 —— 只有我发布的单能挑人派单", () => {
-  // 演示身份固定为同学A，且按发布者字段判断
-  assert.match(PAGE, /const ME = "同学A"/, "演示身份应固定为同学A");
+  // 身份：默认演示口径仍是同学A，但登录后换成服务端签发的匿名昵称（2026-10-31 起站点"活"了）
+  assert.match(PAGE, /let ME = "同学A"/, "缺省演示身份应为同学A");
+  assert.match(PAGE, /ensureSession\(\)/, "启动时要先拿会话身份");
+  assert.match(PAGE, /currentNickname\(\)/, "会话昵称要覆盖 ME（否则认不出自己发的单）");
   assert.match(PAGE, /publisher\s*\?\?\s*t\.owner_handle/, "要兼容 publisher / owner_handle 两种字段");
   assert.match(PAGE, /const isMine = \(t\) => publisherOf\(t\) === ME/);
 

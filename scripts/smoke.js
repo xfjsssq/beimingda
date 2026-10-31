@@ -104,6 +104,7 @@ try {
     "runners",
     "schedule_items",
     "scrub_audit",
+    "sessions",
     "tasks",
     "users",
   ].sort();

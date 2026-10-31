@@ -19,10 +19,15 @@
    ============================================================================= */
 
 /** 写接口（需要 X-Demo-Token）的 HTTP 方法 */
+import { sessionToken } from "./session.js";   // ⚠️ 必须相对导入：/js/... 在 Node 测试里解析成 C:\js\... 会炸
+
 const WRITE_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 /** 写接口令牌头（契约 contracts/core.md §4） */
 const TOKEN_HEADER = "X-Demo-Token";
+
+/** 会话令牌头（2026-10-31）：代表"我是谁"。与 TOKEN_HEADER 严格错开，⛔ 不许混用 */
+const SESSION_HEADER = "X-Session-Token";
 
 /** 令牌只存本机浏览器会话，⛔ 不落库、不入库、不写进页面 */
 const TOKEN_STORAGE_KEY = "bm.demo.token.session";
@@ -181,6 +186,9 @@ export async function api(path, opts = {}) {
   const url = String(path);
   const method = String(opts.method || "GET").toUpperCase();
   const headers = Object.assign({ Accept: "application/json" }, opts.headers || {});
+  // * 每个请求都带上会话身份：服务端据此判定"这是谁发的"
+  const sid = sessionToken();
+  if (sid) headers[SESSION_HEADER] = sid;
 
   const init = { method, headers, credentials: "same-origin", cache: "no-store" };
 

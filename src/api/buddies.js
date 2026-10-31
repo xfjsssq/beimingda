@@ -55,7 +55,7 @@ export function createBuddiesRouter() {
   // 我的申请：默认仍是「我发出的意愿」数组（契约口径不变）；
   // ?shape=console 时给站内用的三块结构 { posts, intents, mutual }
   router.get("/mine", (req, res) => {
-    const handle = req.query.handle ?? req.query.seeker_handle;
+    const handle = req.query.handle ?? req.query.seeker_handle ?? req.session?.handle;
     if (req.query.shape === "console") {
       return res.json(ok(myConsole({ handle, limit: req.query.limit })));
     }
@@ -68,8 +68,9 @@ export function createBuddiesRouter() {
     requireWriteToken,
     wrap(async (req, res) => {
       const body = req.body ?? {};
-      const r = castConsent({ post_id: req.params.id, seeker_handle: body.handle ?? body.seeker_handle ?? body.from_handle, agree: body.agree !== false });
-      if (body.message) postMessage({ post_id: req.params.id, from_handle: body.handle ?? body.seeker_handle, body: body.message, kind: "message" });
+      const me = req.session?.handle;   // ⭐ 有会话就用会话身份
+      const r = castConsent({ post_id: req.params.id, seeker_handle: me ?? body.handle ?? body.seeker_handle ?? body.from_handle, agree: body.agree !== false });
+      if (body.message) postMessage({ post_id: req.params.id, from_handle: me ?? body.handle ?? body.seeker_handle, body: body.message, kind: "message" });
       res.json(ok(r));
     }),
   );
@@ -82,7 +83,7 @@ export function createBuddiesRouter() {
       res.json(ok(postMessage({
         post_id: req.params.id,
         consent_id: body.to_consent_id ?? null,
-        from_handle: body.handle ?? body.from_handle,
+        from_handle: req.session?.handle ?? body.handle ?? body.from_handle,
         to_handle: body.to_handle ?? null,
         body: body.message,
         kind: body.to_consent_id ? "reply" : "message",
@@ -100,7 +101,9 @@ export function createBuddiesRouter() {
     "/",
     requireWriteToken,
     wrap(async (req, res) => {
-      res.json(ok(await publishPost(req.body ?? {})));
+      const b = req.body ?? {};
+      // ⭐ 有会话就用会话身份发帖（谁发的 = 谁）；无会话保留 body（MCP/老调用）
+      res.json(ok(await publishPost({ ...b, author_handle: req.session?.handle ?? b.author_handle })));
     }),
   );
 

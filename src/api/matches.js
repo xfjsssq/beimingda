@@ -38,7 +38,7 @@ export function createMatchesRouter() {
   // POST /api/matches/:id/accept —— 接单（matches.state: pushed → accepted）
   router.post("/:id/accept", requireWriteToken, (req, res, next) => {
     try {
-      res.json(ok(setMatchState(req.params.id, "accepted", { as: req.body?.as })));
+      res.json(ok(setMatchState(req.params.id, "accepted", { as: req.session?.handle ?? req.body?.as })));
     } catch (e) {
       next(e);
     }
@@ -47,7 +47,7 @@ export function createMatchesRouter() {
   // POST /api/matches/:id/cancel —— 取消接单（accepted → pushed，回到可接单）
 router.post("/:id/cancel", requireWriteToken, (req, res, next) => {
   try {
-    res.json(ok(setMatchState(req.params.id, "pushed")));
+    res.json(ok(setMatchState(req.params.id, "pushed", { as: req.session?.handle ?? req.body?.as })));
   } catch (e) {
     next(e);
   }
@@ -56,7 +56,7 @@ router.post("/:id/cancel", requireWriteToken, (req, res, next) => {
 // POST /api/matches/:id/decline —— 拒单（matches.state: pushed → declined）
   router.post("/:id/decline", requireWriteToken, (req, res, next) => {
     try {
-      res.json(ok(setMatchState(req.params.id, "declined")));
+      res.json(ok(setMatchState(req.params.id, "declined", { as: req.session?.handle ?? req.body?.as })));
     } catch (e) {
       next(e);
     }

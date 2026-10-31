@@ -128,3 +128,13 @@ CREATE TABLE IF NOT EXISTS buddy_messages (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_buddy_msg_post ON buddy_messages(post_id, created_at);
+
+-- 匿名会话（2026-10-31）：让站点"活起来"——每个浏览器一份身份，发的内容彼此可见
+--   ⛔ 只存 token 的 sha256；不存姓名/学号/手机号/IP，表里没有任何身份信息字段
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash   TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  created_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);

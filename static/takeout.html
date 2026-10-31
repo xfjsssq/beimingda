@@ -186,6 +186,7 @@
 <main id="main" class="page page--mid">
   <div class="page-head">
     <h1>代取看板</h1>
+        <div class="whoami" id="whoami" title="你的匿名身份（仅存浏览器，不收集身份信息）"></div>
     <p class="lead">我发布的单（淡蓝底）自己挑人派单；别人的单只能表达意愿，等发布者确认。</p>
   </div>
 
@@ -279,6 +280,7 @@
 <script src="/config.js"></script>
 <script type="module">
 import { api, mcpRpc } from "/js/api.js";
+import { ensureSession, currentNickname, mountIdentityChip } from "/js/session.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo, displayName, aliasFor } from "/js/demo.js";
 import { el, icon, createSheet, openModal, toast, showLoading, errorText } from "/js/ui.js";
@@ -287,7 +289,7 @@ const $ = (s) => document.querySelector(s);
 const money = (n) => (Number.isFinite(Number(n)) ? String(Number(n)) : "—");
 
 /* 演示身份固定为「同学A」：判断「是不是我发的单」只看发布者字段（⛔ 不看演示别名） */
-const ME = "同学A";
+let ME = "同学A";      // * 登录后会换成服务端签发的匿名昵称（见 boot 里的 ensureSession）
 const publisherOf = (t) => String((t && (t.publisher ?? t.owner_handle)) || "").trim();
 const isMine = (t) => publisherOf(t) === ME;
 
@@ -1594,7 +1596,13 @@ async function boot() {
   registerSheet = buildRegisterSheet();
   await initDemo();   // ?demo=1：显示演示徽章 + 昵称假名 + 灌一次演示数据
   await loadNodes();
-  await loadBoard();
+// * 先拿到身份（匿名开户/恢复会话），再加载看板：这样"我发布的/我接的"才认得出来
+  await ensureSession();
+  if (currentNickname()) ME = currentNickname();
+  mountIdentityChip("#whoami");
+  // * 5 秒轮询：别人新发的单、别人对我的单表达的意愿都会自己出现
+  setInterval(() => { if (!document.hidden) loadBoard({ force: true }).catch(() => {}); }, 5000);
+    await loadBoard();
   setInterval(tickCountdowns, 30000);
 }
 

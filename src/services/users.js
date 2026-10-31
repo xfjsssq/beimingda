@@ -58,6 +58,11 @@ export function toInt(v, fallback = null) {
 export function ensureUser(handle, contactCode = null) {
   const name = normalizeHandle(handle);
   const db = getDb();
+  // ⭐ 先按 handle 复用**已有**用户（含会话用户 u-xxxx，demo=0）：
+  //    handle 上有 UNIQUE，若这里硬造 demo-user-<昵称> 会被 INSERT OR IGNORE 静默跳过，
+  //    然后返回一个不存在的 id → 外键失败。
+  const byHandle = db.prepare("SELECT id FROM users WHERE handle = ?").get(name);
+  if (byHandle) return byHandle.id;
   const id = `demo-user-${name}`;
   const existing = db.prepare("SELECT id FROM users WHERE id = ?").get(id);
   if (!existing) {

@@ -309,6 +309,7 @@
 <script src="/config.js"></script>
 <script type="module">
 import { api, hasWriteToken } from "/js/api.js";
+import { ensureSession, currentNickname, renameSession } from "/js/session.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo } from "/js/demo.js";
 import {
@@ -429,10 +430,13 @@ let demo = { threads: {}, my: null };
 const celebrated = new Set();
 let mineSeg = "posts";
 
-const getHandle = () => ($("handle").value || "").trim() || "同学A";
+const getHandle = () => ($("handle").value || "").trim() || currentNickname() || "同学A";
 $("handle").value = params.get("handle") || localStorage.getItem("beimingda.handle") || "同学A";
-$("handle").addEventListener("change", () => {
+// * 昵称 = 服务端签发的匿名身份：登录后覆盖，改动会同步到服务端（别人看到的就是它）
+ensureSession().then(() => { if (currentNickname()) $("handle").value = currentNickname(); });
+$("handle").addEventListener("change", async () => {
   try { localStorage.setItem("beimingda.handle", getHandle()); } catch { /* 隐私模式：忽略 */ }
+  try { await renameSession(getHandle()); } catch (e) { toast(e.message || "改名失败", "danger"); }   // 同步到服务端
   refreshMine().then(() => { renderMine(); refreshStats(); });
 });
 
@@ -1307,6 +1311,8 @@ async function refreshAll() {
   await loadDemoData();
   await refreshAll();
   initReveals();
+  // * 5 秒轮询：别人新发的帖、给你留的言会自己出现（这就是"活起来"）
+  setInterval(() => { if (!document.hidden) refreshAll().catch(() => {}); }, 5000);
 })();
 </script>
 </body>

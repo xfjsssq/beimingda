@@ -25,6 +25,8 @@ import { ok, toEnvelope, CODES } from "../util/envelope.js";
 import { nowSec, toIso } from "../util/time.js";
 import { getDb } from "../db/index.js";
 import { requireWriteToken } from "../middleware/auth.js";
+import { withSession } from "../middleware/session.js";
+import { createSessionRouter } from "./session.js";
 import { addScheduleItem, getScheduleItem, listScrubAudit, querySchedule } from "../services/schedule.js";
 import { createMapRouter } from "./map.js";
 import { createDemoRouter } from "./demo.js";
@@ -37,6 +39,11 @@ const VERSION = process.env.npm_package_version || "0.1.0";
 
 export function createApiRouter() {
   const router = express.Router();
+
+  // ⭐ 会话：每个浏览器一份匿名身份（让"别人发的"能被看见）
+  //    withSession 只解析不拦；需要身份的接口自己 requireSession
+  router.use(withSession);
+  router.use("/", createSessionRouter());
 
   // ---------- 核心：健康检查 ----------
   router.get("/health", (req, res) => {
