@@ -382,24 +382,27 @@ def wrap_blend(eq: Image.Image) -> Image.Image:
 
 # ---------------------------------------------------------------- 输出
 def build_manifest(entries: list[dict]) -> dict:
+    """每个场景按**真实宽高**声明 haov/vaov：这样查看器不会把画面硬拉成全球面（就是"弯曲"的来源）。
+    视场默认 56°：屏幕需要的垂直角(≈39°)小于素材覆盖(≈41°) → 屏幕上 100% 真实画面。"""
     scenes = {}
     for e in entries:
+        vaov = round(360.0 * e["h"] / e["w"], 1)
         scenes[e["id"]] = {
             "panorama": f"/pano/{e['file']}",
             "title": e["title"],
             "type": "equirectangular",
-            "hfov": 62, "yaw": 0, "pitch": 0,      # ⭐ 68°：屏幕垂直视角(≈47°)小于真实画面覆盖(≈49°)，看不到补边；pitch=0 地平线笔直
-            "haov": 360, "vaov": TARGET_VAOV,      # ⭐ 如实告知垂直覆盖，避免把条带硬拉成全球面
-            "minPitch": -6, "maxPitch": 6,         # 画面上下余量很小，别让人抬到画面外
-            "hotSpots": [],                        # 互跳热点由站长在页面上手动加
+            "haov": 360, "vaov": vaov,
+            "hfov": 52, "yaw": 0, "pitch": 0,
+            "minPitch": -6, "maxPitch": 6,
+            "hotSpots": [],
         }
     return {
         "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。"
-                    "图片由手机实拍素材拼成（tools/stitch-pano.py v3：先摆正再逐列找平）。",
-        "_view_note": "站长实测：水平视场 72°、pitch 0（地平线在画面正中，看着才平）；"
-                      f"成图只覆盖 {TARGET_VAOV:.0f}° 垂直视场（用 haov/vaov 如实声明），因此不会出现弧形雾化边界。",
-        "_hotspot_note": "hotSpots 空着：由站长在 /welcome?edit=1 里手动加。",
-        "_privacy_note": "源素材已由站长手动打码（车牌/人脸）；重新拼图后仍需自查。",
+                    "图片 = 手机实拍两段素材**纯水平拼接**（tools/stitch-pano.py，⛔ 不补边/不拉伸/不改画幅）。",
+        "_view_note": "视场 52°：屏幕垂直角(≈36°) 小于素材实际覆盖 → 全屏真实画面、地平线笔直；两段按重叠区宽融合拼接，接缝连续。"
+                      "想更宽可调大 hfov，代价是上下会露出背景。",
+        "_hotspot_note": "hotSpots 空着：由站长自己加互跳点。",
+        "_privacy_note": "源素材已由站长手动打码（车牌/人脸）。",
         "default": {"firstScene": entries[0]["id"], "sceneFadeDuration": 800, "autoLoad": True, "showControls": True},
         "scenes": scenes,
     }
@@ -435,17 +438,18 @@ def main() -> None:
     entries, report = [], []
     for i, (name, a, b) in enumerate(points, start=1):
         print(f"\n=== {name} ===")
-        strip, info = stitch_pair(a, b)
-        strip, horizon = level_columns(strip)
-        eq = wrap_blend(pad_to_vaov(strip, horizon))
+        strip, info = stitch_pair(a, b)          # 水平拼接（含 dy 垂直对齐 + 亮度对齐 + 羽化）
+        out_img = strip                          # ⛔ 原图不动：连环闭合融合也不做
         out_name = f"pano-{i}.jpg"
         out_path = os.path.join(args.out, out_name)
-        eq.save(out_path, "JPEG", quality=JPEG_Q, optimize=True, progressive=True)
-        entries.append({"id": f"pano-{i}", "file": out_name, "title": TITLE_OVERRIDE.get(name, name)})
-        row = {"point": name, "file": out_name, "eq_size": f"{eq.width}x{eq.height}",
-               "vaov": TARGET_VAOV,
-               "mb": round(os.path.getsize(out_path) / 1024 / 1024, 2),
-               "horizon_row": int(horizon), **info}
+        out_img.save(out_path, "JPEG", quality=JPEG_Q, optimize=True, progressive=True)
+        entries.append({"id": f"pano-{i}", "file": out_name,
+                        "title": TITLE_OVERRIDE.get(name, name),
+                        "w": out_img.width, "h": out_img.height})
+        row = {"point": name, "file": out_name,
+               "size": f"{out_img.width}x{out_img.height}",
+               "vaov": round(360.0 * out_img.height / out_img.width, 1),
+               "mb": round(os.path.getsize(out_path) / 1024 / 1024, 2), **info}
         report.append(row)
         print(json.dumps(row, ensure_ascii=False))
 
