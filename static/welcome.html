@@ -633,9 +633,9 @@ function openStreetScene(sceneId) {
       showControls: true,
       // ⭐ 站长实测：72° 观感最好（minHfov = maxHfov = 72 → 真的锁死，缩放条也撤掉了）；
       //    并把默认视角往上抬 4°（视线稍向上，画面的天空/地面占比更舒服）
-      hfov: 72, minHfov: 72, maxHfov: 72,
+      hfov: 62, minHfov: 62, maxHfov: 62,
       pitch: 4, yaw: 0,
-      showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true,
+      showZoomCtrl: false, mouseZoom: false, touchZoom: false, disableKeyboardCtrl: true, backgroundColor: [0.42, 0.46, 0.45],   // 画布外万一露出来，用接近雾边的中性灰绿（Pannellum 要 0~1 的三元组）
       // 只做水平 360：锁住俯仰角，别让画面上下露出补出来的假天空/地面
       minPitch: -18, maxPitch: 18, pitch: 0,
       compass: false,

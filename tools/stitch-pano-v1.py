@@ -40,7 +40,11 @@ TAIL_FRAC = 0.22         # 取 A 尾部多少比例作为"接缝探针"
 MAX_SHIFT_FRAC = 0.45    # B 允许被"吃掉"的最大比例（即最大重叠）
 NCC_OK = 0.35            # NCC 高于此值才认为两段接续
 FEATHER_FRAC = 0.55      # 羽化带占重叠宽度的比例
-OUT_MAX_W = 6000         # 输出宽度上限（体积与显存友好）
+OUT_MAX_W = 6000
+# 场景显示名（重跑拼图不会被目录名覆盖）
+TITLE_OVERRIDE = {"第一点位": "明湖风光 1", "第二点位": "明湖风光 2", "第三点位": "明湖风光 3"}
+
+OUT_MAX_W = 6000          # 输出宽度上限（体积与显存友好）
 JPEG_Q = 82
 
 
@@ -189,18 +193,15 @@ def build_manifest(entries: list[dict]) -> dict:
             "panorama": f"/pano/{e['file']}",
             "title": e["title"],
             "type": "equirectangular",
-            "hfov": 100,
+            "hfov": 72,
             "yaw": 0,
-            "pitch": 0,
-            "hotSpots": [
-                {"pitch": -3, "yaw": 30,  "type": "scene", "text": "去下一个点位", "sceneId": nxt},
-                {"pitch": -3, "yaw": -150, "type": "scene", "text": "回上一个点位", "sceneId": prv},
-            ],
+            "pitch": 4,
+            "hotSpots": [],   # ⭐ 互跳热点由站长在页面上手动加（见 /welcome?edit=1），脚本不再自动生成,
         }
     return {
         "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。"
                     "⭐ 图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py）。",
-        "_note_attach": "把某个场景挂到校园点位上：在 config/map-nodes.json 里给该节点写 "
+        "_note_attach": "把某个场景挂到点位上：在 static/map/sat-coords.json 里给该点位写 "
                         "pano_url=\"/pano/pano-N.jpg\"、pano_yaw=<朝向>，页面就会在详情里给出「进入 3D 街景」。",
         "default": {"firstScene": entries[0]["id"], "sceneFadeDuration": 800, "autoLoad": True, "showControls": True},
         "scenes": scenes,
@@ -244,7 +245,7 @@ def main() -> None:
         out_path = os.path.join(args.out, out_name)
         eq.save(out_path, "JPEG", quality=JPEG_Q, optimize=True, progressive=True)
         size_mb = os.path.getsize(out_path) / 1024 / 1024
-        entries.append({"id": f"pano-{i}", "file": out_name, "title": name})
+        entries.append({"id": f"pano-{i}", "file": out_name, "title": TITLE_OVERRIDE.get(name, name)})
         row = {"point": name, "file": out_name, "eq_size": f"{eq.width}x{eq.height}",
                "ratio": round(eq.width / eq.height, 2), "mb": round(size_mb, 2), **info}
         report.append(row)

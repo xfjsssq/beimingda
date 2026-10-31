@@ -2526,3 +2526,14 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
 .sat-marker.side-right .sat-marker__label { left: 22px; }
 .sat-marker.side-left  .sat-marker__label { right: 22px; }
 .sat-marker.has-pano .sat-marker__label { border-color: rgba(46, 139, 118, 0.45); }
+
+/* ---------- 3D 街景：画布外的"天空→地面"渐变 ----------
+   素材只覆盖约 49° 垂直视场，视场再大一点画面上下就会露出来。
+   与其硬补一块假的，不如把露出来的部分做成天空→地面的渐变，和画面接上，看不出边界。 */
+#panoOverlay .street-stage,
+#panoOverlay .pano-stage,
+#panoOverlay #pano {
+  background: linear-gradient(to bottom,
+    #a9bcca 0%, #9fb2c0 18%, #93a3ae 32%,
+    #6f7a76 50%, #5c6459 66%, #4d544c 84%, #454b45 100%) !important;
+}
