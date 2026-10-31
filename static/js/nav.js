@@ -309,6 +309,68 @@ export async function decorateAvailability(opts = {}) {
    三、渲染
    --------------------------------------------------------------------------- */
 
+/* 「导览」在 6 项的正中（第 3、4 项之间），把它做成导航条里的视觉中心。
+   ⚠️ 只落在 .nav-link--center 上，不碰 .site-nav / .nav-link 的既有布局 ——
+      桌面「折叠胶囊 / hover 展开」与手机「底部 tab bar / 把手展开」两套行为都不受影响。
+   ⛔ 不改 app.css（共享样式归那一份），这里注入的是一段页内补丁；⛔ 不用 emoji，图标仍走 phosphor。 */
+const NAV_STYLE_ID = "bm-nav-center-style";
+
+function navCenterCSS() {
+  return `
+/* 导览：导航条里的正中强调块（浅底 + 主色描边 + 大一号） */
+.site-nav .nav-link--center { position: relative; }
+
+@media (min-width: 769px) {
+  /* 收起态也让它在场：默认只露「品牌 + 当前页」，导览作为中心要点一直可见 */
+  .site-nav .nav-link--center {
+    max-width: 200px; padding-inline: 12px; opacity: 1;
+    margin-inline: 8px; font-size: 16px; font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-line);
+  }
+  .site-nav .nav-link--center:hover {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    border-color: var(--color-primary);
+  }
+  /* 导览恰好是当前页时，让既有的「实心主色」当前页样式优先 */
+  .site-nav .nav-link--center[aria-current="page"] {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  }
+}
+
+@media (max-width: 768px) {
+  /* 手机：底部 tab bar 里 6 项均分，让导览略宽 + 抬高一档 + 顶部圆角，成为正中那块 */
+  .site-nav .nav-link--center {
+    flex: 1.25 1 0; margin-inline: 0;
+    font-size: 14px; font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-radius: 12px 12px 0 0;
+    box-shadow: inset 0 -1px 0 0 var(--color-primary-line);
+    transform: translateY(-2px);
+  }
+  .site-nav .nav-link--center .nav-link__icon { transform: scale(1.12); }
+  .site-nav .nav-link--center[aria-current="page"] {
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 2px 0 0 var(--color-primary);
+  }
+}
+`;
+}
+
+/** 幂等注入导览特殊化样式（没有 document 时静默跳过，便于 Node 单测） */
+function injectNavStyle() {
+  if (typeof document === "undefined" || !document.head) return false;
+  if (document.getElementById(NAV_STYLE_ID)) return true;
+  const st = document.createElement("style");
+  st.id = NAV_STYLE_ID;
+  st.textContent = navCenterCSS();
+  document.head.appendChild(st);
+  return true;
+}
+
 /** 单个导航项 HTML。center 项（导览）多一个 class，样式见 navCenterCSS() */
 function linkHTML(page, activeId) {
   const active = page.id === activeId;

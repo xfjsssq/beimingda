@@ -730,11 +730,16 @@ function postCard(post) {
   const talkBtn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 留言与回复");
   talkBtn.addEventListener("click", () => openThreadSheet(post));
   footer.appendChild(talkBtn);
-  if (hasAccepted(post.anon_token)) {
+  // ⛔ 私聊入口只在我确实有这条会话时出现（否则会出现"点了空列表"的数据错乱）
+  const myThread = threadForPost(post.post_id);
+  if (myThread) {
     footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
     const go = iconBtn("btn--ok btn--sm", "message-chatbot", " 打开私聊");
-    go.addEventListener("click", () => { setView("agreed"); });
+    go.addEventListener("click", () => openChat(myThread));
     footer.appendChild(go);
+  } else if (hasAccepted(post.anon_token)) {
+    footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    footer.appendChild(el("span", "buddy-sub", "私聊只在双方之间开放"));
   }
   card.appendChild(footer);
   return card;
@@ -842,44 +847,81 @@ function renderPublish() {
   host.appendChild(wrap);
 }
 
+/** 四个段：始终都在、可来回切、当前态明确（⛔ 不允许"点了别段就消失、还回不去"） */
+const WALL_SEGS = [
+  { k: "all", label: "全部需求", icon: "list-check" },
+  { k: "posts", label: "我发布的需求", icon: "note-pencil" },
+  { k: "intents", label: "我表达的意愿", icon: "hand-pointing" },
+  { k: "mutual", label: "已同意的搭子", icon: "circle-check" },
+];
+const MAX_AGG_ROWS = 3;   // 聚合列表（我的意愿 / 已同意）只展示最近几条：演示要"少而精"
+
+function mineSegBar() {
+  const seg = el("div", "buddy-seg");
+  for (const s of WALL_SEGS) {
+    const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label);
+    b.classList.remove("btn");
+    b.setAttribute("aria-pressed", String(wallSeg === s.k));
+    b.dataset.seg = s.k;
+    b.addEventListener("click", () => {
+      wallSeg = s.k;
+      for (const other of seg.querySelectorAll(".buddy-seg__btn")) {
+        other.setAttribute("aria-pressed", String(other === b));
+      }
+      renderWallSeg();   // ⭐ 只重绘列表：段栏本身不重建、不消失
+    });
+    seg.appendChild(b);
+  }
+  return seg;
+}
+
 function renderWall() {
   const host = $("viewHost");
   host.innerHTML = "";
   paintMode("表达意愿", "hand-pointing");
-
-  const seg = el("div", "buddy-seg");
-  const SEGS = [
-    { k: "all", label: "全部需求", icon: "list-check" },
-    { k: "posts", label: "我发布的需求", icon: "note-pencil" },
-    { k: "intents", label: "我表达的意愿", icon: "hand-pointing" },
-    { k: "mutual", label: "已同意的搭子", icon: "circle-check" },
-  ];
-  const list = el("div", null);
-  for (const s of SEGS) {
-    const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label);
-    b.classList.remove("btn");
-    b.setAttribute("aria-pressed", String(wallSeg === s.k));
-    b.addEventListener("click", () => {
-      wallSeg = s.k;
-      if (s.k === "mutual") { setView("agreed"); return; }
-      renderWallView();
-    });
-    seg.appendChild(b);
-  }
-  host.appendChild(seg);
-  host.appendChild(list);
-  renderWallView(list);
+  renderMine(host);
 }
 
-function renderWallView(listHost) {
-  const host = listHost || $("viewHost");
+/** 段栏 + 列表（列表容器固定 id，切换段只换列表内容） */
+function renderMine(host) {
+  const box = host || $("viewHost");
+  box.innerHTML = "";
+  box.appendChild(mineSegBar());
+  const list = el("div", "stack");
+  list.id = "wallList";
+  box.appendChild(list);
+  renderWallSeg(list);
+}
+
+function renderWallSeg(listHost) {
+  const host = listHost || $("wallList") || $("viewHost");
+  host.innerHTML = "";
+  const kind = $("kindFilter").value;
+  const box = el("div", "stack");
+  host.appendChild(box);
+
+  // ②③ 聚合段：我表达的意愿 / 已同意的搭子（少而精）
+  if (wallSeg === "intents" || wallSeg === "mutual") {
+    const rows = wallSeg === "mutual" ? myMutual() : myIntents();
+    if (!rows.length) {
+      emptyArt(box, wallSeg === "mutual"
+        ? { title: "还没有互相同意的搭子", hint: "你表达意愿后对方接受（或你接受别人的意愿），这里就会出现，并且可以直接开聊。", actionText: "去表达意愿", onAction: () => { wallSeg = "all"; renderWall(); } }
+        : { title: "还没有表达过意愿", hint: "在「全部需求」里找一条合适的，点「表达意愿」留句话。", actionText: "看全部需求", onAction: () => { wallSeg = "all"; renderWall(); } });
+      return;
+    }
+    const shown = rows.slice(0, MAX_AGG_ROWS);
+    for (const r of shown) box.appendChild(mineRow(r, wallSeg === "mutual" ? "mutual" : "intent"));
+    if (rows.length > shown.length) {
+      box.appendChild(el("p", "buddy-note", "上面是最新的 " + shown.length + " 条（共 " + rows.length + " 条）：演示数据保持精简，全部记录仍可在「已同意」里查看。"));
+    }
+    return;
+  }
+
+  // ① 需求流：全部需求 / 我发布的需求
   const rows = wallSeg === "posts"
     ? myPosts().map((p) => wallByAnon.get(p.anon_token) || { ...p, anon_token: p.anon_token, kind: p.kind, profile: p.profile || {}, created_at: p.at })
     : wall;
-  const kind = $("kindFilter").value;
   const filtered = kind ? rows.filter((p) => p.kind === kind) : rows;
-  const box = el("div", "stack");
-  host.innerHTML = "";
   if (!filtered.length) {
     emptyArt(box, {
       title: wallSeg === "posts" ? "还没有发布过需求" : kind ? "这个类型下还没有人发需求" : "墙上还没有搭子需求",
@@ -887,11 +929,9 @@ function renderWallView(listHost) {
       actionText: "发布我的需求",
       onAction: () => setView("publish"),
     });
-    host.appendChild(box);
     return;
   }
   for (const p of filtered) box.appendChild(postCard(p));
-  host.appendChild(box);
 }
 
 function renderAgreed() {
@@ -1408,13 +1448,31 @@ function openPublishSheet() { closeRail(); setView("publish"); }
 
 /* ---------------------------------------------------------------- 我的三块（分段 + 列表） */
 
+/** 这条记录对应的**真实** buddy 会话；没有就返回 null（页面据此不给私聊入口） */
+function threadForPost(postId) {
+  if (!postId) return null;
+  return threads.find((t) => t.kind === "buddy" && t.ref_id === postId) || null;
+}
+function nodeThread(node) {
+  if (!node) return null;
+  if (node.thread_id) {
+    const t = threads.find((x) => x.thread_id === node.thread_id);
+    if (t) return t;
+  }
+  const wallPost = node.anon_token ? wallByAnon.get(node.anon_token) : null;
+  return threadForPost(node.post_id || (wallPost && wallPost.post_id));
+}
+
 function mineRow(node, role = "intent") {
   const card = el("article", "item");
+  const isDemo = node.source === "demo";
   const k = kindOf(node.kind);
   const top = el("div", "buddy-post__head");
   top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
   top.appendChild(el("span", "buddy-anon", node.anon_token || node.post_id || ""));
-  if (role === "post") {
+  if (role === "mutual" && isDemo) {
+    top.appendChild(badgeWithIcon("演示样例 · 尚未开通私聊", "info-circle", "badge badge--muted"));
+  } else if (role === "post") {
     const inbox = (node.consents || []).length;
     if (node.status === "mutual" || (node.status === "accepted" && hasAccepted(node.anon_token))) top.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
     else if (inbox) top.appendChild(badgeWithIcon("收到 " + inbox + " 条留言", "message-chatbot", "badge badge--warn"));
@@ -1457,58 +1515,25 @@ function mineRow(node, role = "intent") {
     go.addEventListener("click", () => openThreadSheet(post || { post_id: node.post_id, anon_token: node.anon_token, kind: node.kind, profile: node.profile }));
     acts.appendChild(go);
   }
-  if (role === "mutual" || node.status === "accepted" || node.status === "mutual") {
-    const chat = iconBtn("btn--ok btn--sm", "send", " 打开私聊");
-    chat.addEventListener("click", () => {
-      const t = node.thread_id ? threads.find((x) => x.thread_id === node.thread_id) : null;
-      if (t) openChat(t);
-      else setView("agreed");
-    });
-    acts.appendChild(chat);
+  // ⛔ 只有"真的有会话"才给「打开私聊」：避免点了进空列表（站长反馈的数据错乱）
+  if (role === "mutual" || node.status === "accepted" || node.status === "mutual" || node.reveal_status === "mutual") {
+    const t = isDemo ? null : nodeThread(node);
+    if (t) {
+      const chat = iconBtn("btn--ok btn--sm", "send", " 打开私聊");
+      chat.addEventListener("click", () => openChat(t));
+      acts.appendChild(chat);
+    } else {
+      acts.appendChild(el("span", "buddy-sub", isDemo
+        ? "演示样例：没有真实会话；真做一对（互相接受）才会出现私聊入口"
+        : "还没有可用的会话：等对方也点同意后开通私聊"));
+    }
   }
-  if (node.source === "local" || node.source === "demo") acts.appendChild(badgeWithIcon("演示数据", "info-circle", "badge badge--muted"));
+  if (node.source === "local" || isDemo) acts.appendChild(badgeWithIcon(isDemo ? "演示样例" : "仅本机", "info-circle", "badge badge--muted"));
   card.appendChild(acts);
   return card;
 }
 
-function renderMine(host) {
-  const box = host || $("viewHost");
-  box.innerHTML = "";
-  const posts = myPosts();
-  const intents = myIntents();
-  const mutual = myMutual();
-
-  const seg = el("div", "buddy-seg");
-  const SEGS = [
-    { k: "posts", label: "我发布的需求", n: posts.length, icon: "note-pencil" },
-    { k: "intents", label: "我表达的意愿", n: intents.length, icon: "hand-pointing" },
-    { k: "mutual", label: "已同意的搭子", n: mutual.length, icon: "circle-check" },
-  ];
-  for (const s of SEGS) {
-    const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label + " " + s.n);
-    b.classList.remove("btn");
-    b.setAttribute("aria-pressed", String(wallSeg === s.k));
-    b.addEventListener("click", () => {
-      wallSeg = s.k === "posts" ? "posts" : "all";
-      if (s.k === "mutual") { setView("agreed"); return; }
-      setView("wall");
-    });
-    seg.appendChild(b);
-  }
-  box.appendChild(seg);
-
-  const list = el("div", "stack");
-  box.appendChild(list);
-  if (wallSeg === "posts") {
-    if (!posts.length) emptyArt(list, { title: "还没有发布过需求", hint: "点左侧「发布需求」，一句话就能发。", actionText: "去发帖", onAction: () => setView("publish") });
-    else for (const p of posts) list.appendChild(mineRow(p, "post"));
-  } else {
-    if (!intents.length) emptyArt(list, { title: "还没有表达过意愿", hint: "去「表达意愿」找一条合适的，留句话。", actionText: "去表达意愿", onAction: () => setView("wall") });
-    else for (const it of intents) list.appendChild(mineRow(it, "intent"));
-  }
-}
-
-/* ---------------------------------------------------------------- 设置（昵称 / 密码占位 / 退出） */
+/* ---------------------------------------------------------------- 设置（昵称 / 改密码 / 退出） */
 
 function openSettings() {
   const sheet = createSheet({ title: "设置", iconName: "sliders-horizontal" });
@@ -1546,43 +1571,69 @@ function openSettings() {
 
   body.appendChild(el("hr", "hr"));
 
-  // 改密码（入口 + 占位；后端上线后自动可用）
+  // 改密码（真弹窗：PATCH /api/me/password；已设过密码要先给旧密码）
   body.appendChild(el("div", "buddy-block__label", "登录密码"));
+  const pwState = el("p", "field__hint", "读取中…");
+  body.appendChild(pwState);
   const pwMsg = el("div", null);
   body.appendChild(pwMsg);
-  const pwBtn = el("button", "btn btn--ghost btn--sm", "修改密码");
+  let me = null;
+  const refreshPw = async () => {
+    try {
+      me = await fetchMe();
+      pwState.textContent = me && me.has_password
+        ? "已设置密码：换设备时用「昵称 + 密码」就能找回这个身份。"
+        : "还没设密码：匿名身份只保存在这台浏览器里，换设备就找不回来了。";
+    } catch {
+      me = null;
+      pwState.textContent = "身份状态读取失败，稍后再试。";
+    }
+  };
+  refreshPw();
+  const pwBtn = el("button", "btn btn--ghost btn--sm", "设置 / 修改密码");
   pwBtn.type = "button";
   pwBtn.addEventListener("click", async () => {
-    let ready = false;
-    try {
-      const me = await fetchMe();
-      ready = !!me && (me.has_password === true || me.password === true);
-    } catch { ready = false; }
-    if (!ready) {
-      showNotice(pwMsg, "改密码接口还没上线（后端排期中）：入口先放这儿，上线后同一个按钮就能用。", "warn");
-      return;
-    }
+    await refreshPw();
+    const needOld = !!(me && me.has_password);
     const val = await openModal({
-      title: "设置新密码", iconName: "key",
+      title: needOld ? "修改密码" : "设置密码",
+      iconName: "key",
       body: (() => {
         const wrap = el("div", null);
-        const f = el("div", "field");
-        const lb = el("label", null, "新密码（至少 6 位）");
-        const input = document.createElement("input");
-        input.id = "setPw";
-        input.style.webkitTextSecurity = "disc";
-        f.append(lb, input);
-        wrap.appendChild(f);
+        wrap.appendChild(el("p", "small muted", needOld
+          ? "先输入当前密码，再设一个新密码；改完继续用当前身份，不用重新登录。"
+          : "给这个匿名身份设个密码：以后换电脑或换浏览器，用「昵称 + 密码」就能把身份找回来。"));
+        const mkPw = (id, label) => {
+          const f = el("div", "field");
+          const l = el("label", null, label);
+          const i = document.createElement("input");
+          i.id = id;
+          i.type = "text";
+          i.autocomplete = "off";
+          i.style.webkitTextSecurity = "disc";   // 掩码显示；⛔ 不用 type=password（与静态守卫口径一致）
+          f.append(l, i);
+          return f;
+        };
+        if (needOld) wrap.appendChild(mkPw("pwOld", "当前密码"));
+        wrap.appendChild(mkPw("pwNew", "新密码（6~64 位）"));
+        wrap.appendChild(mkPw("pwNew2", "再输一遍新密码"));
         return wrap;
       })(),
-      confirmText: "保存密码", cancelText: "取消",
+      confirmText: needOld ? "保存新密码" : "设置密码",
+      cancelText: "取消",
     });
     if (!val) return;
-    const pw = (($("setPw") && $("setPw").value) || "").trim();
-    if (pw.length < 6) { showNotice(pwMsg, "密码至少 6 位。", "danger"); return; }
+    const oldPw = ($("pwOld") && $("pwOld").value) || "";
+    const a = ($("pwNew") && $("pwNew").value) || "";
+    const b = ($("pwNew2") && $("pwNew2").value) || "";
+    if (!a) { showNotice(pwMsg, "新密码不能为空。", "danger"); return; }
+    if (a !== b) { showNotice(pwMsg, "两次输入的新密码不一样。", "danger"); return; }
     try {
-      await api("/api/me", { method: "PATCH", body: { password: pw } });
-      showNotice(pwMsg, "密码已更新。", "ok");
+      await api("/api/me/password", { method: "PATCH", body: { password: a, old_password: oldPw } });
+      pwMsg.innerHTML = "";
+      showNotice(pwMsg, "密码已保存：换设备时用「" + currentNickname() + " + 新密码」登录。", "ok");
+      toast("密码已更新", "ok");
+      refreshPw();
     } catch (e) {
       showError(pwMsg, e, { title: "改密码失败" });
     }
@@ -1641,12 +1692,12 @@ $("navPublish").addEventListener("click", () => setView("publish"));
 $("navWall").addEventListener("click", () => setView("wall"));
 $("navAgreed").addEventListener("click", () => setView("agreed"));
 $("btnSettings").addEventListener("click", openSettings);
-$("kindFilter").addEventListener("change", () => { if (view === "wall") renderWallView(); });
+$("kindFilter").addEventListener("change", () => { if (view === "wall") renderWallSeg(); });
 $("btnRefresh").addEventListener("click", async () => {
   toast("正在刷新…", "");
   await refreshAll();
   if (view === "agreed") renderAgreed();
-  else if (view === "wall") renderWallView();
+  else if (view === "wall") renderWallSeg();
 });
 
 /* ---------------------------------------------------------------- 数据加载 */
