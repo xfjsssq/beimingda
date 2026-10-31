@@ -6,12 +6,22 @@
 队伍 **啊对对**（TM202610160004）｜ 站点 `https://demo.knowingly.dpdns.org` ｜ 提交截止 **2026-10-31 23:59:59**
 
 四个模块：**代取撮合** · **搭子匹配** · **迎新导览** · **日程提醒**。
-平台能力通过**远程 Streamable HTTP MCP**（`POST /mcp`，14 个工具）开放给 WorkBuddy，
+平台能力通过**远程 Streamable HTTP MCP**（`POST /mcp`，15 个工具）开放给 WorkBuddy，
 评委零配置接入即可用一句话操控整个平台。
 
 ---
 
-## 快速开始
+## 一键跑起来（非技术同学看这段）
+
+- **Windows**：双击 **`启动服务.cmd`** —— 自动装依赖、建库灌演示数据、起服务、打开浏览器
+- **macOS / Linux**：`bash start.sh`
+- 改完代码想确认没坏：双击 **`自检.cmd`**（161 项测试 + 8 项冒烟 + 114 项集成校验）
+
+想了解每个文件是干什么的、环境变量有哪些、演示当天要做什么 → 看 **[交付说明.md](交付说明.md)**。
+
+---
+
+## 快速开始（开发同学）
 
 ```bash
 git clone https://github.com/xfjsssq/beimingda.git
