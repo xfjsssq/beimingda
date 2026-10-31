@@ -93,7 +93,7 @@
 { "ok": true, "data": {
     "token": "<会话令牌，只在这里出现一次，前端存 sessionStorage>",
     "uid": "u-…", "handle": "同学A", "nickname": "同学A",
-    "created_at": "2026-10-31T09:25:23.000Z", "contact_code": "…",
+    "created_at": "2026-10-31T09:25:23.000Z", "has_password": false,
     "resumed": true            // 仅"恢复"时出现
 }, "error": null }
 ```
@@ -238,13 +238,16 @@
   "reveal_status":"pending", "parts":{ "interest":35, "schedule":30, "traits":20, "semantic":10 } }
 
 // 双选实测
-// ① 寻找方同意 → {author_ok:0, seeker_ok:1, revealed:0}            ← contact_code 键根本不出现
-// ② 帖主同意   → {author_ok:1, seeker_ok:1, revealed:1, contact_code:null,
-//                 chat_ready:true, thread_id:"th_…"}               ← 双方同意 → 直接开聊
+// ① 寻找方同意 → {author_ok:0, seeker_ok:1, revealed:0}      ← 不含任何联系方式字段
+// ② 帖主同意   → {author_ok:1, seeker_ok:1, revealed:1, chat_ready:true,
+//                 thread_id:"th_…"}                          ← 双方同意 → 直接开聊
 // ③ 任一方重复表决 → 400 SCHEMA_REJECTED（UNIQUE(post_id,seeker_id) / 已表决过）
 ```
 
-> `revealed=0` 时返回对象里**没有 `contact_code` 键**（不是 null，是不出现）——这是契约 §8 的硬要求。
+> **关于 `contact_code`（"中转码"）**：2026-10-31 起**整体废弃**——
+> 出口按状态机推导（`src/engine/doubleOpt.js::toResponse`），`revealed=0` 时返回对象里**没有** `contact_code` 键；
+> `revealed=1` 时**也不再给中转码**，改为 `chat_ready:true` +（API 层附加的）`thread_id`，让双方**站内直接聊**。
+> 候选列表同一口径：`reveal_status="mutual"` 时才带 `chat_ready` / `thread_id`。
 > 单方同意时 `GET /api/threads` **不会**出现该帖的会话（实测：0 条）；双方同意后才出现。
 
 ### 6.3 M3 地图（`/api/map`）
@@ -401,7 +404,7 @@ curl -fsS --max-time 10 -X POST https://demo.knowingly.dpdns.org/mcp \
 | 日期 | 变更 | 影响 |
 |---|---|---|
 | 2026-10-31 | 新增匿名会话（`POST /api/session`、`/api/me`、`sessions` 表） | 写接口的归属从"body 里的 handle"改为"有会话就用会话身份"；**老调用（只带 `X-Demo-Token`）仍兼容** |
-| 2026-10-31 | 新增站内私聊（`/api/threads*`、`threads` / `thread_messages` 表） | 双方同意后不再返回"中转码"，改为 `chat_ready + thread_id` |
+| 2026-10-31 | 新增站内私聊（`/api/threads*`、`threads` / `thread_messages` 表） | 双方同意后**不再返回"中转码"**（`contact_code` 整体废弃），改为 `chat_ready + thread_id`；`/api/session` 与 `/api/me` 也不再输出 `contact_code` |
 | 2026-10-31 | 新增搭子留言（`buddy_messages`、`/api/buddies/:id/messages`、`/:id/reply`） | 只读口开放 |
 | 2026-10-31 | 新增 MCP 工具 `app_open_view`（第 15 个） | 只读；`/agent` 页工具一览同步为 15 |
 | 2026-10-31 | REST 读接口默认限频 60 → **240**/分钟（`API_READ_LIMIT`） | 页面轮询与演示翻页不再被自己的限频挡住 |
@@ -415,5 +418,11 @@ curl -fsS --max-time 10 -X POST https://demo.knowingly.dpdns.org/mcp \
 覆盖：会话三连、私聊全链路（含越权与边界）、四模块只读口、写接口鉴权、MCP `tools/list`、
 限频头、favicon 跳转与 404 分流。
 
-**未实测**（如需请自测）：真机上"多实例 + 共享限频"、学校统一认证接入后的行为、
+⚠️ **`contact_code` 相关结论是二次核对过的**：工作树在我探测期间被并行修改，
+第一次探测拿到的双选响应还带 `contact_code: null`（中间版本）；
+随后我重启服务、用当前代码重跑，确认现状是
+`{"author_ok":1,"seeker_ok":1,"revealed":1,"chat_ready":true,"thread_id":"th_…"}`
+（**没有 `contact_code`**），`POST /api/session` 也返回 `has_password` 而不是 `contact_code`——本文按**当前代码**写。
+
+**未实测**（如需请自测）：真机多实例的共享限频、接入学校统一身份认证后的行为、
 以及 `POST /api/tasks/:id/interest` 在并发下的表现。
