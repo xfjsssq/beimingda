@@ -2537,3 +2537,8 @@ p, li, .card__desc, .faq__item p { line-height: var(--body-leading); }
     #a9bcca 0%, #9fb2c0 18%, #93a3ae 32%,
     #6f7a76 50%, #5c6459 66%, #4d544c 84%, #454b45 100%) !important;
 }
+/* 弹层永远在最上层：街景小窗（z 45/50）、地图 HUD（z 800~1200）都不该盖住选单 */
+.sheet-backdrop { z-index: 2000 !important; }
+.sheet { z-index: 2001 !important; }
+.modal-backdrop { z-index: 2000 !important; }
+.modal { z-index: 2001 !important; }
