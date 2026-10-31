@@ -1,10 +1,46 @@
 {
   "_note": "演示对话数据（服务端静态数据文件，页面只读不硬编码）。threads 用 anon_token 关联 fixtures/buddy-posts.json 里的帖子；my 是「我的申请」三块在演示态下的样例：我发布的帖（含收到的留言与我的回复）、我表达的意愿（含对方回复/被接受）、已互相同意的搭子。两份内容由 tests/ui-buddy-ui.test.js 断言保持一致。",
   "_shape": {
-    "threads[anon_token].consents[]": { "id": "string", "from_anon": "anon_xxx（表达意愿者的匿名标识）", "text": "留言内容", "at": "ISO 时间", "status": "sent|replied|accepted", "replies": [{ "id": "string", "text": "发布者的回复", "at": "ISO" }] },
-    "my.posts[]": { "anon_token": "我发布的帖", "kind": "study|roommate|project|sport|other", "profile": { "wanted": "需求" }, "created_at": "ISO", "consents": "同 threads 的 consents" },
-    "my.intents[]": { "anon_token": "对方的帖", "kind": "…", "text": "我留的话", "at": "ISO", "status": "sent|replied|accepted", "reply_text": "对方的回复（可选）", "reply_at": "ISO（可选）", "contact_code": "互相可见时才有的中转码（可选，仅演示）" },
-    "my.mutual[]": { "anon_token": "…", "kind": "…", "text": "…", "contact_code": "ct_…", "reveal_status": "mutual" }
+    "threads[anon_token].consents[]": {
+      "id": "string",
+      "from_anon": "anon_xxx（表达意愿者的匿名标识）",
+      "text": "留言内容",
+      "at": "ISO 时间",
+      "status": "sent|replied|accepted",
+      "replies": [
+        {
+          "id": "string",
+          "text": "发布者的回复",
+          "at": "ISO"
+        }
+      ]
+    },
+    "my.posts[]": {
+      "anon_token": "我发布的帖",
+      "kind": "study|roommate|project|sport|other",
+      "profile": {
+        "wanted": "需求"
+      },
+      "created_at": "ISO",
+      "consents": "同 threads 的 consents"
+    },
+    "my.intents[]": {
+      "anon_token": "对方的帖",
+      "kind": "…",
+      "text": "我留的话",
+      "at": "ISO",
+      "status": "sent|replied|accepted",
+      "reply_text": "对方的回复（可选）",
+      "reply_at": "ISO（可选）",
+      "contact_code": "互相可见时才有的中转码（可选，仅演示）"
+    },
+    "my.mutual[]": {
+      "anon_token": "…",
+      "kind": "…",
+      "text": "…",
+      "contact_code": "ct_…",
+      "reveal_status": "mutual"
+    }
   },
   "threads": {
     "anon_9f3a2c1b8d47": {
@@ -16,7 +52,11 @@
           "at": "2026-10-29T11:20:00Z",
           "status": "accepted",
           "replies": [
-            { "id": "demo-r-study-1", "text": "行，那七点图书馆门口见。我一般坐靠窗那排，你到了发我一声", "at": "2026-10-29T11:35:00Z" }
+            {
+              "id": "demo-r-study-1",
+              "text": "行，那七点图书馆门口见。我一般坐靠窗那排，你到了发我一声",
+              "at": "2026-10-29T11:35:00Z"
+            }
           ]
         },
         {
@@ -26,11 +66,17 @@
           "at": "2026-10-29T13:02:00Z",
           "status": "replied",
           "replies": [
-            { "id": "demo-r-study-2", "text": "周末我要实习，平时七点以后都在，工作日也行的话就约得上", "at": "2026-10-29T13:18:00Z" }
+            {
+              "id": "demo-r-study-2",
+              "text": "周末我要实习，平时七点以后都在，工作日也行的话就约得上",
+              "at": "2026-10-29T13:18:00Z"
+            }
           ]
         }
       ],
-      "accepted": ["anon_7c1e5a0d9b42"]
+      "accepted": [
+        "anon_7c1e5a0d9b42"
+      ]
     },
     "anon_1b8d5e2f9a30": {
       "consents": [
@@ -41,7 +87,11 @@
           "at": "2026-10-29T15:40:00Z",
           "status": "replied",
           "replies": [
-            { "id": "demo-r-room-1", "text": "行，那就先按十一点关灯试试，我周四下午在宿舍，可以先把东西搬过去", "at": "2026-10-29T15:55:00Z" }
+            {
+              "id": "demo-r-room-1",
+              "text": "行，那就先按十一点关灯试试，我周四下午在宿舍，可以先把东西搬过去",
+              "at": "2026-10-29T15:55:00Z"
+            }
           ]
         },
         {
@@ -64,7 +114,11 @@
           "at": "2026-10-29T08:05:00Z",
           "status": "accepted",
           "replies": [
-            { "id": "demo-r-sport-1", "text": "好，我带球，你早点来先热身", "at": "2026-10-29T08:20:00Z" }
+            {
+              "id": "demo-r-sport-1",
+              "text": "好，我带球，你早点来先热身",
+              "at": "2026-10-29T08:20:00Z"
+            }
           ]
         },
         {
@@ -74,11 +128,17 @@
           "at": "2026-10-29T12:44:00Z",
           "status": "replied",
           "replies": [
-            { "id": "demo-r-sport-2", "text": "能，先练十分钟定点，再打半场", "at": "2026-10-29T12:50:00Z" }
+            {
+              "id": "demo-r-sport-2",
+              "text": "能，先练十分钟定点，再打半场",
+              "at": "2026-10-29T12:50:00Z"
+            }
           ]
         }
       ],
-      "accepted": ["anon_4f7a2e9c5b31"]
+      "accepted": [
+        "anon_4f7a2e9c5b31"
+      ]
     }
   },
   "my": {
@@ -86,7 +146,9 @@
       {
         "anon_token": "anon_5e1f8b2a6c47",
         "kind": "study",
-        "profile": { "wanted": "想找人一起自习，图书馆三楼，晚上七点" },
+        "profile": {
+          "wanted": "想找人一起自习，图书馆三楼，晚上七点"
+        },
         "created_at": "2026-10-29T10:00:00Z",
         "consents": [
           {
@@ -96,7 +158,11 @@
             "at": "2026-10-29T10:24:00Z",
             "status": "replied",
             "replies": [
-              { "id": "demo-my-p1-r1", "text": "行，那七点图书馆门口见", "at": "2026-10-29T10:31:00Z" }
+              {
+                "id": "demo-my-p1-r1",
+                "text": "行，那七点图书馆门口见",
+                "at": "2026-10-29T10:31:00Z"
+              }
             ]
           },
           {
@@ -112,7 +178,9 @@
       {
         "anon_token": "anon_4d8c2f6a1b93",
         "kind": "sport",
-        "profile": { "wanted": "想找人一起打羽毛球，周末下午体育馆" },
+        "profile": {
+          "wanted": "想找人一起打羽毛球，周末下午体育馆"
+        },
         "created_at": "2026-10-28T09:10:00Z",
         "consents": [
           {
@@ -122,7 +190,11 @@
             "at": "2026-10-28T09:40:00Z",
             "status": "accepted",
             "replies": [
-              { "id": "demo-my-p2-r1", "text": "那太好了，两点体育馆门口见", "at": "2026-10-28T09:52:00Z" }
+              {
+                "id": "demo-my-p2-r1",
+                "text": "那太好了，两点体育馆门口见",
+                "at": "2026-10-28T09:52:00Z"
+              }
             ]
           }
         ]
@@ -155,8 +227,9 @@
         "status": "accepted",
         "reply_text": "太好了，那我按你的时间来，明早七点半操场见",
         "reply_at": "2026-10-30T00:44:00Z",
-        "contact_code": "ct_demo7f2a91",
-        "reveal_status": "mutual"
+        "reveal_status": "mutual",
+        "chat_ready": true,
+        "thread_id": "th_demo_2f6c9e3d8b54"
       }
     ],
     "mutual": [
@@ -165,8 +238,9 @@
         "kind": "sport",
         "text": "我早上七点半就在操场跑步，跑完一起去球馆也行",
         "reply_text": "太好了，那我按你的时间来，明早七点半操场见",
-        "contact_code": "ct_demo7f2a91",
-        "reveal_status": "mutual"
+        "reveal_status": "mutual",
+        "chat_ready": true,
+        "thread_id": "th_demo_2f6c9e3d8b54"
       }
     ]
   }

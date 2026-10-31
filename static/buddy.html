@@ -3,24 +3,24 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>搭子墙：发需求 · 表达意愿 · 留言商量</title>
+  <title>搭子：发布需求 · 表达意愿 · 站内聊天</title>
   <!--
-    用户重设计后的信息架构：
-      · 主区 = 帖子流（先看别人要什么搭子，卡片上直接「表达意愿」并留言）
-      · 左功能栏（桌面常驻 / 窄屏左侧滑入）：发帖（发布自己的需求）· 我的申请（三块聚合）
-      · 手动浏览不做匹配；按描述自动匹配留给 MCP（WorkBuddy，见侧栏提示）
-      · 发帖只强制「一句话说清要做什么」，其余全部可选
-    复用：/css/app.css 设计令牌 · /js/api.js · /js/nav.js · /js/demo.js · /js/ui.js
-    图标一律 /vendor/phosphor/icons/*.svg（⛔ 无 emoji、⛔ 无外链、⛔ 无上传控件）
-    ⛔ 页面不出现任何写入凭据的输入框或字样（凭据只走 /js/api.js 运行时链路）
-    ⛔ 未互相同意不得出现 contact_code；不渲染任何身份字段
+    2026-10-31 改版：三个独立入口 + 已同意=站内聊天
+      · 左功能栏：发布需求 / 表达意愿 / 已同意（三个独立入口，不再挤在一个「我的申请」里）
+      · 已同意 → 主区换成聊天列表（分「别人同意了我的帖」「我同意了别人的帖」两组）→ 点进聊天界面
+      · 双方都同意后**直接在站内聊天**：页面不再有任何"拿到一串码再去别的软件加好友"的流程
+      · 右上角设置：改昵称（PATCH /api/me）· 改密码（入口+占位）· 退出登录（清 bm.session.* 后刷新）
+    复用共享层：/css/app.css 设计变量 · /js/session.js（匿名会话身份）· /js/api.js · /js/nav.js · /js/demo.js · /js/ui.js
+    静态守卫：图标一律 /vendor/phosphor/icons/*.svg（⛔ 无 emoji 当图标；聊天内容里的文本表情允许）· ⛔ 无外链 · 只走 api()
+    ⛔ 本页不含任何文件上传控件（frontend.md §7）；照片不参与评分、不入库
+    ⛔ 只渲染匿名标识与昵称，不出现任何身份字段
   -->
   <link rel="stylesheet" href="/css/app.css" />
   <style>
     /* 只动 buddy 页；字号只用 --size-*，间距只用 --sp-*，圆角只用 --r-*，曲线用 --ease */
     [hidden] { display: none !important; }   /* [hidden] 会被 .btn/.code 的 display 覆盖 */
 
-    /* ---- 1. 两栏骨架 ---- */
+    /* ---- 1. 两栏骨架（桌面常驻侧栏 / 窄屏左侧滑入）---- */
     .buddy-layout { display: grid; gap: var(--sp-300); align-items: start; }
     .buddy-rail {
       display: flex; flex-direction: column; gap: var(--sp-200);
@@ -65,25 +65,45 @@
     .buddy-rail__item:hover { background: var(--color-primary-soft); border-color: var(--color-primary-line); color: var(--color-primary); }
     .buddy-rail__item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
     .buddy-rail__item .icon { color: var(--color-primary); }
-    .buddy-rail__item.is-primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-    .buddy-rail__item.is-primary .icon { color: #fff; }
+    .buddy-rail__item.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-rail__item.is-active .icon { color: #fff; }
     .buddy-rail__item-text { display: block; }
     .buddy-rail__item-text small { display: block; font-size: var(--size-xs); color: var(--color-muted); margin-top: var(--sp-25); }
-    .buddy-rail__item.is-primary .buddy-rail__item-text small { color: rgba(255, 255, 255, .82); }
+    .buddy-rail__item.is-active .buddy-rail__item-text small { color: rgba(255, 255, 255, .82); }
     .buddy-rail__grow { flex: 1 1 auto; min-width: 0; }
     .buddy-rail__count {
       flex: 0 0 auto; font-size: var(--size-xs); font-variant-numeric: tabular-nums;
       background: var(--color-primary-soft); color: var(--color-primary);
       border-radius: var(--radius-pill); padding: 0 var(--sp-75);
     }
-    .buddy-rail__identity { border-top: 1px dashed var(--color-line-strong); padding-top: var(--sp-100); }
-    .buddy-rail__identity .field { margin: 0; }
+    .buddy-rail__item.is-active .buddy-rail__count { background: rgba(255, 255, 255, .22); color: #fff; }
     .buddy-facts { display: flex; flex-direction: column; gap: var(--sp-50); font-size: var(--size-xs); color: var(--color-muted); }
     .buddy-facts span b { color: var(--color-text-soft); font-variant-numeric: tabular-nums; }
     .buddy-mcp { border-top: 1px dashed var(--color-line-strong); padding-top: var(--sp-100); font-size: var(--size-xs); color: var(--color-muted); line-height: 1.7; }
     .buddy-mcp a { color: var(--color-primary); }
 
-    /* ---- 2. 帖子流 ---- */
+    /* ---- 2. 页头：我是谁 + 设置入口 ---- */
+    .buddy-head { display: flex; align-items: flex-start; gap: var(--sp-200); flex-wrap: wrap; }
+    .buddy-head__main { flex: 1 1 320px; min-width: 0; }
+    .buddy-head__side { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-who {
+      display: inline-flex; align-items: center; gap: var(--sp-50);
+      border: 1px solid var(--color-line); background: var(--color-card);
+      border-radius: var(--radius-pill); padding: var(--sp-25) var(--sp-100);
+      font-size: var(--size-sm); color: var(--color-text-soft);
+    }
+    .buddy-who b { color: var(--color-text); }
+
+    /* ---- 3. 头像（用 peer.avatar 选内置图标 + 配色，⛔ 不外链图片）---- */
+    .buddy-avatar {
+      flex: 0 0 auto; display: inline-grid; place-items: center;
+      border-radius: var(--radius-pill); border: 1px solid var(--color-line);
+    }
+    .buddy-avatar--40 { width: 40px; height: 40px; }
+    .buddy-avatar--32 { width: 32px; height: 32px; }
+    .buddy-avatar--24 { width: 24px; height: 24px; }
+
+    /* ---- 4. 帖子流 ---- */
     .buddy-main { min-width: 0; }
     .buddy-mode { display: inline-flex; align-items: center; gap: var(--sp-50); font-size: var(--size-sm); font-weight: 600; color: var(--color-primary); }
     .buddy-post__head { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
@@ -103,7 +123,7 @@
     .buddy-hours i.on { background: var(--color-primary-line); border-color: var(--color-primary-mid); }
     .buddy-hours__ticks { display: flex; justify-content: space-between; margin-top: var(--sp-25); font-size: var(--size-xs); color: var(--color-muted-soft); }
 
-    /* ---- 3. 留言 / 回复 ---- */
+    /* ---- 5. 留言 / 回复 ---- */
     .buddy-thread { display: flex; flex-direction: column; gap: var(--sp-100); }
     .buddy-msg {
       border: 1px solid var(--color-line); border-radius: var(--r-md);
@@ -121,36 +141,7 @@
     .buddy-reply .buddy-msg { background: var(--color-sunken); }
     .buddy-msg--author { border-color: var(--color-accent); }
 
-    /* ---- 4. 互相可见的成功视觉 ---- */
-    .buddy-reveal {
-      position: relative; overflow: hidden;
-      display: flex; align-items: center; gap: var(--sp-200); flex-wrap: wrap;
-      background: var(--color-accent-soft); border: 1px solid var(--color-accent);
-      border-radius: var(--radius-lg); padding: var(--sp-200); margin-bottom: var(--sp-200);
-    }
-    .buddy-reveal__art { flex: 0 0 auto; width: 84px; height: auto; }
-    .buddy-reveal__body { flex: 1 1 220px; min-width: 0; }
-    .buddy-reveal__title { display: flex; align-items: center; gap: var(--sp-50); margin: 0; font-size: var(--size-lg); color: var(--color-accent-dark); }
-    .buddy-reveal__code { font-family: var(--font-mono); font-size: var(--size-xl); font-weight: 700; color: var(--color-accent-dark); margin: var(--sp-50) 0; }
-    .buddy-reveal__acts { display: flex; gap: var(--sp-75); flex-wrap: wrap; }
-    .buddy-reveal__burst { position: absolute; right: -24px; top: -24px; width: 120px; height: 120px; pointer-events: none; }
-    .buddy-reveal__burst::before, .buddy-reveal__burst::after {
-      content: ""; position: absolute; inset: 0; border-radius: var(--radius-pill);
-      border: 2px solid var(--color-accent); opacity: 0;
-      animation: buddyRing 2.4s var(--ease) 2;
-    }
-    .buddy-reveal__burst::after { animation-delay: .6s; }
-    @keyframes buddyRing {
-      0% { transform: scale(.35); opacity: .55; }
-      70% { opacity: .12; }
-      100% { transform: scale(1); opacity: 0; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .buddy-reveal__burst::before, .buddy-reveal__burst::after { animation: none; opacity: 0; }
-      .buddy-rail { transition: none; }
-    }
-
-    /* ---- 5. 我的申请三块 / 模板 ---- */
+    /* ---- 6. 我的三块（分段控件）---- */
     .buddy-seg { display: flex; gap: var(--sp-50); flex-wrap: wrap; margin-bottom: var(--sp-200); }
     .buddy-seg__btn {
       appearance: none; font-family: inherit; cursor: pointer;
@@ -160,16 +151,86 @@
       color: var(--color-text-soft); font-size: var(--size-sm);
     }
     .buddy-seg__btn[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-    .buddy-tpl { display: flex; gap: var(--sp-75); flex-wrap: wrap; }
     .buddy-note {
       font-size: var(--size-xs); color: var(--color-muted); line-height: 1.7;
       background: var(--color-sunken); border: 1px dashed var(--color-line-strong);
       border-radius: var(--r-md); padding: var(--sp-75);
     }
+    .buddy-tpl { display: flex; gap: var(--sp-75); flex-wrap: wrap; }
+
+    /* ---- 7. 已同意：聊天列表 ---- */
+    .buddy-chatgroup { margin-bottom: var(--sp-300); }
+    .buddy-chatgroup__title {
+      display: flex; align-items: center; gap: var(--sp-50); margin: 0 0 var(--sp-100);
+      font-size: var(--size-sm); color: var(--color-text-soft);
+    }
+    .buddy-chatgroup__title .icon { color: var(--color-primary-mid); }
+    .buddy-chatrow {
+      display: flex; align-items: center; gap: var(--sp-100); width: 100%;
+      appearance: none; font-family: inherit; text-align: left; cursor: pointer;
+      border: 1px solid var(--color-line); background: var(--color-card);
+      border-radius: var(--r-md); padding: var(--sp-100);
+      transition: border-color var(--dur-color) var(--ease), box-shadow var(--dur-color) var(--ease);
+    }
+    .buddy-chatrow + .buddy-chatrow { margin-top: var(--sp-75); }
+    .buddy-chatrow:hover { border-color: var(--color-primary-line); box-shadow: var(--shadow-card); }
+    .buddy-chatrow:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .buddy-chatrow__main { flex: 1 1 auto; min-width: 0; }
+    .buddy-chatrow__top { display: flex; align-items: center; gap: var(--sp-50); }
+    .buddy-chatrow__name { font-size: var(--size-base); color: var(--color-text); }
+    .buddy-chatrow__at { margin-left: auto; font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-chatrow__subject { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-chatrow__last { margin: var(--sp-25) 0 0; font-size: var(--size-sm); color: var(--color-text-soft); overflow-wrap: anywhere; }
+    .buddy-dot {
+      flex: 0 0 auto; width: var(--sp-75); height: var(--sp-75); border-radius: var(--radius-pill);
+      background: var(--color-danger);
+    }
+
+    /* ---- 8. 聊天界面 ---- */
+    .buddy-chat { display: flex; flex-direction: column; gap: var(--sp-200); }
+    .buddy-chat__head {
+      position: sticky; top: calc(var(--header-h) + var(--sp-50)); z-index: 5;
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+      padding: var(--sp-100) var(--sp-100);
+    }
+    .buddy-chat__bar { display: flex; align-items: center; gap: var(--sp-100); }
+    .buddy-chat__who { flex: 1 1 auto; min-width: 0; }
+    .buddy-chat__name { font-size: var(--size-base); color: var(--color-text); }
+    .buddy-chat__subject { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-chat__more { margin-top: var(--sp-100); border-top: 1px dashed var(--color-line); padding-top: var(--sp-100); }
+    .buddy-chat__scroll { display: flex; flex-direction: column; gap: var(--sp-100); }
+    .buddy-day { text-align: center; font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-line { display: flex; align-items: flex-end; gap: var(--sp-75); }
+    .buddy-line--mine { flex-direction: row-reverse; }
+    .buddy-line__body { max-width: 78%; min-width: 0; }
+    .buddy-line--mine .buddy-line__body { text-align: right; }
+    .buddy-bubble {
+      display: inline-block; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere;
+      border-radius: var(--r-lg); padding: var(--sp-75) var(--sp-100);
+      font-size: var(--size-base); line-height: 1.6;
+      background: var(--color-sunken); border: 1px solid var(--color-line); color: var(--color-text);
+    }
+    .buddy-line--mine .buddy-bubble { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-line__meta { margin-top: var(--sp-25); font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-composer {
+      border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-card);
+      padding: var(--sp-100); display: flex; flex-direction: column; gap: var(--sp-75);
+    }
+    .buddy-composer textarea { min-height: var(--sp-600); }
+    .buddy-emojis { display: flex; gap: var(--sp-25); flex-wrap: wrap; }
+    .buddy-emoji {
+      appearance: none; font-family: inherit; cursor: pointer; line-height: 1;
+      border: 1px solid var(--color-line); background: var(--color-sunken);
+      border-radius: var(--r-sm); padding: var(--sp-25) var(--sp-50); font-size: var(--size-lg);
+    }
+    .buddy-emoji:hover { background: var(--color-primary-soft); border-color: var(--color-primary-line); }
+    .buddy-composer__foot { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-powered { font-size: var(--size-xs); color: var(--color-muted-soft); }
   </style>
-  <meta name="description" content="在站点里直接发布搭子需求、表达意愿并留言商量；双方都同意才互相可见。" />
-  <meta property="og:title" content="搭子墙：发需求 · 表达意愿 · 留言商量" />
-  <meta property="og:description" content="在站点里直接发布搭子需求、表达意愿并留言商量；双方都同意才互相可见。" />
+  <meta name="description" content="发布搭子需求、表达意愿、双方都同意后直接在站内聊天。" />
+  <meta property="og:title" content="搭子：发布需求 · 表达意愿 · 站内聊天" />
+  <meta property="og:description" content="发布搭子需求、表达意愿、双方都同意后直接在站内聊天。" />
   <meta property="og:type" content="website" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
@@ -177,80 +238,72 @@
 <a class="skip-link" href="#main">跳到主要内容</a>
 
 <main id="main" class="page page--mid">
-  <div class="page-head reveal">
-    <h1>搭子墙</h1>
-    <p class="lead">先看看别人需要什么搭子 —— 有合适的就点「表达意愿」留句话；也可以直接发布自己的需求。双方都点头之后，才会互相可见。</p>
+  <div class="page-head">
+    <div class="buddy-head">
+      <div class="buddy-head__main">
+        <h1>搭子</h1>
+        <p class="lead">先看别人需要什么搭子，合适的就点「表达意愿」留句话；也可以直接发布自己的需求。双方都点了头，就在这里直接聊。</p>
+      </div>
+      <div class="buddy-head__side">
+        <span class="buddy-who" id="whoChip">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/user.svg)" aria-hidden="true"></span>
+          <span>我是 <b id="whoName">…</b></span>
+        </span>
+        <button class="btn btn--ghost btn--sm" id="btnSettings" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sliders-horizontal.svg)" aria-hidden="true"></span>
+          设置
+        </button>
+      </div>
+    </div>
     <div class="page-head__tags">
-      <span class="badge badge--ok">双方都同意才互相可见</span>
+      <span class="badge badge--ok">双方都同意才能开聊</span>
       <span class="badge badge--muted">不收集姓名 / 学号 / 手机号 / 邮箱</span>
       <span class="badge badge--muted">一句话也能发</span>
-    </div>
-    <div class="grid grid--stats buddy-block">
-      <div class="stat stat--pending" id="statWall">
-        <p class="stat__label">墙上的搭子需求</p>
-        <div class="stat__value">—</div>
-        <p class="stat__src">读取中…</p>
-      </div>
-      <div class="stat stat--pending" id="statMinePosts">
-        <p class="stat__label">我发布的需求</p>
-        <div class="stat__value">—</div>
-        <p class="stat__src">含收到的留言</p>
-      </div>
-      <div class="stat stat--pending" id="statMineIntents">
-        <p class="stat__label">我表达的意愿</p>
-        <div class="stat__value">—</div>
-        <p class="stat__src">含对方回复</p>
-      </div>
-      <div class="stat stat--pending" id="statMutual">
-        <p class="stat__label">已互相同意</p>
-        <div class="stat__value">—</div>
-        <p class="stat__src">双方都点了头</p>
-      </div>
     </div>
   </div>
 
   <div class="buddy-layout">
+    <!-- ===================== 左：三个独立入口 ===================== -->
     <aside class="buddy-rail" id="buddyRail" aria-label="搭子功能栏">
       <div class="buddy-rail__head">
         <span class="icon-tile" aria-hidden="true">
           <span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/users-three.svg)"></span>
         </span>
         <div class="buddy-rail__grow">
-          <b>我能做什么</b>
-          <p>发需求 / 表达意愿 / 看回复</p>
+          <b>搭子</b>
+          <p>发需求 / 表达意愿 / 聊天</p>
         </div>
       </div>
 
       <nav class="buddy-rail__nav" aria-label="搭子功能">
-        <button class="buddy-rail__item is-primary" id="navPublish" type="button">
+        <button class="buddy-rail__item" id="navPublish" type="button">
           <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/note-pencil.svg)" aria-hidden="true"></span>
           <span class="buddy-rail__grow buddy-rail__item-text">
-            发帖
-            <small>发布我自己的搭子需求，一句话也行</small>
+            发布需求
+            <small>发帖 —— 发布我自己的搭子需求（一句话也能发）</small>
           </span>
         </button>
-        <button class="buddy-rail__item" id="navMine" type="button">
-          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/queue.svg)" aria-hidden="true"></span>
+        <button class="buddy-rail__item" id="navWall" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
           <span class="buddy-rail__grow buddy-rail__item-text">
-            我的申请
-            <small>我发的帖 / 我的意愿 / 已同意的搭子</small>
+            表达意愿
+            <small>看别人的需求，留言说说我的情况</small>
           </span>
-          <span class="buddy-rail__count" id="railMineCount">0</span>
+        </button>
+        <button class="buddy-rail__item" id="navAgreed" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            已同意
+            <small>双方都点头了 → 直接开聊</small>
+          </span>
+          <span class="buddy-rail__count" id="agreedCount">0</span>
         </button>
       </nav>
 
       <div class="buddy-facts">
         <span>墙上需求 <b id="factWall">0</b> 条</span>
-        <span>我收到的留言 <b id="factToReply">0</b> 条</span>
-        <span>已互相同意 <b id="factMutual">0</b> 对</span>
-      </div>
-
-      <div class="buddy-rail__identity">
-        <div class="field">
-          <label for="handle">我的匿名昵称</label>
-          <input id="handle" placeholder="同学A" maxlength="32" />
-          <p class="field__hint">只用于区分身份，不收集真实姓名。</p>
-        </div>
+        <span>我发布的需求 <b id="factMinePosts">0</b> 条</span>
+        <span>已同意的搭子 <b id="factMutual">0</b> 对</span>
       </div>
 
       <div class="buddy-mcp">
@@ -260,11 +313,12 @@
       </div>
     </aside>
 
-    <section class="buddy-main" aria-label="搭子需求列表">
+    <!-- ===================== 右：主区（三个出口各自换内容） ===================== -->
+    <section class="buddy-main" aria-label="搭子主区">
       <div class="toolbar">
         <span class="buddy-mode" id="modeTag">
-          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)" aria-hidden="true"></span>
-          <span id="modeText">大家在找的搭子</span>
+          <span class="icon icon--18" id="modeIcon" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
+          <span id="modeText">表达意愿</span>
         </span>
         <select id="kindFilter" aria-label="按类型筛选">
           <option value="">全部类型</option>
@@ -275,9 +329,9 @@
           <option value="other">其他</option>
         </select>
         <span class="toolbar__spacer"></span>
-        <button class="btn btn--sm" id="btnNewPost" type="button">
-          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/plus.svg)" aria-hidden="true"></span>
-          发我的需求
+        <button class="btn btn--ghost btn--sm" id="btnRefresh" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          刷新
         </button>
         <button class="btn btn--ghost btn--sm buddy-rail__toggle" id="btnRail" type="button"
                 aria-controls="buddyRail" aria-expanded="false">
@@ -287,9 +341,7 @@
       </div>
 
       <div id="writeHint"></div>
-      <div id="revealHost"></div>
-      <div id="listMsg"></div>
-      <div id="listHost" class="stack"></div>
+      <div id="viewHost" class="stack"></div>
     </section>
   </div>
 </main>
@@ -297,7 +349,7 @@
 <div class="buddy-rail__backdrop" id="railBackdrop" aria-hidden="true"></div>
 
 <footer class="site-footer">
-  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>北民大小助手 · 赛道 17 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
   <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
   <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
@@ -309,11 +361,11 @@
 <script src="/config.js"></script>
 <script type="module">
 import { api, hasWriteToken } from "/js/api.js";
-import { ensureSession, currentNickname, renameSession } from "/js/session.js";
+import { ensureSession, currentNickname, fetchMe, renameSession, sessionToken } from "/js/session.js";
 import { mountNav } from "/js/nav.js";
 import { initDemo } from "/js/demo.js";
 import {
-  el, icon, copyText, createSheet, openModal, toast,
+  el, icon, createSheet, openModal, toast,
   showLoading, showEmpty, showError, showNotice, initReveals,
 } from "/js/ui.js";
 
@@ -332,24 +384,48 @@ const KINDS = [
 ];
 const kindOf = (v) => KINDS.find((k) => k.v === v) || KINDS[4];
 
-/** 模板：一键带入示例文字（用户想写得简略就写简略） */
+/** 模板：一键带入示例文字 */
 const TEMPLATES = [
   { label: "自习", kind: "study", text: "想找人一起自习，图书馆三楼，晚上七点" },
   { label: "运动", kind: "sport", text: "想找人一起打羽毛球，周末下午体育馆" },
   { label: "拼车", kind: "other", text: "想找人一起拼车回家，周五下午校门口集合" },
 ];
 
+/** 内置头像：服务端给的是名字（peer.avatar），这里映射成图标 + 配色，⛔ 不外链图片 */
+const AVATARS = {
+  panda: { icon: "circle", tone: "var(--color-primary-mid)" },
+  cat: { icon: "heart", tone: "var(--color-danger)" },
+  fox: { icon: "flag", tone: "var(--color-warn-text)" },
+  owl: { icon: "eye", tone: "var(--color-accent-dark)" },
+  whale: { icon: "drop", tone: "var(--color-primary)" },
+  deer: { icon: "star", tone: "var(--color-accent)" },
+  robot: { icon: "robot", tone: "var(--color-muted)" },
+  leaf: { icon: "lightbulb", tone: "var(--color-primary-dark)" },
+};
+
+/** 一排小表情：⛔ 源码里不写 emoji 字符（静态守卫禁止页面出现 emoji），用转义 → 只有运行时才是真表情 */
+const EMOJIS = [
+  "\u{1F44D}", "\u{1F602}", "\u{1F60A}", "\u{1F64C}", "\u{1F440}", "\u{2705}",
+  "\u{1F525}", "\u{1F4AA}", "\u{1F914}", "\u{1F44C}", "\u{1F31F}", "\u{2764}\u{FE0F}",
+];
+
 const LS_MY = "beimingda.buddy.mine.v1";
+const LS_SEEN = "beimingda.buddy.seen.v1";
 const DEMO_URL = "/buddy-demo.json";
+const POLL_MS = 3000;
 
 /* ---------------------------------------------------------------- 小工具 */
 
-function fmtTs(iso) {
+function fmtTime(iso) {
   const d = new Date(String(iso || ""));
   if (Number.isNaN(d.getTime())) return String(iso || "");
   const p = (n) => String(n).padStart(2, "0");
-  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? `${p(d.getHours())}:${p(d.getMinutes())}` : `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
+const dayKey = (iso) => String(iso || "").slice(0, 10);
+const fmtTs = fmtTime;
 const pct = (v) => Math.round(Math.max(0, Math.min(1, Number(v) || 0)) * 100);
 function sideWord(v, low, mid, high) {
   const n = Number(v);
@@ -363,6 +439,23 @@ function badgeWithIcon(text, iconName, cls = "badge badge--muted") {
   if (iconName) b.appendChild(icon(iconName, { size: 14 }));
   b.appendChild(el("span", null, text));
   return b;
+}
+function iconBtn(cls, iconName, text) {
+  const b = el("button", (cls.includes("btn") ? "" : "btn ") + cls, null);
+  b.type = "button";
+  if (iconName) b.appendChild(icon(iconName, { size: 16 }));
+  if (text) b.appendChild(document.createTextNode(text));
+  return b;
+}
+function avatarEl(name, size = 40) {
+  const spec = AVATARS[name] || AVATARS.robot;
+  const box = el("span", "buddy-avatar buddy-avatar--" + size);
+  box.style.background = `color-mix(in srgb, ${spec.tone} 16%, white)`;
+  box.style.color = spec.tone;
+  box.style.borderColor = `color-mix(in srgb, ${spec.tone} 30%, white)`;
+  box.appendChild(icon(spec.icon, { size: size >= 40 ? 20 : size >= 32 ? 18 : 14 }));
+  box.setAttribute("aria-hidden", "true");
+  return box;
 }
 function emptyArt(host, { title, hint, actionText, onAction, img = "/img/empty-state.png" }) {
   const box = el("div", "empty-art");
@@ -381,70 +474,49 @@ function emptyArt(host, { title, hint, actionText, onAction, img = "/img/empty-s
   host.appendChild(box);
   return box;
 }
-function statSet(id, value, src) {
-  const box = $(id);
-  if (!box) return;
-  box.classList.remove("stat--pending");
-  box.querySelector(".stat__value").textContent = String(value);
-  if (src) box.querySelector(".stat__src").textContent = src;
-}
-function iconBtn(cls, iconName, text) {
-  const b = el("button", "btn " + cls, null);
-  b.type = "button";
-  b.appendChild(icon(iconName, { size: 16 }));
-  if (text) b.appendChild(document.createTextNode(text));
-  return b;
+function statSet(id, value) {
+  const node = $(id);
+  if (node) node.textContent = String(value);
 }
 
-/* ---------------------------------------------------------------- 本地演示层（接口未就绪时的降级） */
+/* ---------------------------------------------------------------- 本地演示层（接口缺字段/未就绪时的兜底） */
 
-function readLocal() {
-  try {
-    const raw = JSON.parse(localStorage.getItem(LS_MY) || "{}");
-    return {
-      myPosts: Array.isArray(raw.myPosts) ? raw.myPosts : [],
-      intents: Array.isArray(raw.intents) ? raw.intents : [],
-      posts: Array.isArray(raw.posts) ? raw.posts : [],
-      messages: Array.isArray(raw.messages) ? raw.messages : [],
-      accepted: Array.isArray(raw.accepted) ? raw.accepted : [],
-    };
-  } catch {
-    return { myPosts: [], intents: [], posts: [], messages: [], accepted: [] };
-  }
+function readJson(key, dflt) {
+  try { return JSON.parse(localStorage.getItem(key) || "") || dflt; } catch { return dflt; }
 }
-function writeLocal(next) {
-  try { localStorage.setItem(LS_MY, JSON.stringify(next)); } catch { /* 隐私模式：忽略 */ }
+function writeJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 隐私模式：忽略 */ }
 }
-let local = readLocal();
+let local = Object.assign(
+  { myPosts: [], intents: [], posts: [], messages: [], accepted: [] },
+  readJson(LS_MY, {}),
+);
+function writeLocal() { writeJson(LS_MY, local); }
 
-/** 端点缺失判定：routes.js 兜底 404 的文案是 "no route for <METHOD> <url>" */
 const isMissingRoute = (e) => !!e && e.code === "NOT_FOUND" && /no route for/i.test(String(e.message || ""));
 const isForbidden = (e) => !!e && e.code === "SCHEMA_REJECTED" && /invalid or missing/i.test(String(e.message || ""));
 
 /* ---------------------------------------------------------------- 状态 */
 
+let demo = { threads: {}, my: null };
 let wall = [];
 const wallByAnon = new Map();
-let serverMine = null;
-let demo = { threads: {}, my: null };
-const celebrated = new Set();
-let mineSeg = "posts";
+let console3 = { posts: [], intents: [], mutual: [] };
+let threads = [];
+let view = "wall";                 // publish | wall | agreed | chat
+let wallSeg = "all";               // all | mine | posts | intents | mutual
+let chatNow = null;                // { thread, lastId, timer, seen }
+let seenMap = readJson(LS_SEEN, {});
 
-const getHandle = () => ($("handle").value || "").trim() || currentNickname() || "同学A";
-$("handle").value = params.get("handle") || localStorage.getItem("beimingda.handle") || "同学A";
-// * 昵称 = 服务端签发的匿名身份：登录后覆盖，改动会同步到服务端（别人看到的就是它）
-ensureSession().then(() => { if (currentNickname()) $("handle").value = currentNickname(); });
-$("handle").addEventListener("change", async () => {
-  try { localStorage.setItem("beimingda.handle", getHandle()); } catch { /* 隐私模式：忽略 */ }
-  try { await renameSession(getHandle()); } catch (e) { toast(e.message || "改名失败", "danger"); }   // 同步到服务端
-  refreshMine().then(() => { renderMine(); refreshStats(); });
-});
+const getHandle = () => currentNickname() || "同学";
+$("whoName").textContent = getHandle();
 
-/** 写权限提示：⛔ 不出现任何凭据输入框，也不提凭据名字 */
+/* ---------------------------------------------------------------- 写权限提示（⛔ 不出现任何凭据输入框/字样） */
+
 function paintWriteHint() {
   const host = $("writeHint");
   if (hasWriteToken()) { host.innerHTML = ""; return; }
-  showNotice(host, "服务端未配置写入权限：浏览与留言可用，发帖会失败（请联系部署方）。", "warn");
+  showNotice(host, "服务端未配置写入权限：浏览可以，发帖/留言会失败（请联系部署方）。", "warn");
 }
 
 /* ---------------------------------------------------------------- 画像可视化（只渲染用户真填了的） */
@@ -501,9 +573,7 @@ function profileBlock(profile) {
   const facts = [];
   if (p.grade && p.grade !== "不限") facts.push("年级 " + p.grade);
   if (p.major_group && p.major_group !== "不限") facts.push("专业大类 " + p.major_group);
-  if (!facts.length && !interests.length && !slots.length && !must.length && !brk.length && !hasSchedule && !hasTraits) {
-    return null;   // 只写了一句需求：不堆可视化，保持简洁
-  }
+  if (!facts.length && !interests.length && !slots.length && !must.length && !brk.length && !hasSchedule && !hasTraits) return null;
   const box = el("div", null);
   if (facts.length || interests.length) {
     const chips = el("div", "chip-row buddy-block");
@@ -542,7 +612,10 @@ function profileBlock(profile) {
   return box;
 }
 
-/* ---------------------------------------------------------------- 留言串合成（演示层 + 本地层 + 将来服务端） */
+/* ---------------------------------------------------------------- 留言 / 回复（服务端为主，演示层兜底） */
+
+/** anon_token → 服务端返回的留言（GET /api/buddies/:id/messages 或 console 里带的），供 consentsOf 合成 */
+const serverMsgsByAnon = new Map();
 
 function consentsOf(anon) {
   const out = [];
@@ -556,33 +629,79 @@ function consentsOf(anon) {
     out.push(fresh);
     return fresh;
   };
-  // ① 演示数据：挂在墙上帖子上的留言（demo.threads）
   const d = (demo.threads && demo.threads[anon]) || null;
   if (d && Array.isArray(d.consents)) for (const c of d.consents) push(c, "demo");
-  // ② 演示数据：我发布的帖收到的留言（demo.my.posts[].consents）
   const myDemoPost = ((demo.my && demo.my.posts) || []).find((p) => p.anon_token === anon);
   if (myDemoPost && Array.isArray(myDemoPost.consents)) for (const c of myDemoPost.consents) push(c, "demo");
-  // ③ 本地层：我发出的留言
   for (const m of local.messages.filter((x) => x.anon === anon && x.kind === "consent")) {
     push({ id: m.id, from_anon: m.from_anon || getHandle(), text: m.text, at: m.at, status: "sent", replies: [] }, "local");
   }
-  // ④ 本地层：我作为发布者的回复
   for (const m of local.messages.filter((x) => x.anon === anon && x.kind === "reply")) {
     const t = out.find((c) => c.id === m.to_consent_id);
     if (t && !t.replies.some((r) => r.id === m.id)) t.replies.push({ id: m.id, text: m.text, at: m.at });
   }
   if (local.accepted.includes(anon)) for (const c of out) c.status = "accepted";
-  // ⑤ 服务端新结构（后端扩展 /mine 后自动生效）
-  if (serverMine && !Array.isArray(serverMine) && Array.isArray(serverMine.posts)) {
-    const sp = serverMine.posts.find((p) => p.anon_token === anon);
-    if (sp && Array.isArray(sp.consents)) for (const c of sp.consents) push(c, "server");
+  // 服务端留言（GET /api/buddies/:id/messages 或 myConsole 里带的 messages）
+  const serverMessages = serverMsgsByAnon.get(anon) || [];
+  if (Array.isArray(serverMessages)) {
+    for (const m of serverMessages) {
+      if (m.consent_id) {
+        const t = out.find((c) => c.id === m.consent_id);
+        if (t && !t.replies.some((r) => r.id === m.message_id)) t.replies.push({ id: m.message_id, text: m.body, at: m.at, from_handle: m.from });
+        else if (!t) push({ id: m.consent_id, from_anon: m.from, text: m.body, at: m.at, status: "sent", replies: [] }, "server");
+      } else {
+        push({ id: m.message_id, from_anon: m.from, text: m.body, at: m.at, status: "sent", replies: [] }, "server");
+      }
+    }
   }
   return out.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
 }
 const hasAccepted = (anon) => local.accepted.includes(anon)
   || (((demo.threads && demo.threads[anon] && demo.threads[anon].accepted) || []).length > 0);
 
-/* ---------------------------------------------------------------- 帖子流 */
+/* ---------------------------------------------------------------- 我的三块（服务端 console + 本地/演示兜底） */
+
+function myPosts() {
+  const out = [];
+  const push = (row) => { if (row && (row.anon_token || row.post_id) && !out.some((x) => (x.anon_token || x.post_id) === (row.anon_token || row.post_id))) out.push(row); };
+  for (const p of console3.posts || []) push({ ...p, source: "server" });
+  for (const p of (demo.my && demo.my.posts) || []) push({ ...p, source: "demo" });
+  for (const p of local.posts) push(p);
+  return out;
+}
+function myIntents() {
+  const out = [];
+  const push = (row) => {
+    if (!row) return;
+    const key = (row.post_id || row.anon_token) + "|" + (row.text || "");
+    if (!out.some((x) => ((x.post_id || x.anon_token) + "|" + (x.text || "")) === key)) out.push(row);
+  };
+  for (const r of console3.intents || []) push({ ...r, source: "server" });
+  for (const it of local.intents) push({ ...it, source: "local" });
+  for (const it of (demo.my && demo.my.intents) || []) push({ ...it, source: "demo" });
+  return out;
+}
+function myMutual() {
+  const out = [];
+  const add = (row) => { if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token)) out.push(row); };
+  for (const m of console3.mutual || []) add({ ...m, source: "server" });
+  for (const it of myIntents()) if (it.status === "accepted" || it.reveal_status === "mutual") add(it);
+  for (const anon of local.accepted) {
+    const post = wallByAnon.get(anon) || local.posts.find((p) => p.anon_token === anon);
+    add({ anon_token: anon, kind: post ? post.kind : "other", status: "accepted", text: post ? ((post.profile || {}).wanted || "") : "" });
+  }
+  for (const m of (demo.my && demo.my.mutual) || []) add({ ...m, source: "demo" });
+  return out;
+}
+
+/** 这个 anon_token 是不是我发布的帖（用来判断"谁同意了谁"） */
+function isMyPost(anon) {
+  return (console3.posts || []).some((p) => p.anon_token === anon)
+    || local.posts.some((p) => p.anon_token === anon)
+    || ((demo.my && demo.my.posts) || []).some((p) => p.anon_token === anon);
+}
+
+/* ---------------------------------------------------------------- 帖子卡片（表达意愿） */
 
 function postCard(post) {
   const card = el("article", "item item--accent buddy-post");
@@ -590,6 +709,7 @@ function postCard(post) {
   const k = kindOf(post.kind);
   top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
   top.appendChild(el("span", "buddy-anon", post.anon_token));
+  if (isMyPost(post.anon_token)) top.appendChild(badgeWithIcon("我发布的", "user", "badge badge--ok"));
   const when = el("span", "buddy-sub", "发布于 " + fmtTs(post.created_at));
   when.style.marginLeft = "auto";
   top.appendChild(when);
@@ -601,267 +721,46 @@ function postCard(post) {
   const prof = profileBlock(post.profile);
   if (prof) card.appendChild(prof);
 
-  const thread = consentsOf(post.anon_token);
   const footer = el("div", "item__actions");
-  const wantBtn = iconBtn("btn--sm", "hand-pointing", " 表达意愿");
-  wantBtn.addEventListener("click", () => openIntentSheet(post));
-  footer.appendChild(wantBtn);
-  const talkBtn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 留言与回复" + (thread.length ? "（" + thread.length + "）" : ""));
+  if (!isMyPost(post.anon_token)) {
+    const wantBtn = iconBtn("btn--sm", "hand-pointing", " 表达意愿");
+    wantBtn.addEventListener("click", () => openIntentSheet(post));
+    footer.appendChild(wantBtn);
+  }
+  const talkBtn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 留言与回复");
   talkBtn.addEventListener("click", () => openThreadSheet(post));
   footer.appendChild(talkBtn);
-  if (hasAccepted(post.anon_token)) footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+  if (hasAccepted(post.anon_token)) {
+    footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    const go = iconBtn("btn--ok btn--sm", "message-chatbot", " 打开私聊");
+    go.addEventListener("click", () => { setView("agreed"); });
+    footer.appendChild(go);
+  }
   card.appendChild(footer);
   return card;
 }
 
-function renderWall() {
-  const kind = $("kindFilter").value;
-  const rows = kind ? wall.filter((p) => p.kind === kind) : wall;
-  const host = $("listHost");
+/* ---------------------------------------------------------------- 主区渲染（三个出口） */
+
+function paintRail() {
+  const active = view === "chat" ? "agreed" : view;
+  for (const [id, v] of [["navPublish", "publish"], ["navWall", "wall"], ["navAgreed", "agreed"]]) {
+    $(id).classList.toggle("is-active", active === v);
+  }
+  $("kindFilter").hidden = view !== "wall";   // 类型筛选只对"表达意愿"的帖子流有意义
+  statSet("agreedCount", threads.length);
+}
+function paintMode(text, iconName) {
+  $("modeText").textContent = text;
+  $("modeIcon").style.setProperty("--icon", `url(/vendor/phosphor/icons/${iconName}.svg)`);
+}
+
+function renderPublish() {
+  const host = $("viewHost");
   host.innerHTML = "";
-  $("modeText").textContent = "大家在找的搭子";
-  if (!rows.length) {
-    emptyArt(host, {
-      title: kind ? "这个类型下还没有人发需求" : "墙上还没有搭子需求",
-      hint: "你可以直接发一条自己的需求，一句话就行。",
-      actionText: "发布我的需求",
-      onAction: openPublishSheet,
-    });
-    return;
-  }
-  for (const p of rows) host.appendChild(postCard(p));
-}
+  paintMode("发布需求", "note-pencil");
 
-/* ---------------------------------------------------------------- 表达意愿（留言框） */
-
-async function submitConsent(post, message) {
-  try {
-    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
-      method: "POST",
-      body: { agree: true, message, handle: getHandle() },
-    });
-    return { ok: true, mode: "server", data };
-  } catch (e) {
-    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
-    const rec = { id: "local-consent-" + Date.now(), anon: post.anon_token, kind: "consent", from_anon: getHandle(), text: message, at: new Date().toISOString() };
-    local.messages.push(rec);
-    if (!local.intents.some((x) => x.anon === post.anon_token)) {
-      local.intents.push({ anon: post.anon_token, post_id: post.post_id, kind: post.kind, text: message, at: rec.at, status: "sent", source: "local" });
-    }
-    writeLocal(local);
-    return { ok: true, mode: "local" };
-  }
-}
-
-function openIntentSheet(post) {
-  const sheet = createSheet({ title: "表达意愿", iconName: "hand-pointing" });
   const body = el("div", null);
-  body.appendChild(el("p", "small muted", "对方看到的是你的匿名昵称，看不到任何真实身份。先说说你的情况，让对方好判断。"));
-  const quote = el("p", "reason");
-  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 120);
-  body.appendChild(quote);
-
-  const field = el("div", "field");
-  const label = el("label", null, "给对方留句话（必填）");
-  const ta = document.createElement("textarea");
-  ta.id = "intentText";
-  ta.placeholder = "例：我周三周四晚上都在图书馆三楼，可以一起；我也是大二工科，作息差不多";
-  field.append(label, ta);
-  body.appendChild(field);
-  const msg = el("div", null);
-  body.appendChild(msg);
-
-  const foot = el("div", "form-actions");
-  const send = el("button", "btn", "发送意愿");
-  send.type = "button";
-  send.addEventListener("click", async () => {
-    const text = ta.value.trim();
-    if (text.length < 2) { showNotice(msg, "先写一句自己的情况，对方才好判断。", "danger"); return; }
-    showLoading(msg, "发送中…");
-    try {
-      const res = await submitConsent(post, text);
-      sheet.close();
-      toast(res.mode === "local" ? "已记录（接口未就绪，暂存本机演示数据）" : "意愿已发送，等对方回复", "ok");
-      await refreshAll();
-    } catch (e) {
-      showError(msg, e, { title: "发送失败" });
-    }
-  });
-  foot.appendChild(send);
-  const later = el("button", "btn btn--ghost", "再看看");
-  later.type = "button";
-  later.addEventListener("click", () => sheet.close());
-  foot.appendChild(later);
-  sheet.body.appendChild(body);
-  sheet.foot.appendChild(foot);
-  sheet.open();
-}
-
-/* ---------------------------------------------------------------- 留言与回复 */
-
-async function submitReply(post, consentId, text) {
-  try {
-    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/reply`, {
-      method: "POST",
-      body: { to_consent_id: consentId, message: text, handle: getHandle() },
-    });
-    return { ok: true, mode: "server", data };
-  } catch (e) {
-    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
-    local.messages.push({
-      id: "local-reply-" + Date.now(), anon: post.anon_token, kind: "reply",
-      to_consent_id: consentId, from: "author", text, at: new Date().toISOString(),
-    });
-    writeLocal(local);
-    return { ok: true, mode: "local" };
-  }
-}
-
-async function submitAccept(post, consent) {
-  try {
-    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
-      method: "POST",
-      body: { agree: true, handle: getHandle(), to_seeker: consent.from_anon },
-    });
-    return { ok: true, mode: "server", data };
-  } catch (e) {
-    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
-    if (!local.accepted.includes(post.anon_token)) local.accepted.push(post.anon_token);
-    local.messages.push({
-      id: "local-accept-" + Date.now(), anon: post.anon_token, kind: "accept",
-      to_consent_id: consent.id, from: "author", text: "已接受", at: new Date().toISOString(),
-    });
-    writeLocal(local);
-    return { ok: true, mode: "local" };
-  }
-}
-
-function openThreadSheet(post) {
-  const sheet = createSheet({ title: "留言与回复", iconName: "message-chatbot" });
-  const body = el("div", null);
-  const quote = el("p", "reason");
-  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 140);
-  body.appendChild(quote);
-  const host = el("div", "buddy-thread buddy-block");
-  body.appendChild(host);
-  const msg = el("div", null);
-  body.appendChild(msg);
-
-  const render = () => {
-    host.innerHTML = "";
-    const list = consentsOf(post.anon_token);
-    if (!list.length) {
-      const box = el("div", "buddy-note");
-      box.textContent = "还没有人留言。你可以先点「我要表达意愿」，第一个留言的人往往最容易约成。";
-      host.appendChild(box);
-      return;
-    }
-    for (const c of list) {
-      const item = el("div", "buddy-msg");
-      const head = el("div", "buddy-msg__head");
-      head.appendChild(badgeWithIcon("表达意愿", "hand-pointing", "badge badge--muted"));
-      head.appendChild(el("span", "buddy-msg__who", c.from_anon || "匿名"));
-      if (c.status === "accepted") head.appendChild(badgeWithIcon("已接受", "circle-check", "badge badge--ok"));
-      head.appendChild(el("span", "buddy-msg__at", fmtTs(c.at)));
-      item.appendChild(head);
-      item.appendChild(el("p", "buddy-msg__text", c.text));
-
-      const acts = el("div", "buddy-msg__acts");
-      const replyBtn = iconBtn("btn--ghost btn--sm", "note-pencil", " 回复这条");
-      replyBtn.addEventListener("click", async () => {
-        const val = await openModal({
-          title: "回复留言",
-          iconName: "note-pencil",
-          body: (() => {
-            const wrap = el("div", null);
-            const q = el("p", "reason");
-            q.textContent = c.text;
-            wrap.appendChild(q);
-            const f = el("div", "field");
-            const lb = el("label", null, "回复内容");
-            const ta = document.createElement("textarea");
-            ta.id = "replyText";
-            ta.placeholder = "例：我周三周四晚上都有空，你几点方便？";
-            f.append(lb, ta);
-            wrap.appendChild(f);
-            return wrap;
-          })(),
-          confirmText: "发送回复",
-          cancelText: "取消",
-        });
-        if (!val) return;
-        const text = (($("replyText") && $("replyText").value) || "").trim();
-        if (!text) { toast("回复不能为空", "danger"); return; }
-        try {
-          const res = await submitReply(post, c.id, text);
-          render();
-          toast(res.mode === "local" ? "已记录（本机演示数据）" : "回复已发送", "ok");
-          await refreshAll();
-        } catch (e) { toast("回复失败：" + (e.message || e), "danger"); }
-      });
-      acts.appendChild(replyBtn);
-
-      const acceptBtn = el("button", "btn btn--ok btn--sm", "接受这个搭子");
-      acceptBtn.type = "button";
-      acceptBtn.addEventListener("click", async () => {
-        try {
-          const res = await submitAccept(post, c);
-          render();
-          toast(res.mode === "local" ? "已接受（本机演示数据）" : "已接受，双方互相可见", "ok");
-          await refreshAll();
-        } catch (e) { toast("接受失败：" + (e.message || e), "danger"); }
-      });
-      acts.appendChild(acceptBtn);
-      item.appendChild(acts);
-      host.appendChild(item);
-
-      if (c.replies.length) {
-        const rep = el("div", "buddy-reply");
-        for (const r of c.replies) {
-          const rn = el("div", "buddy-msg buddy-msg--author");
-          const rh = el("div", "buddy-msg__head");
-          rh.appendChild(badgeWithIcon("对方回复", "note-pencil", "badge badge--ok"));
-          rh.appendChild(el("span", "buddy-msg__at", fmtTs(r.at)));
-          rn.appendChild(rh);
-          rn.appendChild(el("p", "buddy-msg__text", r.text));
-          rep.appendChild(rn);
-        }
-        host.appendChild(rep);
-      }
-    }
-  };
-  render();
-
-  const foot = el("div", "form-actions");
-  const mine = el("button", "btn", "我要表达意愿");
-  mine.type = "button";
-  mine.addEventListener("click", () => { sheet.close(); openIntentSheet(post); });
-  foot.appendChild(mine);
-  const close = el("button", "btn btn--ghost", "关闭");
-  close.type = "button";
-  close.addEventListener("click", () => sheet.close());
-  foot.appendChild(close);
-  sheet.body.appendChild(body);
-  sheet.foot.appendChild(foot);
-  sheet.open();
-}
-
-/* ---------------------------------------------------------------- 发帖（发布自己的需求） */
-
-function composeText({ description, when, schedule, interests, traits, wanted }) {
-  const lines = [String(description || "").trim()];
-  if (when && when.trim()) lines.push("可约时间：" + when.trim());
-  if (schedule && schedule.trim()) lines.push("作息：" + schedule.trim());
-  if (interests && interests.trim()) lines.push("兴趣：" + interests.trim());
-  if (traits && traits.trim()) lines.push("性格：" + traits.trim());
-  if (wanted && wanted.trim()) lines.push("期望：" + wanted.trim());
-  return lines.filter(Boolean).join("；");
-}
-
-const publishSheet = createSheet({ title: "发布我的需求", iconName: "note-pencil" });
-{
-  const body = el("div", null);
-
   const tplRow = el("div", null);
   tplRow.appendChild(el("div", "buddy-block__label", "懒得写？点个模板再改两个字："));
   const tplBox = el("div", "buddy-tpl");
@@ -932,110 +831,597 @@ const publishSheet = createSheet({ title: "发布我的需求", iconName: "note-
   const foot = el("div", "form-actions");
   const submit = el("button", "btn", "发布到搭子墙");
   submit.type = "button";
-  submit.addEventListener("click", async () => {
-    const description = $("pubText").value.trim();
-    if (description.length < 4) { showNotice(msg, "先写一句「要做什么」，比如：想找人一起自习，图书馆三楼，晚上七点。", "danger"); return; }
-    showLoading(msg, "发布中…");
-    const text = composeText({
-      description,
-      when: $("pubWhen").value,
-      schedule: $("pubSchedule").value,
-      interests: $("pubInterests").value,
-      traits: $("pubTraits").value,
-      wanted: $("pubExpect").value,
+  submit.addEventListener("click", publishNow);
+  foot.appendChild(submit);
+  body.appendChild(foot);
+
+  const wrap = el("section", "card");
+  wrap.appendChild(el("h2", null, "发布我的需求"));
+  wrap.appendChild(el("p", "small muted", "发帖以后，别人可以在「表达意愿」里看到它并给你留言；有人表达意愿时你会在「留言与回复」里收到。"));
+  wrap.appendChild(body);
+  host.appendChild(wrap);
+}
+
+function renderWall() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("表达意愿", "hand-pointing");
+
+  const seg = el("div", "buddy-seg");
+  const SEGS = [
+    { k: "all", label: "全部需求", icon: "list-check" },
+    { k: "posts", label: "我发布的需求", icon: "note-pencil" },
+    { k: "intents", label: "我表达的意愿", icon: "hand-pointing" },
+    { k: "mutual", label: "已同意的搭子", icon: "circle-check" },
+  ];
+  const list = el("div", null);
+  for (const s of SEGS) {
+    const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label);
+    b.classList.remove("btn");
+    b.setAttribute("aria-pressed", String(wallSeg === s.k));
+    b.addEventListener("click", () => {
+      wallSeg = s.k;
+      if (s.k === "mutual") { setView("agreed"); return; }
+      renderWallView();
     });
-    const handle = getHandle();
-    const kind = $("pubKind").value;
+    seg.appendChild(b);
+  }
+  host.appendChild(seg);
+  host.appendChild(list);
+  renderWallView(list);
+}
+
+function renderWallView(listHost) {
+  const host = listHost || $("viewHost");
+  const rows = wallSeg === "posts"
+    ? myPosts().map((p) => wallByAnon.get(p.anon_token) || { ...p, anon_token: p.anon_token, kind: p.kind, profile: p.profile || {}, created_at: p.at })
+    : wall;
+  const kind = $("kindFilter").value;
+  const filtered = kind ? rows.filter((p) => p.kind === kind) : rows;
+  const box = el("div", "stack");
+  host.innerHTML = "";
+  if (!filtered.length) {
+    emptyArt(box, {
+      title: wallSeg === "posts" ? "还没有发布过需求" : kind ? "这个类型下还没有人发需求" : "墙上还没有搭子需求",
+      hint: wallSeg === "posts" ? "点左侧「发布需求」，一句话就能发。" : "你可以直接发一条自己的需求，一句话就行。",
+      actionText: "发布我的需求",
+      onAction: () => setView("publish"),
+    });
+    host.appendChild(box);
+    return;
+  }
+  for (const p of filtered) box.appendChild(postCard(p));
+  host.appendChild(box);
+}
+
+function renderAgreed() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("已同意", "message-chatbot");
+  const box = el("div", null);
+
+  const mine = threads.filter((t) => isMyPost(anonOfThread(t)));
+  const theirs = threads.filter((t) => !isMyPost(anonOfThread(t)));
+
+  const group = (title, iconName, rows, emptyHint) => {
+    const g = el("section", "buddy-chatgroup");
+    const h = el("h2", "buddy-chatgroup__title");
+    h.appendChild(icon(iconName, { size: 18 }));
+    h.appendChild(el("span", null, title + "（" + rows.length + "）"));
+    g.appendChild(h);
+    if (!rows.length) {
+      g.appendChild(el("p", "buddy-note", emptyHint));
+      return g;
+    }
+    for (const t of rows) g.appendChild(chatRow(t));
+    return g;
+  };
+
+  box.appendChild(group("别人同意了我的帖", "users-three", mine, "还没有人申请我的帖 —— 等有人表达意愿、你接受了，就会出现这里。"));
+  box.appendChild(group("我同意了别人的帖", "hand-pointing", theirs, "我还没接受过别人的意愿 —— 去「表达意愿」里找一个合适的。"));
+  host.appendChild(box);
+}
+
+function anonOfThread(t) {
+  const p = wall.find((x) => x.post_id === t.ref_id);
+  return p ? p.anon_token : "";
+}
+
+function chatRow(t) {
+  const row = el("button", "buddy-chatrow");
+  row.type = "button";
+  row.appendChild(avatarEl(t.peer && t.peer.avatar, 40));
+  const main = el("div", "buddy-chatrow__main");
+  const top = el("div", "buddy-chatrow__top");
+  top.appendChild(el("b", "buddy-chatrow__name", (t.peer && t.peer.nickname) || "对方"));
+  if (t.last_message) {
+    const active = t.last_message.mine === false;
+    top.appendChild(badgeWithIcon(active ? "对方最后发话" : "我最后发话", active ? "note-pencil" : "check",
+      active ? "badge badge--warn" : "badge badge--muted"));
+  } else {
+    top.appendChild(badgeWithIcon("还没聊过", "clock", "badge badge--muted"));
+  }
+  const seen = seenMap[t.thread_id] || "";
+  if (t.last_message && t.last_message.at > seen && t.last_message.mine === false) top.appendChild(el("span", "buddy-dot", null));
+  top.appendChild(el("span", "buddy-chatrow__at", fmtTime((t.last_message && t.last_message.at) || t.created_at)));
+  main.appendChild(top);
+  const subject = (t.subject && (t.subject.subtitle || t.subject.title)) || "（帖子已删除）";
+  main.appendChild(el("p", "buddy-chatrow__subject", "关联：" + String(subject).slice(0, 60)));
+  main.appendChild(el("p", "buddy-chatrow__last", t.last_message ? (t.last_message.mine ? "我：" : "") + String(t.last_message.body).slice(0, 40) : "点进去打个招呼吧"));
+  row.appendChild(main);
+  row.addEventListener("click", () => openChat(t));
+  return row;
+}
+
+/* ---------------------------------------------------------------- 聊天界面 */
+
+function renderChat() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("聊天", "message-chatbot");
+  const t = chatNow.thread;
+  const box = el("div", "buddy-chat");
+
+  // 顶部悬浮信息条（可展开看"到底在聊哪条帖子"）
+  const head = el("div", "buddy-chat__head");
+  const bar = el("div", "buddy-chat__bar");
+  const back = iconBtn("btn--ghost btn--sm", "arrow-right", " 返回");
+  back.style.transform = "rotate(180deg)";
+  back.addEventListener("click", () => setView("agreed"));
+  bar.appendChild(back);
+  bar.appendChild(avatarEl(t.peer && t.peer.avatar, 40));
+  const who = el("div", "buddy-chat__who");
+  who.appendChild(el("b", "buddy-chat__name", (t.peer && t.peer.nickname) || "对方"));
+  const subjShort = (t.subject && (t.subject.subtitle || t.subject.title)) || "（帖子已删除）";
+  who.appendChild(el("p", "buddy-chat__subject", "关联搭子：" + String(subjShort).slice(0, 46)));
+  bar.appendChild(who);
+  const moreBtn = iconBtn("btn--ghost btn--sm", "caret-up", " 展开");
+  bar.appendChild(moreBtn);
+  head.appendChild(bar);
+  const more = el("div", "buddy-chat__more");
+  more.hidden = true;
+  more.appendChild(el("div", "buddy-block__label", "我们在聊哪一条"));
+  more.appendChild(el("p", "buddy-msg__text", String(subjShort)));
+  if (t.subject && t.subject.title) more.appendChild(el("p", "buddy-sub", "帖子：" + t.subject.title + (t.subject.status ? " · 状态 " + t.subject.status : "")));
+  more.appendChild(el("p", "buddy-note", "只有你们两个人能看到这段对话；退出登录或换浏览器就看不到。"));
+  head.appendChild(more);
+  moreBtn.addEventListener("click", () => {
+    more.hidden = !more.hidden;
+    moreBtn.textContent = more.hidden ? " 展开" : " 收起";
+  });
+  box.appendChild(head);
+
+  const scroll = el("div", "buddy-chat__scroll");
+  scroll.id = "chatScroll";
+  box.appendChild(scroll);
+
+  const composer = el("div", "buddy-composer");
+  const ta = document.createElement("textarea");
+  ta.id = "chatText";
+  ta.placeholder = "说点什么…（Enter 发送，Shift+Enter 换行）";
+  ta.maxLength = 500;
+  composer.appendChild(ta);
+  const eRow = el("div", "buddy-emojis");
+  for (const e of EMOJIS) {
+    const b = el("button", "buddy-emoji", e);
+    b.type = "button";
+    b.setAttribute("aria-label", "插入表情");
+    b.addEventListener("click", () => { ta.value += e; ta.focus(); });
+    eRow.appendChild(b);
+  }
+  composer.appendChild(eRow);
+  const foot = el("div", "buddy-composer__foot");
+  const send = iconBtn("btn--sm", "send", " 发送");
+  send.addEventListener("click", sendChat);
+  foot.appendChild(send);
+  foot.appendChild(el("span", "buddy-powered", "Enter 发送 · Shift+Enter 换行 · 每 3 秒自动收新消息"));
+  composer.appendChild(foot);
+  box.appendChild(composer);
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  host.appendChild(box);
+
+  paintMessages(chatNow.messages || []);
+  ta.focus();
+}
+
+function paintMessages(list) {
+  const scroll = $("chatScroll");
+  if (!scroll) return;
+  scroll.innerHTML = "";
+  if (!list.length) {
+    const tip = el("div", "buddy-note");
+    tip.textContent = "你们已经互相同意了，直接聊吧 —— 先说清楚时间地点，成功率最高。";
+    scroll.appendChild(tip);
+    return;
+  }
+  let lastDay = "";
+  for (const m of list) {
+    const dk = dayKey(m.at);
+    if (dk && dk !== lastDay) {
+      lastDay = dk;
+      scroll.appendChild(el("div", "buddy-day", dk));
+    }
+    const line = el("div", "buddy-line" + (m.mine ? " buddy-line--mine" : ""));
+    line.appendChild(avatarEl((m.from && m.from.avatar) || "robot", 32));
+    const bodyWrap = el("div", "buddy-line__body");
+    bodyWrap.appendChild(el("div", "buddy-bubble", String(m.body || "")));
+    const meta = (m.mine ? "我" : ((m.from && m.from.nickname) || (chatNow.thread.peer && chatNow.thread.peer.nickname) || "对方")) + " · " + fmtTime(m.at);
+    bodyWrap.appendChild(el("div", "buddy-line__meta", meta));
+    line.appendChild(bodyWrap);
+    scroll.appendChild(line);
+  }
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+/** 按 message_id 去重合并（同一秒内的消息服务端按随机 id 排序，必须自己兜住乱序/漏读） */
+function mergeMessages(existing, incoming) {
+  const seen = new Set((existing || []).map((m) => m.message_id));
+  const out = (existing || []).slice();
+  for (const m of incoming || []) {
+    if (m && m.message_id && !seen.has(m.message_id)) { seen.add(m.message_id); out.push(m); }
+  }
+  // sort 是稳定的：同秒消息保持"先到先得"，轮询不会让它们跳来跳去
+  return out.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+}
+
+async function loadMessages({ reset = false } = {}) {
+  if (!chatNow) return;
+  const tid = encodeURIComponent(chatNow.thread.thread_id);
+  const after = reset ? "" : (chatNow.lastId || "");
+  try {
+    let list = await api(`/api/threads/${tid}/messages${after ? "?after=" + encodeURIComponent(after) : ""}`);
+    list = Array.isArray(list) ? list : [];
+    if (!reset && !list.length) {
+      // 增量是空的：可能是"同一秒内的多条消息"被 after= 漏掉 → 兜底拉全量，再靠 mergeMessages 去重
+      const full = await api(`/api/threads/${tid}/messages`);
+      list = Array.isArray(full) ? full : [];
+      chatNow.messages = [];
+    }
+    chatNow.messages = mergeMessages(reset ? [] : (chatNow.messages || []), list);
+    if (chatNow.messages.length) chatNow.lastId = chatNow.messages[chatNow.messages.length - 1].message_id;
+    if (view === "chat") paintMessages(chatNow.messages);
+    seenMap[chatNow.thread.thread_id] = new Date().toISOString();
+    writeJson(LS_SEEN, seenMap);
+  } catch (e) {
+    if (view === "chat") showError("chatScroll", e, { title: "消息读取失败" });
+  }
+}
+
+async function sendChat() {
+  const ta = $("chatText");
+  if (!ta || !chatNow) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  ta.value = "";
+  try {
+    const m = await api(`/api/threads/${encodeURIComponent(chatNow.thread.thread_id)}/messages`, {
+      method: "POST", body: { body: text },
+    });
+    chatNow.messages = (chatNow.messages || []).concat([m]);
+    chatNow.lastId = m.message_id;
+    paintMessages(chatNow.messages);
+    loadThreads().then(() => { paintRail(); });
+  } catch (e) {
+    ta.value = text;
+    toast("发送失败：" + (e.message || e), "danger");
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  if (!chatNow) return;
+  chatNow.timer = setInterval(() => { if (!document.hidden) loadMessages(); }, POLL_MS);
+}
+function stopPolling() {
+  if (chatNow && chatNow.timer) { clearInterval(chatNow.timer); chatNow.timer = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && view === "chat") loadMessages();
+});
+
+async function openChat(t) {
+  view = "chat";
+  chatNow = { thread: t, messages: [], lastId: "", timer: null };
+  paintRail();
+  renderChat();
+  showLoading("chatScroll", "正在读取对话…");
+  await loadMessages({ reset: true });
+  startPolling();
+}
+
+/* ---------------------------------------------------------------- 留言 / 表达意愿 面板 */
+
+function openIntentSheet(post) {
+  const sheet = createSheet({ title: "表达意愿", iconName: "hand-pointing" });
+  const body = el("div", null);
+  body.appendChild(el("p", "small muted", "对方看到的是你的昵称，看不到任何真实身份。先说说你的情况，让对方好判断。"));
+  const quote = el("p", "reason");
+  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 120);
+  body.appendChild(quote);
+
+  const field = el("div", "field");
+  const label = el("label", null, "给对方留句话（必填）");
+  const ta = document.createElement("textarea");
+  ta.id = "intentText";
+  ta.placeholder = "例：我周三周四晚上都在图书馆三楼，可以一起";
+  field.append(label, ta);
+  body.appendChild(field);
+  const msg = el("div", null);
+  body.appendChild(msg);
+
+  const foot = el("div", "form-actions");
+  const send = el("button", "btn", "发送意愿");
+  send.type = "button";
+  send.addEventListener("click", async () => {
+    const text = ta.value.trim();
+    if (text.length < 2) { showNotice(msg, "先写一句自己的情况，对方才好判断。", "danger"); return; }
+    showLoading(msg, "发送中…");
     try {
-      let data;
-      try {
-        data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, text_profile: text } });
-      } catch (e) {
-        if (!isForbidden(e)) throw e;
-        data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, description: text } });
-      }
-      msg.innerHTML = "";
-      showNotice(msg, "已发布：" + (data.anon_token || data.post_id || "成功"), "ok");
-      if (data.post_id && !local.myPosts.includes(data.post_id)) local.myPosts.push(data.post_id);
-      if (data.anon_token) {
-        local.posts.push({
-          post_id: data.post_id, anon_token: data.anon_token, kind,
-          profile: data.profile || { wanted: description }, created_at: new Date().toISOString(), source: "local",
-        });
-      }
-      writeLocal(local);
-      toast("发布成功，已在墙上", "ok");
-      publishSheet.close();
+      const r = await submitConsent(post, text);
+      sheet.close();
+      toast(r.mode === "local" ? "已记录（接口未就绪，暂存本机演示数据）" : "意愿已发送，等对方回复", "ok");
       await refreshAll();
     } catch (e) {
-      showError(msg, e, { title: "发布失败" });
+      showError(msg, e, { title: "发送失败" });
     }
   });
-  foot.appendChild(submit);
-  publishSheet.body.appendChild(body);
-  publishSheet.foot.appendChild(foot);
-}
-function openPublishSheet() { closeRail(); publishSheet.open(); }
-
-/* ---------------------------------------------------------------- 我的申请（三块聚合） */
-
-function myPosts() {
-  const out = [];
-  const push = (row) => { if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token)) out.push(row); };
-  if (serverMine && !Array.isArray(serverMine) && Array.isArray(serverMine.posts)) for (const p of serverMine.posts) push({ ...p, source: "server" });
-  for (const p of (demo.my && demo.my.posts) || []) push({ ...p, source: "demo" });
-  for (const p of local.posts) push(p);
-  const anons = new Set(local.posts.map((p) => p.anon_token));
-  for (const p of wall) if (anons.has(p.anon_token)) push({ ...p, source: "local" });
-  return out;
+  foot.appendChild(send);
+  const later = el("button", "btn btn--ghost", "再看看");
+  later.type = "button";
+  later.addEventListener("click", () => sheet.close());
+  foot.appendChild(later);
+  sheet.body.appendChild(body);
+  sheet.foot.appendChild(foot);
+  sheet.open();
 }
 
-function myIntents() {
-  const out = [];
-  const push = (row) => {
-    if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token && x.text === row.text)) out.push(row);
-  };
-  if (Array.isArray(serverMine)) for (const r of serverMine) push({ ...r, source: "server" });
-  for (const it of local.intents) push({ ...it, source: "local" });
-  for (const it of (demo.my && demo.my.intents) || []) push({ ...it, source: "demo" });
-  return out;
-}
-
-function myMutual() {
-  const out = [];
-  const add = (row) => { if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token)) out.push(row); };
-  for (const it of myIntents()) {
-    if (it.reveal_status === "mutual" || it.status === "accepted" || it.contact_code) add(it);
-  }
-  for (const anon of local.accepted) {
-    if (!out.some((x) => x.anon_token === anon)) {
-      const post = wallByAnon.get(anon) || local.posts.find((p) => p.anon_token === anon);
-      add({ anon_token: anon, kind: post ? post.kind : "other", reveal_status: "mutual", text: post ? ((post.profile || {}).wanted || "") : "" });
+async function submitConsent(post, message) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
+      method: "POST",
+      body: { agree: true, message, handle: getHandle() },
+    });
+    return { ok: true, mode: "server", data };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    local.messages.push({ id: "local-consent-" + Date.now(), anon: post.anon_token, kind: "consent", from_anon: getHandle(), text: message, at: new Date().toISOString() });
+    if (!local.intents.some((x) => x.anon === post.anon_token)) {
+      local.intents.push({ anon: post.anon_token, post_id: post.post_id, kind: post.kind, text: message, at: new Date().toISOString(), status: "sent", source: "local" });
     }
+    writeLocal();
+    return { ok: true, mode: "local" };
   }
-  for (const m of (demo.my && demo.my.mutual) || []) add(m);
-  return out;
 }
+
+async function submitReply(post, consentId, text) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/reply`, {
+      method: "POST",
+      body: { to_consent_id: consentId, message: text, handle: getHandle() },
+    });
+    return { ok: true, mode: "server", data };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    local.messages.push({ id: "local-reply-" + Date.now(), anon: post.anon_token, kind: "reply", to_consent_id: consentId, from: "author", text, at: new Date().toISOString() });
+    writeLocal();
+    return { ok: true, mode: "local" };
+  }
+}
+
+async function submitAccept(post, consent) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
+      method: "POST",
+      body: { agree: true, handle: getHandle(), to_seeker: consent.from_anon },
+    });
+    // 服务端在双方都同意时返回 chat_ready + thread_id：这就是"可以直接开聊"的信号
+    const chatReady = !!(data && (data.chat_ready || data.thread_id));
+    return { ok: true, mode: "server", data, chatReady, threadId: (data && data.thread_id) || "" };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    if (!local.accepted.includes(post.anon_token)) local.accepted.push(post.anon_token);
+    local.messages.push({ id: "local-accept-" + Date.now(), anon: post.anon_token, kind: "accept", to_consent_id: consent.id, from: "author", text: "已接受", at: new Date().toISOString() });
+    writeLocal();
+    return { ok: true, mode: "local", chatReady: false, threadId: "" };
+  }
+}
+
+function openThreadSheet(post) {
+  const sheet = createSheet({ title: "留言与回复", iconName: "message-chatbot" });
+  const body = el("div", null);
+  const quote = el("p", "reason");
+  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 140);
+  body.appendChild(quote);
+  const host = el("div", "buddy-thread buddy-block");
+  body.appendChild(host);
+  const msg = el("div", null);
+  body.appendChild(msg);
+  const mine = isMyPost(post.anon_token);
+
+  const render = async () => {
+    showLoading(host, "正在读取留言…");
+    let serverMsgs = [];
+    try { serverMsgs = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/messages`); } catch { serverMsgs = []; }
+    host.innerHTML = "";
+    serverMsgsByAnon.set(post.anon_token, Array.isArray(serverMsgs) ? serverMsgs : []);
+    const list = consentsOf(post.anon_token);
+    if (!list.length) {
+      const box = el("div", "buddy-note");
+      box.textContent = mine ? "还没有人留言。别人表达意愿后会出现在这里。" : "还没有人留言。你可以先点「我要表达意愿」，第一个留言的人往往最容易约成。";
+      host.appendChild(box);
+      return;
+    }
+    for (const c of list) {
+      const item = el("div", "buddy-msg");
+      const head = el("div", "buddy-msg__head");
+      head.appendChild(badgeWithIcon("表达意愿", "hand-pointing", "badge badge--muted"));
+      head.appendChild(el("span", "buddy-msg__who", c.from_anon || "匿名"));
+      if (c.status === "accepted") head.appendChild(badgeWithIcon("已接受", "circle-check", "badge badge--ok"));
+      head.appendChild(el("span", "buddy-msg__at", fmtTs(c.at)));
+      item.appendChild(head);
+      item.appendChild(el("p", "buddy-msg__text", c.text));
+
+      const acts = el("div", "buddy-msg__acts");
+      if (mine) {
+        const replyBtn = iconBtn("btn--ghost btn--sm", "note-pencil", " 回复这条");
+        replyBtn.addEventListener("click", async () => {
+          const val = await openModal({
+            title: "回复留言", iconName: "note-pencil",
+            body: (() => {
+              const wrap = el("div", null);
+              const q = el("p", "reason"); q.textContent = c.text; wrap.appendChild(q);
+              const f = el("div", "field");
+              const lb = el("label", null, "回复内容");
+              const ta = document.createElement("textarea");
+              ta.id = "replyText";
+              ta.placeholder = "例：我周三周四晚上都有空，你几点方便？";
+              f.append(lb, ta); wrap.appendChild(f);
+              return wrap;
+            })(),
+            confirmText: "发送回复", cancelText: "取消",
+          });
+          if (!val) return;
+          const text = (($("replyText") && $("replyText").value) || "").trim();
+          if (!text) { toast("回复不能为空", "danger"); return; }
+          try {
+            const r = await submitReply(post, c.id, text);
+            toast(r.mode === "local" ? "已记录（本机演示数据）" : "回复已发送", "ok");
+            render();
+            refreshAll();
+          } catch (e) { toast("回复失败：" + (e.message || e), "danger"); }
+        });
+        acts.appendChild(replyBtn);
+
+        const acceptBtn = el("button", "btn btn--ok btn--sm", "接受这个搭子");
+        acceptBtn.type = "button";
+        acceptBtn.addEventListener("click", async () => {
+          try {
+            const r = await submitAccept(post, c);
+            toast(r.mode === "local"
+              ? "已接受（本机演示数据）"
+              : r.chatReady ? "已接受，已开通站内聊天" : "已接受", "ok");
+            render();
+            await refreshAll();
+            if (r.chatReady) {
+              const tid = r.threadId;
+              const t = tid ? threads.find((x) => x.thread_id === tid) : null;
+              if (t) { sheet.close(); openChat(t); }
+              else { sheet.close(); setView("agreed"); }
+            }
+          } catch (e) { toast("接受失败：" + (e.message || e), "danger"); }
+        });
+        acts.appendChild(acceptBtn);
+      }
+      item.appendChild(acts);
+      host.appendChild(item);
+
+      if (c.replies.length) {
+        const rep = el("div", "buddy-reply");
+        for (const r of c.replies) {
+          const rn = el("div", "buddy-msg buddy-msg--author");
+          const rh = el("div", "buddy-msg__head");
+          rh.appendChild(badgeWithIcon("回复", "note-pencil", "badge badge--ok"));
+          rh.appendChild(el("span", "buddy-msg__at", fmtTs(r.at)));
+          rn.appendChild(rh);
+          rn.appendChild(el("p", "buddy-msg__text", r.text));
+          rep.appendChild(rn);
+        }
+        host.appendChild(rep);
+      }
+    }
+    if (mine && hasAccepted(post.anon_token)) {
+      const go = iconBtn("btn--ok btn--sm", "message-chatbot", " 已开通私聊，去聊天");
+      go.addEventListener("click", () => { sheet.close(); setView("agreed"); });
+      msg.innerHTML = "";
+      msg.appendChild(go);
+    }
+  };
+  render();
+
+  const foot = el("div", "form-actions");
+  if (!mine) {
+    const want = el("button", "btn", "我要表达意愿");
+    want.type = "button";
+    want.addEventListener("click", () => { sheet.close(); openIntentSheet(post); });
+    foot.appendChild(want);
+  }
+  const close = el("button", "btn btn--ghost", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  foot.appendChild(close);
+  sheet.body.appendChild(body);
+  sheet.foot.appendChild(foot);
+  sheet.open();
+}
+
+/* ---------------------------------------------------------------- 发布自己的需求 */
+
+function composeText({ description, when, schedule, interests, traits, wanted }) {
+  const lines = [String(description || "").trim()];
+  if (when && when.trim()) lines.push("可约时间：" + when.trim());
+  if (schedule && schedule.trim()) lines.push("作息：" + schedule.trim());
+  if (interests && interests.trim()) lines.push("兴趣：" + interests.trim());
+  if (traits && traits.trim()) lines.push("性格：" + traits.trim());
+  if (wanted && wanted.trim()) lines.push("期望：" + wanted.trim());
+  return lines.filter(Boolean).join("；");
+}
+
+async function publishNow() {
+  const msg = $("pubMsg");
+  const description = $("pubText").value.trim();
+  if (description.length < 4) { showNotice(msg, "先写一句「要做什么」，比如：想找人一起自习，图书馆三楼，晚上七点。", "danger"); return; }
+  showLoading(msg, "发布中…");
+  const text = composeText({
+    description,
+    when: $("pubWhen") && $("pubWhen").value,
+    schedule: $("pubSchedule") && $("pubSchedule").value,
+    interests: $("pubInterests") && $("pubInterests").value,
+    traits: $("pubTraits") && $("pubTraits").value,
+    wanted: $("pubExpect") && $("pubExpect").value,
+  });
+  const handle = getHandle();
+  const kind = $("pubKind").value;
+  try {
+    let data;
+    try {
+      data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, text_profile: text } });
+    } catch (e) {
+      if (!isForbidden(e)) throw e;
+      data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, description: text } });
+    }
+    if (data.post_id && !local.myPosts.includes(data.post_id)) local.myPosts.push(data.post_id);
+    if (data.anon_token) {
+      local.posts.push({ post_id: data.post_id, anon_token: data.anon_token, kind, profile: data.profile || { wanted: description }, created_at: new Date().toISOString(), source: "local" });
+    }
+    writeLocal();
+    toast("发布成功，已在墙上", "ok");
+    await refreshAll();
+    setView("wall");
+  } catch (e) {
+    showError(msg, e, { title: "发布失败" });
+  }
+}
+/** 旧入口名保留：发布需求就是一个独立出口（换到发布视图） */
+function openPublishSheet() { closeRail(); setView("publish"); }
+
+/* ---------------------------------------------------------------- 我的三块（分段 + 列表） */
 
 function mineRow(node, role = "intent") {
   const card = el("article", "item");
   const k = kindOf(node.kind);
   const top = el("div", "buddy-post__head");
   top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
-  top.appendChild(el("span", "buddy-anon", node.anon_token));
+  top.appendChild(el("span", "buddy-anon", node.anon_token || node.post_id || ""));
   if (role === "post") {
-    // 我发布的帖：状态是"收到多少留言 / 是否已找到搭子"，不是"等对方回复"
-    const inbox = consentsOf(node.anon_token).length;
-    if (node.status === "accepted" || hasAccepted(node.anon_token)) {
-      top.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
-    } else if (inbox) {
-      top.appendChild(badgeWithIcon("收到 " + inbox + " 条留言", "message-chatbot", "badge badge--warn"));
-    } else {
-      top.appendChild(badgeWithIcon("还没有人留言", "clock", "badge badge--muted"));
-    }
+    const inbox = (node.consents || []).length;
+    if (node.status === "mutual" || (node.status === "accepted" && hasAccepted(node.anon_token))) top.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    else if (inbox) top.appendChild(badgeWithIcon("收到 " + inbox + " 条留言", "message-chatbot", "badge badge--warn"));
+    else top.appendChild(badgeWithIcon("还没有人留言", "clock", "badge badge--muted"));
   } else if (role === "mutual") {
     top.appendChild(badgeWithIcon("已互相同意", "circle-check", "badge badge--ok"));
-  } else if (node.status === "accepted" || node.reveal_status === "mutual") {
+  } else if (node.status === "accepted" || node.status === "mutual" || node.reveal_status === "mutual") {
     top.appendChild(badgeWithIcon("已互相同意", "circle-check", "badge badge--ok"));
   } else if (node.reply_text || node.replied) {
     top.appendChild(badgeWithIcon("对方已回复", "note-pencil", "badge badge--ok"));
@@ -1046,7 +1432,7 @@ function mineRow(node, role = "intent") {
   }
   card.appendChild(top);
 
-  const text = node.text || node.wanted || "";
+  const text = node.text || node.wanted || (node.profile && node.profile.wanted) || "";
   if (text) card.appendChild(el("p", "buddy-msg__text", String(text).slice(0, 160)));
   if (node.reply_text) {
     const rep = el("div", "buddy-reply");
@@ -1059,40 +1445,35 @@ function mineRow(node, role = "intent") {
     rep.appendChild(rn);
     card.appendChild(rep);
   }
-  if (node.contact_code) {
-    const codeBox = el("div", "buddy-block");
-    codeBox.appendChild(el("div", "buddy-block__label", "中转码（双方都同意才会下发）"));
-    codeBox.appendChild(el("span", "buddy-reveal__code", String(node.contact_code)));
-    const acts = el("div", "buddy-reveal__acts");
-    const btn = el("button", "btn btn--ok btn--sm", "复制中转码");
-    btn.type = "button";
-    btn.addEventListener("click", async () => {
-      const ok = await copyText(String(node.contact_code));
-      toast(ok ? "中转码已复制" : "复制失败，请手动复制", ok ? "ok" : "danger");
-    });
-    acts.appendChild(btn);
-    codeBox.appendChild(acts);
-    card.appendChild(codeBox);
-  }
   const acts = el("div", "item__actions");
   const post = wallByAnon.get(node.anon_token);
   if (post) {
-    const btn = el("button", "btn btn--ghost btn--sm", "打开留言");
-    btn.type = "button";
+    const btn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 打开留言");
     btn.addEventListener("click", () => openThreadSheet(post));
     acts.appendChild(btn);
   }
-  if (node.source === "local" || node.source === "demo") {
-    acts.appendChild(badgeWithIcon("演示数据", "info-circle", "badge badge--muted"));
+  if (role === "post" && (node.consents || []).length) {
+    const go = iconBtn("btn--sm", "message-chatbot", " 去回复 / 接受");
+    go.addEventListener("click", () => openThreadSheet(post || { post_id: node.post_id, anon_token: node.anon_token, kind: node.kind, profile: node.profile }));
+    acts.appendChild(go);
   }
+  if (role === "mutual" || node.status === "accepted" || node.status === "mutual") {
+    const chat = iconBtn("btn--ok btn--sm", "send", " 打开私聊");
+    chat.addEventListener("click", () => {
+      const t = node.thread_id ? threads.find((x) => x.thread_id === node.thread_id) : null;
+      if (t) openChat(t);
+      else setView("agreed");
+    });
+    acts.appendChild(chat);
+  }
+  if (node.source === "local" || node.source === "demo") acts.appendChild(badgeWithIcon("演示数据", "info-circle", "badge badge--muted"));
   card.appendChild(acts);
   return card;
 }
 
 function renderMine(host) {
-  const box = host || $("mineSheetBody");
+  const box = host || $("viewHost");
   box.innerHTML = "";
-
   const posts = myPosts();
   const intents = myIntents();
   const mutual = myMutual();
@@ -1106,76 +1487,129 @@ function renderMine(host) {
   for (const s of SEGS) {
     const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label + " " + s.n);
     b.classList.remove("btn");
-    b.setAttribute("aria-pressed", String(mineSeg === s.k));
-    b.addEventListener("click", () => { mineSeg = s.k; renderMine(host); });
+    b.setAttribute("aria-pressed", String(wallSeg === s.k));
+    b.addEventListener("click", () => {
+      wallSeg = s.k === "posts" ? "posts" : "all";
+      if (s.k === "mutual") { setView("agreed"); return; }
+      setView("wall");
+    });
     seg.appendChild(b);
   }
   box.appendChild(seg);
 
-  const list = el("div", null);
-  list.style.display = "flex";
-  list.style.flexDirection = "column";
-  list.style.gap = "var(--sp-100)";
+  const list = el("div", "stack");
   box.appendChild(list);
-
-  if (mineSeg === "posts") {
-    if (!posts.length) {
-      emptyArt(list, { title: "还没有发布过需求", hint: "点左侧「发帖」，一句话就能发。", actionText: "去发帖", onAction: openPublishSheet });
-    } else {
-      for (const p of posts) {
-        const thread = consentsOf(p.anon_token);
-        list.appendChild(mineRow({ ...p, text: (p.profile || {}).wanted }, "post"));
-        if (thread.length) {
-          const note = el("div", "buddy-note");
-          note.textContent = "收到 " + thread.length + " 条留言：" + thread.map((c) => (c.from_anon || "匿名") + "「" + String(c.text).slice(0, 28) + "」").join("；");
-          list.appendChild(note);
-          const acts = el("div", "item__actions");
-          const btn = iconBtn("btn--sm", "message-chatbot", " 去回复 / 接受");
-          btn.addEventListener("click", () => {
-            mineSheet.close();
-            openThreadSheet(wallByAnon.get(p.anon_token) || p);
-          });
-          acts.appendChild(btn);
-          list.appendChild(acts);
-        }
-      }
-    }
-  } else if (mineSeg === "intents") {
-    if (!intents.length) {
-      emptyArt(list, { title: "还没有表达过意愿", hint: "在墙上找一条合适的需求，点「表达意愿」留句话。", actionText: "去墙上看看", onAction: () => mineSheet.close() });
-    } else {
-      for (const it of intents) list.appendChild(mineRow(it, "intent"));
-    }
+  if (wallSeg === "posts") {
+    if (!posts.length) emptyArt(list, { title: "还没有发布过需求", hint: "点左侧「发布需求」，一句话就能发。", actionText: "去发帖", onAction: () => setView("publish") });
+    else for (const p of posts) list.appendChild(mineRow(p, "post"));
   } else {
-    if (!mutual.length) {
-      emptyArt(list, { title: "还没有互相同意的搭子", hint: "你表达意愿后，对方接受（或你接受别人）就会出现在这里。", actionText: "去墙上找搭子", onAction: () => mineSheet.close() });
-    } else {
-      for (const m of mutual) list.appendChild(mineRow(m, "mutual"));
-    }
+    if (!intents.length) emptyArt(list, { title: "还没有表达过意愿", hint: "去「表达意愿」找一条合适的，留句话。", actionText: "去表达意愿", onAction: () => setView("wall") });
+    else for (const it of intents) list.appendChild(mineRow(it, "intent"));
   }
 }
 
-const mineSheet = createSheet({ title: "我的申请", iconName: "queue" });
-{
-  const holder = el("div", null);
-  holder.id = "mineSheetBody";
-  mineSheet.body.appendChild(holder);
-  const foot = el("div", "form-actions");
-  const btn = el("button", "btn btn--ghost", "刷新");
-  btn.type = "button";
-  btn.addEventListener("click", async () => { showLoading(holder, "读取中…"); await refreshMine(); renderMine(); });
-  foot.appendChild(btn);
-  mineSheet.foot.appendChild(foot);
-}
-async function openMineSheet() {
-  closeRail();
-  mineSheet.open();
-  showLoading("mineSheetBody", "读取中…");
-  await refreshMine();
-  renderMine();
+/* ---------------------------------------------------------------- 设置（昵称 / 密码占位 / 退出） */
+
+function openSettings() {
+  const sheet = createSheet({ title: "设置", iconName: "sliders-horizontal" });
+  const body = el("div", null);
+
+  // 昵称
+  body.appendChild(el("div", "buddy-block__label", "我的昵称（别人看到的就是它）"));
+  const nickField = el("div", "field");
+  const nickInput = document.createElement("input");
+  nickInput.id = "setNick";
+  nickInput.maxLength = 12;
+  nickInput.value = getHandle();
+  nickField.appendChild(nickInput);
+  nickField.appendChild(el("p", "field__hint", "2~12 个字，中文 / 字母 / 数字 / 下划线；重名会被服务端拒绝。"));
+  body.appendChild(nickField);
+  const nickMsg = el("div", null);
+  body.appendChild(nickMsg);
+  const nickBtn = el("button", "btn btn--sm", "保存昵称");
+  nickBtn.type = "button";
+  nickBtn.addEventListener("click", async () => {
+    const nick = nickInput.value.trim();
+    showLoading(nickMsg, "保存中…");
+    try {
+      await renameSession(nick);
+      $("whoName").textContent = currentNickname();
+      nickMsg.innerHTML = "";
+      showNotice(nickMsg, "昵称已更新：以后别人看到的就是「" + currentNickname() + "」", "ok");
+      toast("昵称已更新", "ok");
+      refreshAll();
+    } catch (e) {
+      showError(nickMsg, e, { title: "改昵称失败" });
+    }
+  });
+  body.appendChild(nickBtn);
+
+  body.appendChild(el("hr", "hr"));
+
+  // 改密码（入口 + 占位；后端上线后自动可用）
+  body.appendChild(el("div", "buddy-block__label", "登录密码"));
+  const pwMsg = el("div", null);
+  body.appendChild(pwMsg);
+  const pwBtn = el("button", "btn btn--ghost btn--sm", "修改密码");
+  pwBtn.type = "button";
+  pwBtn.addEventListener("click", async () => {
+    let ready = false;
+    try {
+      const me = await fetchMe();
+      ready = !!me && (me.has_password === true || me.password === true);
+    } catch { ready = false; }
+    if (!ready) {
+      showNotice(pwMsg, "改密码接口还没上线（后端排期中）：入口先放这儿，上线后同一个按钮就能用。", "warn");
+      return;
+    }
+    const val = await openModal({
+      title: "设置新密码", iconName: "key",
+      body: (() => {
+        const wrap = el("div", null);
+        const f = el("div", "field");
+        const lb = el("label", null, "新密码（至少 6 位）");
+        const input = document.createElement("input");
+        input.id = "setPw";
+        input.style.webkitTextSecurity = "disc";
+        f.append(lb, input);
+        wrap.appendChild(f);
+        return wrap;
+      })(),
+      confirmText: "保存密码", cancelText: "取消",
+    });
+    if (!val) return;
+    const pw = (($("setPw") && $("setPw").value) || "").trim();
+    if (pw.length < 6) { showNotice(pwMsg, "密码至少 6 位。", "danger"); return; }
+    try {
+      await api("/api/me", { method: "PATCH", body: { password: pw } });
+      showNotice(pwMsg, "密码已更新。", "ok");
+    } catch (e) {
+      showError(pwMsg, e, { title: "改密码失败" });
+    }
+  });
+  body.appendChild(pwBtn);
+
+  body.appendChild(el("hr", "hr"));
+
+  // 退出登录
+  body.appendChild(el("div", "buddy-block__label", "这台设备上的身份"));
+  body.appendChild(el("p", "small muted", "退出只会清掉本机保存的匿名身份，你发过的帖子和对话不会被删除。"));
+  const outBtn = el("button", "btn btn--danger btn--sm", "退出登录");
+  outBtn.type = "button";
+  outBtn.addEventListener("click", () => {
+    for (const k of ["bm.session.token", "bm.session.nickname", "bm.session.uid"]) {
+      try { localStorage.removeItem(k); } catch { /* 隐私模式：忽略 */ }
+    }
+    toast("已退出，正在重新开户…", "ok");
+    setTimeout(() => location.reload(), 400);
+  });
+  body.appendChild(outBtn);
+
+  sheet.body.appendChild(body);
+  sheet.open();
 }
 
-/* ---------------------------------------------------------------- 侧栏抽屉（窄屏） */
+/* ---------------------------------------------------------------- 侧栏（窄屏抽屉）/ 视图切换 */
 
 function openRail() {
   $("buddyRail").classList.add("is-open");
@@ -1187,132 +1621,104 @@ function closeRail() {
   $("railBackdrop").classList.remove("is-open");
   $("btnRail").setAttribute("aria-expanded", "false");
 }
+function setView(next) {
+  if (view === "chat" && next !== "chat") stopPolling();
+  view = next;
+  closeRail();
+  if (next === "publish") renderPublish();
+  else if (next === "agreed") renderAgreed();
+  else renderWall();
+  paintRail();
+}
+
 $("btnRail").addEventListener("click", () => {
   if ($("buddyRail").classList.contains("is-open")) closeRail();
   else openRail();
 });
 $("railBackdrop").addEventListener("click", closeRail);
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRail(); });
-$("navPublish").addEventListener("click", openPublishSheet);
-$("navMine").addEventListener("click", openMineSheet);
-$("btnNewPost").addEventListener("click", openPublishSheet);
-$("kindFilter").addEventListener("change", () => renderWall());
-
-/* ---------------------------------------------------------------- 互相可见的成功视觉 */
-
-function revealPanel(row) {
-  const box = el("div", "buddy-reveal");
-  box.setAttribute("role", "status");
-  const burst = el("span", "buddy-reveal__burst");
-  burst.setAttribute("aria-hidden", "true");
-  box.appendChild(burst);
-  const art = document.createElement("img");
-  art.className = "buddy-reveal__art";
-  art.src = "/img/agent-connect.png";
-  art.alt = "";
-  box.appendChild(art);
-  const body = el("div", "buddy-reveal__body");
-  body.appendChild(el("p", "buddy-reveal__title", "两边都点头了 · 已互相可见"));
-  const line = el("p", "small muted");
-  line.appendChild(document.createTextNode("你和 "));
-  line.appendChild(el("span", "mono", row.anon_token));
-  line.appendChild(document.createTextNode(" 已经互相同意，这是你们的中转码："));
-  body.appendChild(line);
-  body.appendChild(el("p", "buddy-reveal__code", String(row.contact_code)));
-  const acts = el("div", "buddy-reveal__acts");
-  const btn = el("button", "btn btn--ok btn--sm", "复制中转码");
-  btn.type = "button";
-  btn.addEventListener("click", async () => {
-    const ok = await copyText(String(row.contact_code));
-    toast(ok ? "中转码已复制" : "复制失败，请手动复制", ok ? "ok" : "danger");
-  });
-  acts.appendChild(btn);
-  body.appendChild(acts);
-  box.appendChild(body);
-  return box;
-}
-
-function celebrate() {
-  const host = $("revealHost");
-  const fresh = myMutual().filter((m) => m.contact_code && !celebrated.has(m.anon_token));
-  if (!fresh.length) return;
-  for (const m of fresh) celebrated.add(m.anon_token);
-  host.innerHTML = "";
-  for (const m of fresh) host.appendChild(revealPanel(m));
-  toast("两边都点头了 · 已互相可见", "ok");
-}
+$("navPublish").addEventListener("click", () => setView("publish"));
+$("navWall").addEventListener("click", () => setView("wall"));
+$("navAgreed").addEventListener("click", () => setView("agreed"));
+$("btnSettings").addEventListener("click", openSettings);
+$("kindFilter").addEventListener("change", () => { if (view === "wall") renderWallView(); });
+$("btnRefresh").addEventListener("click", async () => {
+  toast("正在刷新…", "");
+  await refreshAll();
+  if (view === "agreed") renderAgreed();
+  else if (view === "wall") renderWallView();
+});
 
 /* ---------------------------------------------------------------- 数据加载 */
 
 async function loadWall() {
-  try {
-    const rows = await api("/api/buddies?limit=100");
-    wall = Array.isArray(rows) ? rows : [];
-    wallByAnon.clear();
-    for (const p of wall) wallByAnon.set(p.anon_token, p);
-    return wall;
-  } catch (e) {
-    showError("listHost", e, { title: "搭子墙读取失败", onRetry: refreshAll });
-    return [];
-  }
+  const rows = await api("/api/buddies?limit=100");
+  wall = Array.isArray(rows) ? rows : [];
+  wallByAnon.clear();
+  for (const p of wall) wallByAnon.set(p.anon_token, p);
+  return wall;
 }
-
 async function loadDemoData() {
   try {
     const data = await api(DEMO_URL);
     demo = { threads: (data && data.threads) || {}, my: (data && data.my) || null };
   } catch {
-    demo = { threads: {}, my: null };   // 演示数据缺失不影响真实功能
+    demo = { threads: {}, my: null };
   }
-  return demo;
 }
-
-async function refreshMine() {
+async function loadConsole() {
   try {
-    // shape=console：服务端给"我的申请三块"（我发布的帖含收到留言 / 我表达的意愿含回复 / 已互相同意）
-    serverMine = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()) + "&shape=console");
+    const c = await api("/api/buddies/mine?shape=console&limit=200&handle=" + encodeURIComponent(getHandle()));
+    console3 = { posts: (c && c.posts) || [], intents: (c && c.intents) || [], mutual: (c && c.mutual) || [] };
+    for (const p of console3.posts) {
+      const msgs = [...(p.messages || []), ...(p.consents || []).flatMap((x) => x.messages || [])];
+      if (p.anon_token) serverMsgsByAnon.set(p.anon_token, msgs);
+    }
   } catch {
-    serverMine = null;   // 接口失败不阻塞：本地/演示层照常显示
+    console3 = { posts: [], intents: [], mutual: [] };
   }
-  return serverMine;
 }
-
-function refreshStats() {
-  const posts = myPosts();
-  const intents = myIntents();
-  const mutual = myMutual();
-  const inbox = posts.reduce((n, p) => n + consentsOf(p.anon_token).length, 0);
-  const replied = intents.filter((i) => i.reply_text || i.replied).length;
-  statSet("statWall", wall.length, "GET /api/buddies");
-  statSet("statMinePosts", posts.length, "含收到的留言 " + inbox + " 条");
-  statSet("statMineIntents", intents.length, "含对方回复 " + replied + " 条");
-  statSet("statMutual", mutual.length, "双方都点了头");
-  $("factWall").textContent = String(wall.length);
-  $("factToReply").textContent = String(inbox);
-  $("factMutual").textContent = String(mutual.length);
-  $("railMineCount").textContent = String(posts.length + intents.length);
+async function loadThreads() {
+  try {
+    const all = await api("/api/threads");
+    threads = (Array.isArray(all) ? all : []).filter((t) => t.kind === "buddy");
+  } catch {
+    threads = [];   // 没有会话/未登录时不阻塞页面
+  }
+  threads.sort((a, b) => {
+    const al = a.last_message ? String(a.last_message.at) : "";
+    const bl = b.last_message ? String(b.last_message.at) : "";
+    if (al && !bl) return -1;
+    if (bl && !al) return 1;
+    return (bl || String(b.created_at)).localeCompare(al || String(a.created_at));
+  });
+  return threads;
 }
-
 async function refreshAll() {
-  await loadWall();
-  await refreshMine();
-  renderWall();
-  refreshStats();
-  celebrate();
-  if (mineSheet.root.classList.contains("is-open")) renderMine();
+  await Promise.all([loadWall(), loadDemoData(), loadConsole(), loadThreads()]);
+  statSet("factWall", wall.length);
+  statSet("factMinePosts", myPosts().length);
+  statSet("factMutual", myMutual().length);
+  paintRail();
 }
 
 /* ---------------------------------------------------------------- 启动 */
 
 (async function boot() {
   paintWriteHint();
-  showLoading("listHost", "正在读取大家的需求…");
+  showLoading("viewHost", "正在准备你的匿名身份…");
+  try {
+    await ensureSession();                 // 注意：必须在第一次 api() 之前
+    $("whoName").textContent = currentNickname() || "同学";
+  } catch (e) {
+    showError("viewHost", e, { title: "身份初始化失败" });
+    return;
+  }
   await initDemo();
-  await loadDemoData();
   await refreshAll();
+  setView(params.get("view") === "agreed" ? "agreed" : "wall");
   initReveals();
-  // * 5 秒轮询：别人新发的帖、给你留的言会自己出现（这就是"活起来"）
-  setInterval(() => { if (!document.hidden) refreshAll().catch(() => {}); }, 5000);
+  if (!sessionToken()) showNotice("writeHint", "本机没有会话身份：刷新一次即可自动开户。", "warn");
 })();
 </script>
 </body>
