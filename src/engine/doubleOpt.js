@@ -6,7 +6,7 @@
  *   初始：       author_ok=0, seeker_ok=0, revealed=0
  *   寻找方同意：  seeker_ok=1        -> author_ok 保持 0，revealed 保持 0
  *   发布方同意：  author_ok=1
- *   双方都为 1： revealed=1，此时才返回 contact_code
+ *   双方都为 1： revealed=1，此时给出聊天入口（chat_ready / thread_id）
  *
  *   任一方拒绝（agree=false）即终止：该方 bit 归 0，revealed 归 0，
  *   且该 (post_id, seeker_id) 不再接受任何表决
@@ -16,7 +16,7 @@
  * 落库与身份解析在 src/services/buddy.js，派生字段（reveal_status）也在这里。
  *
  * ⛔ 三条硬约束（评审对照用）
- *   1. 任何一方未同意时，绝不返回 contact_code
+ *   1. 任何一方未同意时，绝不给出聊天入口（旧的聊天入口机制已废弃）
  *   2. 绝不向一方暗示"对方已经同意了"（对外只给 pending / mutual）
  *   3. 不得把 anon_token 与真实身份关联后展示给另一方
  */
@@ -38,7 +38,7 @@ export function initialConsent() {
  * 把任意来源（DB 行 / 半成品对象 / undefined）收敛成 {author_ok,seeker_ok,revealed} 三个 bit。
  *
  * ⛔ `revealed` **不由存储列决定**：只有 author_ok 与 seeker_ok 同时为 1 才算揭示。
- *    库里那一列即使是脏值（被手工改成 1、或历史遗留），也不会让出口吐出 contact_code。
+ *    库里那一列即使是脏值（被手工改成 1、或历史遗留），也不会让出口给出聊天入口。
  */
 export function normalizeConsent(row) {
   const r = row ?? {};
@@ -104,14 +104,14 @@ export function isSettled(row) {
 /**
  * 对外响应（contracts/m2-buddy.md §4.3）
  *
- * ⛔ 关键：revealed=0 时 contact_code **这个键根本不出现在对象里**
+ * ⛔ 关键：revealed=0 时 chat_ready **这个键根本不出现在对象里**
  *    （不是置 null、不是空字符串 —— 是 Object.hasOwn() 为 false）
  *
  * ⛔ 脏数据防线：是否揭示**以状态机推导为准**（author_ok && seeker_ok 同时为真），
  *    ⛔ 绝不直接信任 row.revealed 这一存储列。
  *
  * @param {object} row 迁移后的行
- * @param {string|null} contactCode 对方的中转码（仅在互相可见时才允许传入）
+ * @param {string|null} contactCode 对方的聊天入口（仅在互相可见时才允许传入）
  */
 export function toResponse(row, contactCode = null) {
   const r = normalizeConsent(row);
@@ -122,13 +122,14 @@ export function toResponse(row, contactCode = null) {
     seeker_ok: r.seeker_ok,
     revealed,
   };
-  if (revealed === 1) base.contact_code = contactCode ?? null;
+  // ⛔ 2026-10-31 起不再给"聊天入口"：双方都同意就**直接站内聊天**（服务器直连）
+  if (revealed === 1) base.chat_ready = true;
   return base;
 }
 
-/** 供测试与自检：断言一个响应对象里是否"含有" contact_code 键（而不是判空） */
+/** 供测试与自检：断言响应对象里是否"含有" chat_ready 键（而不是判空） */
 export function hasContactCodeKey(obj) {
-  return obj != null && typeof obj === "object" && Object.hasOwn(obj, "contact_code");
+  return obj != null && typeof obj === "object" && Object.hasOwn(obj, "chat_ready");
 }
 
 export default {

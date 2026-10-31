@@ -177,18 +177,39 @@ test("period_end < period_start → SCHEMA_REJECTED（service 层）", () => {
   );
 });
 
-test("MCP schema 层：items 里多传 studentNo → SCHEMA_REJECTED", async () => {
+test("MCP 层：items 里多传 studentNo → 脱敏导入（丢弃字段 + 记审计，⛔ 不回显值）", async () => {
   freshDb();
   resetTools();
   registerScheduleTools();
+  // 2026-10-30 用户要求：把课表（可能夹带老师/学号）直接发给 Agent 就要能"脱敏导入"，
+  // ⛔ 不能因为多带了身份字段就整单拒绝 —— 那样用户还得自己改数据。
   const env = await callTool("schedule_import", {
     user_handle: "同学A",
     items: [{ weekday: 1, period_start: 1, period_end: 2, title: "课程A", studentNo: SENTINELS.studentNo }],
   });
-  assert.equal(env.ok, false);
-  assert.equal(env.error.code, "SCHEMA_REJECTED");
-  // ⛔ 错误信息里也不该回显值
-  assert.ok(!JSON.stringify(env).includes(SENTINELS.studentNo));
+  assert.equal(env.ok, true, "多带身份字段应当被丢弃而不是整单拒绝");
+  assert.equal(env.data.imported, 1);
+  assert.ok(env.data.dropped_fields.includes("studentNo"), "被丢弃的字段名要如实回报");
+  // ⛔ 任何地方都不该回显值
+  assert.ok(!JSON.stringify(env).includes(SENTINELS.studentNo), "响应里不得出现被丢弃字段的值");
+  const audit = getDb().prepare("SELECT dropped_fields FROM scrub_audit ORDER BY id DESC LIMIT 1").get();
+  assert.ok(audit && audit.dropped_fields.includes("studentNo"), "脱敏审计要记下字段名");
+  assert.ok(!String(audit.dropped_fields).includes(SENTINELS.studentNo), "审计里只记字段名，不记值");
+});
+
+test("MCP 层：直接发一段课表文本（raw_text）也能脱敏导入，看不懂的行如实跳过", async () => {
+  freshDb();
+  resetTools();
+  registerScheduleTools();
+  const env = await callTool("schedule_import", {
+    user_handle: "文本同学",
+    raw_text: "周一 1-2 节 高等数学 教学楼A-101\n星期三 第3-4节 大学物理 实验楼C-201\n这一行看不懂",
+  });
+  assert.equal(env.ok, true, "raw_text 必须能导入：" + JSON.stringify(env.error));
+  assert.equal(env.data.imported, 2, "两行有效课程应当都被导入");
+  const rows = getDb().prepare("SELECT weekday, period_start, period_end, title, room FROM schedule_items ORDER BY weekday").all();
+  assert.deepEqual(rows.map((r) => [r.weekday, r.period_start, r.period_end, r.title]), [[1, 1, 2, "高等数学"], [3, 3, 4, "大学物理"]]);
+  assert.equal(rows[0].room, "教学楼A-101");
 });
 
 test("MCP 路径：period_end < period_start → SCHEMA_REJECTED", async () => {

@@ -15,7 +15,7 @@
 import express from "express";
 import { ok } from "../util/envelope.js";
 import { requireWriteToken } from "../middleware/auth.js";
-import { getTask, listOpenTasks, matchForTask, publishTask } from "../services/task.js";
+import { expressInterest, getTask, listOpenTasks, matchForTask, publishTask } from "../services/task.js";
 
 export function createTaskRouter() {
   const router = express.Router();
@@ -33,14 +33,25 @@ export function createTaskRouter() {
   // POST /api/tasks （写接口）
   router.post("/", requireWriteToken, (req, res, next) => {
     try {
-      res.json(ok(publishTask(req.body ?? {})));
+      const body0 = req.body ?? {};
+    // 有会话就用会话身份发布（谁发的 = 谁）；无会话保留 body 里的 handle（MCP/老调用不受影响）
+    res.json(ok(publishTask({ ...body0, owner_handle: req.session?.handle ?? body0.owner_handle })));
     } catch (e) {
       next(e);
     }
   });
 
   // GET /api/tasks/:id
-  router.get("/:id", (req, res, next) => {
+  // POST /api/tasks/:id/interest —— 表达意愿（别人对我发布的单说"我想接"；不改变任务归属）
+router.post("/:id/interest", requireWriteToken, (req, res, next) => {
+  try {
+    res.json(ok(expressInterest(req.params.id, req.session?.handle ?? req.body?.runner_handle)));
+  } catch (e) {
+    next(e);
+  }
+});
+
+router.get("/:id", (req, res, next) => {
     try {
       res.json(ok(getTask(req.params.id)));
     } catch (e) {

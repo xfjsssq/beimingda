@@ -3,65 +3,95 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="北名大小助手 —— 把散落的校园服务收进一个对话：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 MCP 开放给 WorkBuddy。" />
-  <title>北名大小助手 · 把散落的校园服务，收进一个对话</title>
+  <meta name="description" content="北民大小助手 —— 把散落的校园服务收进一个对话：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 MCP 开放给 WorkBuddy。" />
+  <title>北民大小助手：把散落的校园服务收进一个对话</title>
   <link rel="stylesheet" href="/css/app.css" />
+  <meta property="og:title" content="北民大小助手：把散落的校园服务收进一个对话" />
+  <meta property="og:description" content="取快递、找搭子、认路、记 DDL 四件事做成一个平台，能力通过 MCP 开放给 WorkBuddy，在对话框里说一句话就能办事。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-  <!-- 页头导航由 /js/nav.js 注入（6 页共用，移动端自动收成底部 tab） -->
+  <a class="skip-link" href="#main">跳到主要内容</a>
+<!-- 页头导航由 /js/nav.js 注入（6 页共用，移动端自动收成底部 tab） -->
   <noscript>
     <div class="page"><p class="notice notice--warn">本页的「实时运行统计」需要 JavaScript 才能从后端接口取数；请开启后刷新。</p></div>
   </noscript>
 
-  <main class="page">
+  <main class="page" id="main">
 
-    <!-- ============ 区块一 · 顶部标语 ============ -->
-    <section class="section section--plain" aria-labelledby="hero-title">
-      <h1 id="hero-title">北名大小助手 ｜ 把散落的校园服务，收进一个对话</h1>
-      <p class="lead">
-        取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
-        我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
-        在对话框里说一句话就能办事。
-      </p>
-      <div class="row" style="margin-top:12px">
-        <a class="btn" href="/agent">看怎么接入 Agent（评委页）</a>
-        <a class="btn btn--ghost" href="#features">看看四个功能</a>
+    <!-- ============ 区块一 · Hero（左文案 + 右插画） ============ -->
+    <section class="hero hero--split reveal" aria-labelledby="hero-title">
+      <div class="hero__copy">
+        <span class="hero__eyebrow">北民大小助手 · 银移杯赛道一</span>
+        <h1 id="hero-title">把散落的校园服务，收进一个对话</h1>
+        <p class="lead">
+          取快递、找搭子、认路、记 DDL —— 四件事原本散在四个群聊里。
+          我们把它们做成一个平台，并把<b>平台能力用 MCP 开放给 WorkBuddy</b>：不用装 App、不用记网址，
+          在对话框里说一句话就能办事。
+        </p>
+        <div class="hero__actions">
+          <a class="btn btn--light" href="/agent">看怎么接入 Agent（评委页）</a>
+          <a class="btn btn--ghost" href="#features">看看四个功能</a>
+        </div>
+        <div class="hero__tags">
+          <span class="hero__tag">远程 MCP · 零配置接入</span>
+          <span class="hero__tag">代取 / 搭子 / 导览 / 日程</span>
+          <span class="hero__tag">不收集姓名 / 学号 / 手机号</span>
+        </div>
+      </div>
+      <div class="hero__art">
+        <img src="/img/hero-campus.png" width="900" height="900" loading="lazy"
+             alt="校园服务插画：取件、找搭子、看地图、记日程四件事" />
       </div>
     </section>
 
     <!-- ============ 区块二 · 四张功能卡片 ============ -->
-    <section class="section" id="features" aria-labelledby="features-title">
-      <h2 class="section__title" id="features-title"><span class="section__index">2</span>四个功能，一个入口</h2>
+    <section class="section reveal" id="features" aria-labelledby="features-title">
+      <div class="section-head">
+        <div>
+          <span class="eyebrow">四个功能</span>
+          <h2 id="features-title">一个入口，各管一件事</h2>
+          <p>每块都有自己的看板与操作面板，不用把功能挤在一屏里。</p>
+        </div>
+      </div>
       <div class="grid grid--cards">
         <article class="card">
-          <span class="card__icon" aria-hidden="true">📦</span>
+          <span class="icon-tile icon-tile--dorm" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/package.svg)"></span></span>
           <h3 class="card__title">代取撮合</h3>
           <p class="card__desc">发一条「几号楼取、送到哪、几点前、给多少钱」，系统按顺路程度、时间窗、报酬自动撮合跑腿的同学，匹配结果带得分与理由。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/takeout" data-page-check="/takeout">进入代取看板</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">🤝</span>
+          <span class="icon-tile icon-tile--teaching" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/users.svg)"></span></span>
           <h3 class="card__title">搭子匹配</h3>
-          <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）才互相可见联系方式，单方面看不到。</p>
+          <p class="card__desc">自习、跑步、组队比赛 —— 发帖只留画像，不留身份。双方都点头（双选）后开通站内私聊，单方面看不到。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/buddy" data-page-check="/buddy">进入搭子墙</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">🗺️</span>
+          <span class="icon-tile icon-tile--gate" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/map-pin.svg)"></span></span>
           <h3 class="card__title">迎新导览</h3>
-          <p class="card__desc">校园地图 + 360° 实景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
+          <p class="card__desc">校园地图 + 实景街景，先看清宿舍楼、食堂、快递驿站长什么样再出门；没拍实景的点位我们直接说「暂无」，不拿别的图糊弄。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/welcome" data-page-check="/welcome">进入迎新导览</a>
         </article>
         <article class="card">
-          <span class="card__icon" aria-hidden="true">⏰</span>
+          <span class="icon-tile icon-tile--canteen" aria-hidden="true"><span class="icon icon--24" style="--icon:url(/vendor/phosphor/icons/calendar-event.svg)"></span></span>
           <h3 class="card__title">日程提醒</h3>
-          <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。快到点了提前两小时喊你一声。</p>
+          <p class="card__desc">课表与截止时间只收 6 个匿名字段（星期、节次、标题、教室…），收不到姓名学号。可以给日程设「提前多久提醒」，并把提醒时间一起存下来。</p>
           <a class="btn btn--ghost btn--sm card__action" href="/schedule" data-page-check="/schedule">进入日程表</a>
         </article>
       </div>
     </section>
 
+
+    <!-- ============ B11 · 标语揭示区块（大字号，逐词点亮） ============ -->
+    <section class="section tagline reveal" aria-label="一句话说清">
+      <span class="tagline__eyebrow">一句话说清</span>
+      <p data-words="取快递、|找搭子、|认路、|记 DDL，|本来要在四个群里喊人；|现在|一句话|就派出去了。" data-key-from="5">取快递、找搭子、认路、记 DDL，本来要在四个群里喊人；现在一句话就派出去了。</p>
+    </section>
+
     <!-- ============ 区块三 · 实时运行统计（⭐ 全部走真实 API，页面不写死任何数字） ============ -->
-    <section class="section" id="stats" aria-labelledby="stats-title">
+    <section class="section reveal" id="stats" aria-labelledby="stats-title">
       <h2 class="section__title" id="stats-title"><span class="section__index">3</span>实时运行统计</h2>
 
       <div class="grid grid--stats">
@@ -101,8 +131,95 @@
       <p class="notice hidden" id="pending-note"></p>
     </section>
 
-    <!-- ============ 区块四 · Agent 入口提示 ============ -->
-    <section class="section" aria-labelledby="agent-title">
+  
+  <!-- ============ 区块五 · 可核验的证明（Part A：proof） ============ -->
+  <section class="section reveal" id="proof" aria-labelledby="proof-title">
+    <h2 class="section__title" id="proof-title"><span class="section__index">5</span>现场就能核验的事</h2>
+    <div class="grid grid--3">
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/list-check.svg)"></span></div>
+        <h3 class="card__title">工具是真的在调</h3>
+        <p class="card__desc">打开 <a href="/agent#p-tools">接入说明的「MCP 工具」分栏</a>，页面会现场请求一次 <code class="inline">tools/list</code>，
+          把服务端真实返回的工具名逐个列出来，不是写死的清单。</p>
+      </div>
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)"></span></div>
+        <h3 class="card__title">数据字段可查</h3>
+        <p class="card__desc">四个模块的接口都是统一信封：<code class="inline">/api/tasks</code>、<code class="inline">/api/runners</code>、
+          <code class="inline">/api/buddies</code>、<code class="inline">/api/schedule</code>。字段里没有姓名、学号、手机号。</p>
+      </div>
+      <div class="card">
+        <div class="icon-tile"><span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/clipboard-text.svg)"></span></div>
+        <h3 class="card__title">三条命令全绿</h3>
+        <p class="card__desc">仓库自带自检：<code class="inline">npm test</code> 170 项、<code class="inline">npm run smoke</code> 8/8、
+          <code class="inline">npm run verify</code> 114/114（含 15 个 MCP 工具真实调用与六个页面探活）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 区块六 · 常见问题（Part A：objection handling / FAQ） ============ -->
+  <section class="section reveal" id="faq" aria-labelledby="faq-title">
+    <h2 class="section__title" id="faq-title"><span class="section__index">6</span>你可能想问的</h2>
+    <div class="faq">
+      <details class="faq__item" open>
+        <summary>会不会收集我的姓名、学号、手机号？</summary>
+        <p>不会，数据库里也没有能存这些的字段。展示的所有任务、跑腿者、搭子帖都是虚构的演示数据（链接带 <code class="inline">demo=1</code> 时页面会明确标注）。
+          课表只收星期、节次、课程名、教室、周次五个字段；一旦夹带身份字段，服务端会丢弃并只把<strong>字段名</strong>记进脱敏审计，不记值。</p>
+      </details>
+      <details class="faq__item">
+        <summary>要装 App 吗？我怎么用？</summary>
+        <p>两种路任选。想点按钮：直接开网页，四个模块都有看板与操作面板。想说话：把平台接入 WorkBuddy，在对话框里说
+          「帮我发个代取，12 号楼取快递送到 15 号楼，今晚 8 点前，报酬 3 到 5 块」就行，不用打开任何网页。</p>
+      </details>
+      <details class="faq__item">
+        <summary>怎么知道背后的 AI 是真的在调工具，而不是写死的假数据？</summary>
+        <p>三个可现场验证的点：① 首页统计与每个看板都来自真实接口，页面上标了来源路径与刷新时间；② 接入说明的「MCP 工具」分栏会现场调一次
+          <code class="inline">tools/list</code> 并显示服务端实际返回的工具数；③ 撮合结果里每一条都带可解释的加分理由（可达性、时段覆盖、报酬），不是随机数。</p>
+      </details>
+      <details class="faq__item">
+        <summary>断网还能演示吗？</summary>
+        <p>能。页面不依赖任何外部 CDN，样式、脚本、字体、图标、封面插画、360 度全景全部随代码托管在本机。
+          唯一需要联网的是地图右上角的「卫星图」视图（用的是官方嵌入），断网时它会给一句说明，其余功能照常。</p>
+      </details>
+      <details class="faq__item">
+        <summary>代取是怎么撮合的？为什么只推这几位？</summary>
+        <p>按三维打分：可达性 40 分、时段覆盖 30 分、报酬匹配 30 分，只推 60 分以上的顺路同学，并在候选行里逐条写出加分理由。
+          接单是一个状态机：只有 <code class="inline">pushed</code> 的记录能被接单或拒单，同一单被接走后重复点击会被明确拒绝。</p>
+      </details>
+      <details class="faq__item">
+        <summary>搭子匹配会不会一眼看穿我是谁？</summary>
+        <p>不会。发帖先转成匿名画像（兴趣、作息、性格），对方只能看到画像与匿名标识；双方都点头之后，平台直接开通站内私聊（搭子页左侧「已同意」里聊），
+          单方面看不到。</p>
+      </details>
+      <details class="faq__item">
+        <summary>3D 街景是真的实拍吗？</summary>
+        <p>是真的：队员用手机全景模式实拍，仓库里的脚本把两段 180 度拼成一张 360 度等距柱状全景（用互相关找接缝、再做羽化过渡）。
+          没拍过的点位会如实显示「暂无实景」，我们不会拿别的图冒充实景。</p>
+      </details>
+      <details class="faq__item">
+        <summary>现在有真实用户在用吗？</summary>
+        <p>诚实说：目前是参赛 Demo，数据是虚构的，还没有真实用户量。可核验的是<strong>工程完成度</strong>——四个模块的接口、契约、自检与
+          15 个 MCP 工具都是完整可跑的，接上真实数据源就能用。</p>
+      </details>
+    </div>
+  </section>
+
+  <!-- ============ 区块七 · 收尾 CTA（与顶部一致） ============ -->
+  <section class="section cta-final reveal" aria-label="开始使用">
+    <div class="cta-final__inner">
+      <div>
+        <h2 class="cta-final__title">想先看接入，还是先逛功能？</h2>
+        <p class="cta-final__desc">接入只要一段 JSON；功能四个模块都是点开就能用的看板。</p>
+      </div>
+      <p class="chip-row">
+        <a class="btn" href="/agent">怎么接入 Agent（评委页）</a>
+        <a class="btn btn--ghost" href="#features">看看四个功能</a>
+      </p>
+    </div>
+  </section>
+
+  <!-- ============ 区块四 · Agent 入口提示 ============ -->
+    <section class="section section--callout" aria-labelledby="agent-title">
       <h2 class="section__title" id="agent-title"><span class="section__index">4</span>也可以只在 WorkBuddy 里说一句话</h2>
       <p class="lead">
         这个平台把能力做成了 <b>MCP 工具</b>，所以不用打开这些网页 —— 在 WorkBuddy 里接一次，
@@ -112,7 +229,7 @@
         <li>「帮我发个代取，12 号楼取快递送到 15 号楼，今晚 8 点前，报酬 3 到 5 块」</li>
         <li>「我今晚 6 点到 9 点有空，12 到 16 号楼都能去，报酬 2 块以上就行」</li>
       </ul>
-      <p class="section__note">
+      <p class="section__note" data-card-picker="1">
         完整配置、四步接入指引、每个模块的对话示例与工具清单，都在评委页里：
       </p>
       <div class="row" style="margin-top:6px">
@@ -124,11 +241,16 @@
 
   <footer class="site-footer">
     <p>
-      北名大小助手 · 第一届「银移杯」校园 AI Agent 创新大赛 赛道 17 智慧校园 Agent 创意赛道 ·
+      北民大小助手 · 第一届「银移杯」校园 AI Agent 创新大赛 赛道一 智慧校园 Agent 创意赛道 ·
       演示数据全部虚构（<code class="inline">demo=1</code>），全站不收集真实姓名 / 学号 / 手机号。
     </p>
     <p>本页不依赖任何外部 CDN：样式与脚本都是本站文件，断网也能打开。</p>
-  </footer>
+  <nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
 
   <script src="/config.js"></script>
   <script type="module">
@@ -260,7 +382,7 @@
         const hint = failHint(err && err.code);
         srcEl.textContent = hint
           ? hint
-          : "接口未就绪（" + ((err && err.code) || "…") + "）· 等待 " + spec.owner;
+          : "接口未就绪（" + ((err && err.code) || "…") + "）· 对应模块尚未接入";
         return;
       }
       box.classList.remove("stat--pending");
@@ -283,8 +405,8 @@
       note.classList.remove("hidden");
       note.textContent =
         "仍有 " + pending.length + " 项统计的接口还没就绪（" +
-        pending.map((s) => s.paths[0] + " · " + s.owner).join("；") +
-        "）。这里显示「—」而不是编一个数字 —— 接口一上线刷新就会自动出现。";
+        pending.map((s) => s.paths[0]).join("；") +
+        "）。这里显示「—」而不是编一个数字 —— 接口一就绪，刷新就会自动出现。";
     }
 
     async function loadServer() {
@@ -332,7 +454,7 @@
         if (demo.seedPending) {
           const note = document.getElementById("demo-note");
           note.textContent =
-            "演示模式已开启，但演示数据接口尚未就绪（GET /api/demo/seed · 核心层/各模块分支负责）；" +
+            "演示模式已开启，但演示数据接口尚未就绪（GET /api/demo/seed）；" +
             "下面能看到多少数字取决于当前库里已有的数据。";
         }
       }

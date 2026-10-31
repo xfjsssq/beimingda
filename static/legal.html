@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN" data-page="legal">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="北民大小助手的许可与素材来源：第三方库、图标、字体、底图与实景素材的出处与许可。" />
+  <title>许可与素材来源</title>
+  <link rel="stylesheet" href="/css/app.css" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main class="page" id="main">
+  <div class="page-head">
+    <h1>许可与素材来源</h1>
+    <p class="lead">本站不依赖任何外部 CDN，页面里用到的第三方资源全部随代码一起托管在本机。</p>
+  </div>
+
+  <section class="section reveal">
+    <div class="section-head"><div><span class="eyebrow">第三方</span><h2>第三方库与图标</h2></div></div>
+    <div class="card">
+      <ul class="stack stack--sm">
+        <li><b>Pannellum 2.5.7</b>（360 度查看器）· MIT · <code class="inline">static/vendor/pannellum/</code> 含 COPYING</li>
+        <li><b>Phosphor Icons 2.1.1</b>（界面图标）· MIT · <code class="inline">static/vendor/phosphor/</code> 含 LICENSE</li>
+        <li><b>Manrope</b>（拉丁与数字字体）· SIL Open Font License 1.1 · <code class="inline">static/vendor/manrope/</code></li>
+        <li><b>Leaflet 1.9.4</b>（自建卫星图层的地图引擎）· BSD-2-Clause · <code class="inline">static/vendor/leaflet/</code> 含 LICENSE</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section reveal">
+    <div class="section-head"><div><span class="eyebrow">素材</span><h2>底图与实景</h2></div></div>
+    <div class="card">
+      <ul class="stack stack--sm">
+        <li><b>校园底图</b>：学校公开的《校园楼宇编号示意图》，用于迎新导览的点位标注</li>
+        <li><b>封面插画</b>：由本站用生成式模型产出，仅供本项目演示使用</li>
+        <li><b>360 度实景</b>：队员用手机全景模式实拍，经脚本拼接为等距柱状全景（<code class="inline">tools/stitch-pano.py</code>）</li>
+        <li><b>卫星影像</b>：<b>Esri World Imagery</b>（影像 © Esri · Maxar · Earthstar Geographics），仅在切换到「卫星图」时联网加载，署名显示在地图右下角</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section reveal">
+    <div class="section-head"><div><span class="eyebrow">隐私</span><h2>我们不收集什么</h2></div></div>
+    <div class="card">
+      <p>全站不收集真实姓名、学号、手机号、身份证、学生证照片与校园网账号口令；数据库里也没有能存这些的字段。</p>
+      <p class="muted">接口与数据字段的可核验位置见 <a href="/agent#p-compliance">接入说明的合规分栏</a>。</p>
+    </div>
+  </section>
+</main>
+<footer class="site-footer">
+  <div style="max-width:var(--page-max);margin:0 auto;padding:0 16px">
+    <nav class="site-footer__legal" aria-label="法律与来源">
+      <a href="/">回到首页</a>
+      <a href="/agent#p-compliance">隐私与合规说明</a>
+    </nav>
+  </div>
+</footer>
+<script src="/config.js"></script>
+<script type="module">
+  import { mountNav } from "/js/nav.js";
+  import { initDemo } from "/js/demo.js";
+  mountNav();
+  initDemo();
+</script>
+</body>
+</html>

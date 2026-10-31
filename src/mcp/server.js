@@ -86,7 +86,7 @@ export function createMcpRouter() {
               capabilities: { tools: { listChanged: false } },
               serverInfo: { name: SERVER_NAME, version: SERVER_VERSION },
               instructions:
-                "北名大小助手：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒。只读演示令牌，限频 30 次/分钟。",
+                "北民大小助手：代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒。只读演示令牌，限频 30 次/分钟。",
             }),
           );
           break;
@@ -119,7 +119,7 @@ export function createMcpRouter() {
             responses.push(rpcErr(id, RPC.INVALID_PARAMS, "params.name is required"));
             break;
           }
-          const envelope = await callTool(name, args, { req, transport: "mcp" });
+          const envelope = await callTool(name, args, { req, transport: "mcp", host: req?.headers?.host || process.env.SITE_DOMAIN || "" });
           responses.push(
             rpcOk(id, {
               content: [{ type: "text", text: JSON.stringify(envelope) }],

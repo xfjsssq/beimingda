@@ -1,0 +1,127 @@
+{
+  "_comment": "实景点位在卫星图上的 WGS84 坐标（站内自建 Leaflet 卫星图层用）。⭐ 这 8 个点由站长提供高德坐标后定死；页面不再提供手动添加。",
+  "_format": "{ points: [ { id, label, category, note, color, pano_scene, lat, lng } ] }",
+  "_source": "高德嵌入坐标（GCJ-02）经 GCJ→WGS 转换；gcj02 字段保留原始值备查",
+  "points": [
+    {
+      "id": "spot-1",
+      "label": "网球场后方",
+      "category": "teaching",
+      "note": "网球场后方（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-8",
+      "lat": 38.495335,
+      "lng": 106.101722,
+      "gcj02": {
+        "lat": 38.49597,
+        "lng": 106.106316
+      },
+      "short": "网球场后"
+    },
+    {
+      "id": "spot-2",
+      "label": "图书馆正门左侧",
+      "category": "teaching",
+      "note": "图书馆正门左侧（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-7",
+      "lat": 38.49533,
+      "lng": 106.102321,
+      "gcj02": {
+        "lat": 38.495965,
+        "lng": 106.106915
+      },
+      "short": "图书馆左"
+    },
+    {
+      "id": "spot-3",
+      "label": "图书馆正门右侧",
+      "category": "teaching",
+      "note": "图书馆正门右侧（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-6",
+      "lat": 38.495331,
+      "lng": 106.102907,
+      "gcj02": {
+        "lat": 38.495965,
+        "lng": 106.107501
+      },
+      "short": "图书馆右"
+    },
+    {
+      "id": "spot-4",
+      "label": "三号楼后方十字路口",
+      "category": "teaching",
+      "note": "三号楼后方十字路口（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-3",
+      "lat": 38.495317,
+      "lng": 106.103845,
+      "gcj02": {
+        "lat": 38.495951,
+        "lng": 106.108439
+      },
+      "short": "三号楼后"
+    },
+    {
+      "id": "spot-5",
+      "label": "主楼后方",
+      "category": "teaching",
+      "note": "主楼后方（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-5",
+      "lat": 38.495954,
+      "lng": 106.103955,
+      "gcj02": {
+        "lat": 38.496588,
+        "lng": 106.108549
+      },
+      "short": "主楼后"
+    },
+    {
+      "id": "spot-6",
+      "label": "明湖风光 1",
+      "category": "teaching",
+      "note": "明湖风光 1（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-1",
+      "lat": 38.496167,
+      "lng": 106.09933,
+      "gcj02": {
+        "lat": 38.496803,
+        "lng": 106.103925
+      },
+      "short": "明湖 1"
+    },
+    {
+      "id": "spot-7",
+      "label": "明湖风光 2",
+      "category": "teaching",
+      "note": "明湖风光 2（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-2",
+      "lat": 38.495605,
+      "lng": 106.099242,
+      "gcj02": {
+        "lat": 38.49624,
+        "lng": 106.103837
+      },
+      "short": "明湖 2"
+    },
+    {
+      "id": "spot-8",
+      "label": "明湖风光 3",
+      "category": "teaching",
+      "note": "明湖风光 3（实拍 360°）",
+      "color": "#2E8B76",
+      "pano_scene": "pano-4",
+      "lat": 38.495299,
+      "lng": 106.09915,
+      "gcj02": {
+        "lat": 38.495934,
+        "lng": 106.103745
+      },
+      "short": "明湖 3"
+    }
+  ]
+}

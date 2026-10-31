@@ -2,8 +2,29 @@
  * M3 · 地图节点业务层（HTTP API 与 MCP 共用，⛔ 不许各写一份）
  * 契约：contracts/m3-welcome.md §2 / §4 / §5
  */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getDb } from "../db/index.js";
 import { CODES, reject } from "../util/envelope.js";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const PANO_MANIFEST = path.join(__dirname, "..", "..", "pano", "manifest.json");
+
+/** 360° 实景场景清单（读 pano/manifest.json；文件缺失就返回空数组，⛔ 不抛） */
+export function listScenes() {
+  try {
+    const raw = JSON.parse(fs.readFileSync(PANO_MANIFEST, "utf8"));
+    return Object.entries(raw.scenes || {}).map(([scene_id, sc]) => ({
+      scene_id,
+      title: sc.title || scene_id,
+      panorama: sc.panorama || null,
+      hotspots: Array.isArray(sc.hotSpots) ? sc.hotSpots.length : 0,
+    }));
+  } catch {
+    return [];
+  }
+}
 
 const CATEGORIES = ["dorm", "canteen", "teaching", "gate", "service"];
 

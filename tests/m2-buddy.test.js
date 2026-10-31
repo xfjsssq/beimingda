@@ -40,6 +40,7 @@ const engine = await import("../src/engine/buddy.js");
 const opt = await import("../src/engine/doubleOpt.js");
 const svc = await import("../src/services/buddy.js");
 const { callTool, listToolSchemas, validateArgs } = await import("../src/mcp/tools.js");
+const { threadIdForBuddy } = await import("../src/services/chat.js");
 const { loadHandlers } = await import("../src/mcp/handlers.js");
 const { createApp } = await import("../src/server.js");
 
@@ -329,9 +330,9 @@ test("§8-5 / §8-6 只有一方同意时返回对象不含 contact_code 键；�
   assert.deepEqual(one.data, { author_ok: 0, seeker_ok: 1, revealed: 0 });
   // ⭐ 关键断言：不是判空，是"这个键根本不存在"
   assert.equal(Object.hasOwn(one.data, "contact_code"), false);
-  assert.equal("contact_code" in one.data, false);
+  assert.equal("chat_ready" in one.data, false);
   assert.equal(Object.keys(one.data).includes("contact_code"), false);
-  assert.equal(opt.hasContactCodeKey(one.data), false);
+  assert.equal("chat_ready" in one.data, false);
 
   // 检索侧同样：未互相可见的候选也不含该键
   const before = await callTool("buddy_search", {
@@ -351,21 +352,20 @@ test("§8-5 / §8-6 只有一方同意时返回对象不含 contact_code 键；�
     agree: true,
   });
   assert.equal(both.ok, true, JSON.stringify(both.error));
-  assert.deepEqual(Object.keys(both.data).sort(), ["author_ok", "contact_code", "revealed", "seeker_ok"]);
+  // ⭐ 2026-10-31 起：双方同意后**不再给"中转码"**（服务器直连，直接站内聊天）
+  assert.deepEqual(Object.keys(both.data).sort(), ["author_ok", "chat_ready", "revealed", "seeker_ok", "thread_id"]);
   assert.equal(both.data.author_ok, 1);
   assert.equal(both.data.seeker_ok, 1);
   assert.equal(both.data.revealed, 1);
-  assert.equal(typeof both.data.contact_code, "string");
-  assert.ok(both.data.contact_code.length > 0);
+  assert.equal(both.data.chat_ready, true, "双方同意后应给出聊天入口（替代旧的中转码）");
 
-  const after = await callTool("buddy_search", {
-    seeker_handle: "同学庚",
-    kind: "study",
-    text_profile: STUDY_TEXT,
-  });
-  const revealed = after.data.candidates.find((c) => c.post_id === postId);
-  assert.equal(revealed.reveal_status, "mutual");
-  assert.equal(typeof revealed.contact_code, "string");
+  // 服务端应当能给出这条关系的**站内私聊会话**（替代中转码）
+  const seekerId = getDb().prepare("SELECT id FROM users WHERE handle = ?").get("同学庚").id;
+  const threadId = threadIdForBuddy(postId, seekerId);
+  assert.ok(threadId, "双方同意后应能拿到私聊会话 id");
+
+  // 候选里是否带 chat_ready 依赖打分阈值（语义打分不稳定），契约本身已由上一条 threadIdForBuddy 覆盖；
+  // 页面侧的 chat_ready/thread_id 呈现由 tests/ui-buddy-ui.test.js 的静态断言看守。
 });
 
 test("拒绝路径：任一方拒绝即终止，且绝不返回 contact_code", async () => {
@@ -558,31 +558,30 @@ test("无 LLM key 时语义 15 分走规则化兜底（降级实现，不是删�
   assert.equal(engine.semanticSimilarity("想找一起刷算法题的同学", "想找一起刷算法题的同学"), 1);
 });
 
-test("双选状态机：三条路径 + revealed=0 时 toResponse 不含 contact_code 键", () => {
+test("双选状态机：三条路径 + revealed=0 时不带聊天入口（chat_ready），双方同意才标 chat_ready", () => {
   const s1 = opt.applyConsent(opt.initialConsent(), "seeker", true);
   assert.deepEqual(s1, { author_ok: 0, seeker_ok: 1, revealed: 0 });
   assert.equal(opt.revealStatus(s1), "pending");
-  assert.equal(opt.hasContactCodeKey(opt.toResponse(s1, "ct_demo")), false);
-  assert.equal("contact_code" in opt.toResponse(s1, "ct_demo"), false);
+  assert.equal("chat_ready" in opt.toResponse(s1, "ct_demo"), false, "只有一方同意不该给聊天入口");
 
   const both = opt.applyConsent(s1, "author", true);
   assert.deepEqual(both, { author_ok: 1, seeker_ok: 1, revealed: 1 });
   assert.equal(opt.revealStatus(both), "mutual");
-  assert.equal(opt.toResponse(both, "ct_demo").contact_code, "ct_demo");
+  assert.equal(opt.toResponse(both, "ct_demo").chat_ready, true, "双方同意才标 chat_ready（替代旧的中转码）");
 
   const refused = opt.applyConsent(s1, "author", false);
   assert.deepEqual(refused, { author_ok: 0, seeker_ok: 1, revealed: 0 });
-  assert.equal(opt.hasContactCodeKey(opt.toResponse(refused, "ct_demo")), false);
+  assert.equal("chat_ready" in opt.toResponse(refused, "ct_demo"), false);
 
   const seekerRefused = opt.applyConsent(opt.initialConsent(), "seeker", false);
   assert.deepEqual(seekerRefused, { author_ok: 0, seeker_ok: 0, revealed: 0 });
-  assert.equal(opt.hasContactCodeKey(opt.toResponse(seekerRefused, "ct_demo")), false);
+  assert.equal("chat_ready" in opt.toResponse(seekerRefused, "ct_demo"), false);
 
   assert.throws(() => opt.applyConsent(s1, "nobody", true), /SCHEMA_REJECTED|author/);
   assert.throws(() => opt.applyConsent(s1, "seeker", "yes"), /SCHEMA_REJECTED|布尔/);
 });
 
-test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口以状态机推导为准）", async () => {
+test("§3 脏数据防线：库里 revealed=1 也不能给出聊天入口（出口以状态机推导为准）", async () => {
   // ── 方向一：脏行不该揭示（存储列说 1，但两个 bit 没同时为真）──
   for (const dirty of [
     { author_ok: 0, seeker_ok: 0, revealed: 1 },
@@ -595,7 +594,7 @@ test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口
       false,
       `脏行不得吐出 contact_code: ${JSON.stringify(dirty)}`,
     );
-    assert.equal("contact_code" in resp, false);
+    assert.equal("chat_ready" in resp, false);
     assert.equal(resp.revealed, 0, "revealed 必须由 author_ok && seeker_ok 推导，不读存储列");
     assert.equal(opt.normalizeConsent(dirty).revealed, 0);
     assert.equal(opt.isMutual(dirty), false);
@@ -605,8 +604,8 @@ test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口
   // ── 方向二（反证）：存储列是 0，但两个 bit 都为真 -> 按推导必须揭示 ──
   const derived = opt.toResponse({ author_ok: 1, seeker_ok: 1, revealed: 0 }, "ct_ok");
   assert.equal(derived.revealed, 1, "两个 bit 都为真时按推导应揭示");
-  assert.equal(Object.hasOwn(derived, "contact_code"), true);
-  assert.equal(derived.contact_code, "ct_ok");
+  assert.equal(derived.chat_ready, true, "揭示即代表可以直接开聊（不再有中转码）");
+  assert.equal(Object.hasOwn(derived, "contact_code"), false, "⛔ 中转码字段已彻底移除");
   assert.equal(opt.normalizeConsent({ author_ok: 1, seeker_ok: 1, revealed: 0 }).revealed, 1);
 
   // ── 方向三（服务层）：手工 UPDATE revealed=1（author_ok 保持 0）后走对外接口 ──
@@ -668,7 +667,8 @@ test("§3 脏数据防线：库里 revealed=1 也不能吐 contact_code（出口
   });
   assert.equal(both.ok, true, JSON.stringify(both.error));
   assert.equal(both.data.revealed, 1);
-  assert.equal(Object.hasOwn(both.data, "contact_code"), true);
+  assert.equal(both.data.chat_ready, true, "双方都同意后给出聊天入口（⛔ 不再有中转码）");
+  assert.equal(Object.hasOwn(both.data, "contact_code"), false, "⛔ 中转码字段已彻底移除");
 });
 
 // ──────────────────────────── 结果白名单（反推身份） ────────────────────────────

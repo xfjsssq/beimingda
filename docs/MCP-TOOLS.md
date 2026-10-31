@@ -31,12 +31,12 @@
 
 ---
 
-## 14 个工具（分模块）
+## 15 个工具（分模块）
 
 **所有工具 `inputSchema.additionalProperties` 必须为 `false`** —— 多传一个字段即 `SCHEMA_REJECTED`。
 
-> **当前接入状态（2026-10-27，四模块全部合入 main 后实测）**：`tools/list` 返回 **14 个**
-> （M1 5 + M2 3 + M3 2 + M4 4）。
+> **当前接入状态（2026-10-31 复核）**：`tools/list` 实测返回 **15 个**
+> （M1 5 + M2 3 + M3 2 + M4 4 + 跨模块 `app_open_view` 1），且每个工具 `inputSchema.additionalProperties` 均为 `false`。
 > 这条状态的机检入口：`npm run verify`（会自动发现已注册工具并逐个真调）。
 
 ### M1 · 代取撮合（5 个）｜分支 `feat/m1-takeout`
@@ -55,7 +55,7 @@
 |---|---|---|
 | `buddy_publish` | 发布搭子帖（服务端抽画像） | `anon_token` 随机生成，⛔ 不得由 user_id 派生 |
 | `buddy_search` | 搜索候选 | 只返回 `open` 且 score ≥ 60；⛔ 结果不含院系全名/班级/学号/宿舍号/真实姓名/联系方式 |
-| `buddy_consent` | 双选表决 | `revealed=0` 时返回里**完全不出现** `contact_code` 键（不是 null） |
+| `buddy_consent` | 双选表决 | `revealed=0` 时返回里**完全不出现** `chat_ready` / `thread_id` 键（不是 null）；双方都同意 → `chat_ready:true` + `thread_id`，**站内直接私聊**（旧的中转码机制已废弃，不下发任何联系方式） |
 
 ### M3 · 迎新导览（2 个）｜分支 `feat/m3-welcome`
 
@@ -72,6 +72,12 @@
 | `schedule_add` | 加一条日程 | `period_end >= period_start`，否则 `SCHEMA_REJECTED` |
 | `schedule_query` | 查日程 | 按 weekday、period_start 升序 |
 | `schedule_remove` | 删一条 | 不存在 → `NOT_FOUND` |
+
+### 跨模块（1 个）
+
+| 工具 | 作用 | 关键约束 |
+|---|---|---|
+| `app_open_view` ⭐ | 生成"帮忙打开某界面"的深链（可带某处 360° 实景） | 只读、不改状态；`view` ∈ welcome/takeout/buddy/schedule/agent；`pano` 只在 view=welcome 有效，场景不存在时返回可用的 `available_scenes` |
 
 ---
 

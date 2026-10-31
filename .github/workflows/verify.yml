@@ -33,5 +33,5 @@ jobs:
       - name: 骨架冒烟
         run: npm run smoke
 
-      - name: 跨模块集成自检（14 个 MCP 工具真调 + 6 页面 + 路由 + CDN 红线）
+      - name: 跨模块集成自检（15 个 MCP 工具真调 + 6 页面 + 路由 + CDN 红线）
         run: npm run verify

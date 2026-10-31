@@ -1,5 +1,183 @@
 {
-  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 场景由 feat/m3-welcome 分支补齐，图片放 pano/ 并压到单张 ≤2MB。",
-  "default": { "firstScene": "dorm-12", "sceneFadeDuration": 800 },
-  "scenes": {}
+  "_comment": "Pannellum multi-scene tour（结构冻版，见 contracts/m3-welcome.md §3）。⭐ 图片由手机实拍的两段 180° 素材拼接而成（tools/stitch-pano.py）。",
+  "_note_attach": "把某个场景挂到点位上：在 static/map/sat-coords.json 里给该点位写 pano_url=\"/pano/pano-N.jpg\"、pano_yaw=<朝向>，页面就会在详情里给出「进入 3D 街景」。",
+  "default": {
+    "firstScene": "pano-1",
+    "sceneFadeDuration": 800,
+    "autoLoad": true,
+    "showControls": true
+  },
+  "scenes": {
+    "pano-1": {
+      "panorama": "/pano/pano-1.jpg",
+      "title": "明湖风光 1",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 0.04,
+          "yaw": -45.18,
+          "type": "scene",
+          "text": "去 明湖风光 2",
+          "sceneId": "pano-2"
+        }
+      ]
+    },
+    "pano-2": {
+      "panorama": "/pano/pano-2.jpg",
+      "title": "明湖风光 2",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 4.93,
+          "yaw": -16.77,
+          "type": "scene",
+          "text": "去 明湖风光 3",
+          "sceneId": "pano-4"
+        },
+        {
+          "pitch": 2.88,
+          "yaw": 179.31,
+          "type": "scene",
+          "text": "去 明湖风光 1",
+          "sceneId": "pano-1"
+        }
+      ]
+    },
+    "pano-3": {
+      "panorama": "/pano/pano-3.jpg",
+      "title": "三号楼后方十字路口",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 1.89,
+          "yaw": -127.27,
+          "type": "scene",
+          "text": "去 图书馆正门右侧",
+          "sceneId": "pano-6"
+        },
+        {
+          "pitch": 3.18,
+          "yaw": -57.78,
+          "type": "scene",
+          "text": "去 主楼后方",
+          "sceneId": "pano-5"
+        }
+      ]
+    },
+    "pano-4": {
+      "panorama": "/pano/pano-4.jpg",
+      "title": "明湖风光 3",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 3.07,
+          "yaw": -122.8,
+          "type": "scene",
+          "text": "去 明湖风光 2",
+          "sceneId": "pano-2"
+        }
+      ]
+    },
+    "pano-5": {
+      "panorama": "/pano/pano-5.jpg",
+      "title": "主楼后方",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 1.99,
+          "yaw": 15.24,
+          "type": "scene",
+          "text": "去 三号楼后方十字路口",
+          "sceneId": "pano-3"
+        }
+      ]
+    },
+    "pano-6": {
+      "panorama": "/pano/pano-6.jpg",
+      "title": "图书馆正门右侧",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": -1.96,
+          "yaw": 0.05,
+          "type": "scene",
+          "text": "去 图书馆正门左侧",
+          "sceneId": "pano-7"
+        },
+        {
+          "pitch": 2.05,
+          "yaw": -145.86,
+          "type": "scene",
+          "text": "去 三号楼后方十字路口",
+          "sceneId": "pano-3"
+        }
+      ]
+    },
+    "pano-7": {
+      "panorama": "/pano/pano-7.jpg",
+      "title": "图书馆正门左侧",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": [
+        {
+          "pitch": 0.55,
+          "yaw": -16.46,
+          "type": "scene",
+          "text": "去 明湖风光 3",
+          "sceneId": "pano-4"
+        },
+        {
+          "pitch": -1.46,
+          "yaw": 144.84,
+          "type": "scene",
+          "text": "去 图书馆正门右侧",
+          "sceneId": "pano-6"
+        },
+        {
+          "pitch": 0.54,
+          "yaw": -3.94,
+          "type": "scene",
+          "text": "去 明湖风光 1",
+          "sceneId": "pano-1"
+        },
+        {
+          "pitch": 0.38,
+          "yaw": -10,
+          "type": "scene",
+          "text": "去 明湖风光 2",
+          "sceneId": "pano-2"
+        }
+      ]
+    },
+    "pano-8": {
+      "panorama": "/pano/pano-8.jpg",
+      "title": "网球场后方",
+      "type": "equirectangular",
+      "hfov": 72,
+      "yaw": 0,
+      "pitch": 4,
+      "hotSpots": []
+    }
+  },
+  "_hotspot_note": "互跳入口由站长在 2026-10-31 手动校准（13 个，覆盖 7 个场景）；固化后不再需要页面上的添加功能。"
 }

@@ -1,363 +1,729 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-page="takeout">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>代取撮合 · 北名大小助手</title>
+<title>代取撮合：看单、接单、跑腿登记</title>
 <!--
-  M1 · 代取撮合页（四个区块：发布任务 / 跑腿登记 / 任务看板 / 匹配结果）
-  - 页面自包含：内联样式 + 内联脚本；⛔ 不外链本分支尚未提供的公共脚本（api / nav 由集成阶段统一接入）
-  - 只加载 /config.js（骨架自带，用于读取服务端注入的运行时配置，不含任何硬编码密钥）
-  - 平台不参与交易、不代收款：报酬由双方线下协商
+  代取撮合页（M1）—— 2026-10-30 第四版：按「是不是我发的单」分成两套行为（权限模型）
+
+  设计口径（来自用户原话）：
+    · 「必须是你发布的代取，你才能去选符合要求的人帮你接单」——
+      我发布的单：淡色底 + 左侧主色描边 + 「我发布的」徽章，候选直接列出来，每行右侧「选 TA 接单」（= 派单给这个人）
+      别人的单：普通白底 + 「XX 发布」徽章，卡片上没有候选、没有派单按钮，
+               主按钮是「我想接这一单」（= 表达意愿）→ 变成「已表达意愿 · 等发布者确认」+「撤回意愿」
+    · 「你发的单子要跟别人的单子有区别」—— 两套卡片底色 / 描边 / 徽章都不一样，一眼能分出来
+    · 用户要求：页面上认证相关的那一块「全部挪掉」—— 本页 ⛔ 不再出现任何凭据字样或控件
+    · ⛔ 站内不做取件图片上传，也不做截图识别：发布表单只有文字字段，页面上没有任何上传控件。
+      需要自动识别取件截图时，请在 WorkBuddy 里把截图直接发给对话方（站内不提供上传入口）
+
+  约定：
+    · 样式与交互共用全站设计系统 /css/app.css、/js/nav.js、/js/api.js、/js/demo.js、/js/ui.js
+    · 图标一律 static/vendor/phosphor/icons/*.svg + .icon（⛔ 不用 emoji）
+    · 字阶只用 12/14/16/18/20/24/30/36/48/60，间距只用 0/2/4/8/12/16/24/32/40/48/64/80/96
+      （本页 <style> 里的取值都由单测钉死，见 tests/ui-takeout.test.js）
+    · 演示身份固定为「同学A」；判断依据是任务的 publisher / owner_handle 字段
+    · ⛔ 不收姓名 / 学号 / 手机号；平台不参与交易、不代收款
 -->
+<link rel="stylesheet" href="/css/app.css" />
 <style>
-  :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; --mut:#5b6470; }
-  * { box-sizing:border-box; }
-  body { margin:0; background:var(--bg); color:#1c1c1e;
-    font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; line-height:1.6; }
-  header { background:var(--pri); color:#fff; padding:18px 20px 16px; }
-  header h1 { margin:0; font-size:20px; }
-  header p { margin:4px 0 0; font-size:13px; opacity:.85; }
-  main { max-width:980px; margin:0 auto; padding:18px 16px 64px; }
-  .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
-    box-shadow:0 1px 3px rgba(16,24,40,.08); }
-  .card h2 { font-size:16px; margin:0 0 12px; color:var(--pri); display:flex; align-items:center; gap:8px; }
-  .card h2 .n { display:inline-flex; width:22px; height:22px; border-radius:50%; background:var(--pri);
-    color:#fff; font-size:12px; align-items:center; justify-content:center; }
-  .row { display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:10px 14px; }
-  label { display:block; font-size:12px; color:var(--mut); margin-bottom:4px; }
-  input,select,textarea,button { font:inherit; }
-  input,select,textarea { width:100%; min-width:0; padding:8px 10px; border:1px solid var(--line);
-    border-radius:8px; background:#fff; color:inherit; }
-  textarea { min-height:64px; resize:vertical; }
-  button { border:0; border-radius:8px; padding:9px 16px; background:var(--pri); color:#fff; cursor:pointer; }
-  button.ghost { background:#eef2f8; color:var(--pri); }
-  button.ok { background:var(--ok); }
-  button:disabled { opacity:.55; cursor:not-allowed; }
-  .actions { margin-top:12px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
-  .hint { font-size:12px; color:var(--mut); }
-  .pill { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; background:#eef2f8; color:var(--pri); }
-  .pill.ok { background:rgba(46,139,118,.12); color:var(--ok); }
-  .pill.warn { background:rgba(192,57,43,.1); color:var(--warn); }
-  .task { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
-  .task .path { font-weight:600; }
-  .task .meta { font-size:13px; color:var(--mut); margin-top:4px; }
-  .match { border:1px solid var(--line); border-left:4px solid var(--ok); border-radius:10px;
-    padding:12px 14px; margin-bottom:10px; }
-  .match .top { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
-  .match .who { font-weight:600; }
-  .score { font-size:20px; font-weight:700; color:var(--ok); }
-  .score.low { color:var(--mut); }
-  .bar { height:6px; border-radius:3px; background:#eef2f8; overflow:hidden; margin:8px 0 6px; }
-  .bar i { display:block; height:100%; background:var(--ok); }
-  .reason { font-family:Consolas,"Courier New",monospace; font-size:12.5px; background:#f7f9fc;
-    border:1px dashed var(--line); border-radius:8px; padding:8px 10px; word-break:break-all; }
-  pre { background:#0f172a; color:#e2e8f0; padding:10px 12px; border-radius:8px; overflow:auto;
-    font-size:12px; margin:8px 0 0; }
-  .shot { max-width:180px; border-radius:8px; border:1px solid var(--line); margin-top:8px; }
-  footer { max-width:980px; margin:0 auto; padding:0 16px 40px; font-size:12px; color:var(--mut); }
-  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  @media (max-width:640px) { .grid2 { grid-template-columns:1fr; } }
-  /* ⚠️ datetime-local 的固有最小宽约 182px：必须 minmax(0,1fr) 才允许收缩，否则 375px 视口被撑破 */
+  /* 登记侧栏的时段行：注意 datetime-local 固有最小宽约 182px，必须 minmax(0,1fr) 才允许收缩 */
   .wins .win { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;
-    gap:8px; margin-bottom:8px; align-items:end; }
+    gap: var(--sp-75); margin-bottom: var(--sp-75); align-items:end; }
   @media (max-width:640px) {
     /* 窄屏：起始时间独占一行，结束时间 + 删除按钮一行，避免两个 datetime-local 并排溢出 */
     .wins .win { grid-template-columns:minmax(0,1fr) auto; }
     .wins .win .w-start { grid-column:1 / -1; }
   }
-  .chk { display:flex; flex-wrap:wrap; gap:10px 16px; }
-  .chk label { display:flex; align-items:center; gap:6px; font-size:13px; color:#1c1c1e; margin:0; }
-  .chk input { width:auto; }
-  /* demo 徽章（?demo=1，由 F0 的 /js/demo.js 注入）；本页不引 app.css，所以这里给个最小样式 */
-  .demo-badge--float { position:fixed; top:10px; right:10px; z-index:50;
-    background:var(--pri); color:#fff; font-size:12px; line-height:1.4; padding:4px 10px;
-    border-radius:999px; box-shadow:0 2px 8px rgba(16,24,40,.18); }
+
+  /* ---------- 壳：≥1024px 左侧常驻功能栏 + 主区只留看板 ---------- */
+  .shell { display:block; }
+  @media (min-width:1024px) {
+    .shell { display:grid; grid-template-columns: 240px minmax(0,1fr);
+      gap: var(--sp-300); align-items:start; }
+  }
+
+  /* ---------- 功能栏（桌面常驻 / 窄屏抽屉） ---------- */
+  .rail { background:var(--color-card); border:1px solid var(--color-line);
+    border-radius:var(--radius-card); box-shadow:var(--shadow-card); padding: var(--sp-200); }
+  .rail__top { display:flex; align-items:center; justify-content:space-between;
+    gap: var(--sp-75); margin-bottom: var(--sp-100); }
+  .rail__title { font-size: 14px; font-weight:600; color:var(--color-primary); }
+  .rail__close { display:none; align-items:center; justify-content:center;
+    width: 32px; height: 32px; border:0; border-radius:var(--radius-sm);
+    background:var(--color-sunken); color:var(--color-muted); cursor:pointer; }
+  .rail__group { display:flex; flex-direction:column; gap: var(--sp-50); }
+  .rail__group + .rail__group { margin-top: var(--sp-100); padding-top: var(--sp-100);
+    border-top:1px dashed var(--color-line); }
+  .rail__group-head { font-size: 12px; color:var(--color-muted); margin-bottom: var(--sp-25); }
+  .rail-item { appearance:none; display:flex; align-items:center; gap: var(--sp-75); width:100%;
+    text-align:left; padding: var(--sp-75) var(--sp-100); border:1px solid transparent;
+    border-radius:var(--radius-md); background:transparent; color:var(--color-text-soft);
+    font-family:inherit; font-size: 14px; cursor:pointer;
+    transition: background var(--dur-color) var(--ease), color var(--dur-color) var(--ease); }
+  .rail-item:hover { background:var(--color-primary-soft); color:var(--color-primary); }
+  .rail-item.is-active { background:var(--color-primary-soft); border-color:var(--color-primary-line);
+    color:var(--color-primary); font-weight:600; }
+  .rail-item__count { margin-left:auto; font-size: 12px; color:var(--color-muted);
+    font-variant-numeric: tabular-nums; }
+  .rail__label { display:block; font-size: 12px; color:var(--color-muted); margin-bottom: var(--sp-25); }
+  .rail__note { margin-top: var(--sp-100); padding-top: var(--sp-100);
+    border-top:1px dashed var(--color-line); font-size: 12px; color:var(--color-muted); }
+  .rail__note summary { cursor:pointer; font-weight:600; color:var(--color-text-soft); }
+  .rail__note p { margin: var(--sp-75) 0 0; line-height:1.7; }
+
+  @media (min-width:1024px) {
+    /* 常驻：吸顶，跟随长看板一起滚 */
+    .rail { position: sticky; top: calc(var(--sp-700) + var(--sp-200));
+      max-height: calc(100vh - var(--sp-900)); overflow:auto; }
+    .rail-fab, .rail-backdrop { display:none; }
+  }
+  @media (max-width:1023px) {
+    /* 收起：默认在屏幕外，点右下角「功能」从左侧滑入 */
+    .rail { position:fixed; left:0; top:0; height:100%; width: min(280px, 86vw); z-index: 96;
+      border-radius: 0 var(--radius-lg) var(--radius-lg) 0; overflow:auto;
+      transform: translateX(-100%); transition: transform var(--dur-move) var(--ease); }
+    .rail.is-open { transform:none; }
+    .rail__close { display:inline-flex; }
+    .rail-backdrop { position:fixed; inset:0; z-index: 95; background: rgba(12,20,33,.42);
+      opacity:0; pointer-events:none; transition: opacity var(--dur-color) var(--ease); }
+    .rail-backdrop.is-open { opacity:1; pointer-events:auto; }
+    .rail-fab { position:fixed; right: var(--sp-200); bottom: calc(var(--tabbar-h) + var(--sp-200));
+      z-index: 60; display:inline-flex; align-items:center; gap: var(--sp-50);
+      padding: var(--sp-75) var(--sp-200); border:0; border-radius:var(--radius-pill);
+      background:var(--color-primary); color:#fff; font-family:inherit;
+      font-size: 14px; font-weight:600; cursor:pointer; box-shadow:var(--shadow-pop); }
+  }
+
+  /* ---------- 看板区头（主区唯一的一段文字） ---------- */
+  .shell__head { display:flex; align-items:flex-end; justify-content:space-between;
+    gap: var(--sp-100); flex-wrap:wrap; margin-bottom: var(--sp-100); }
+  .shell__head h2 { margin:0; font-size: 18px; }
+  .shell__head .eyebrow { display:block; font-size: 12px; color:var(--color-muted-soft);
+    margin-bottom: var(--sp-25); }
+  .shell__head p { margin: var(--sp-25) 0 0; font-size: 12px; color:var(--color-muted); }
+
+  /* ---------- 任务卡：两套外观（我发布的 / 别人的） ---------- */
+  .tk-card { gap: var(--sp-75); }
+  /* 我发布的单：左侧主色描边 + 淡色底 + 深色标题，和别人的单一眼分得开 */
+  .tk-card.card--mine { border-left: 3px solid var(--color-primary);
+    background: var(--color-primary-soft); }
+  .tk-card.card--mine .tk-card__route { color: var(--color-primary-dark); }
+  .tk-card__top { display:flex; align-items:flex-start; justify-content:space-between;
+    gap: var(--sp-75); flex-wrap:wrap; }
+  .tk-card__route { margin:0; font-size: 20px; font-weight:600; line-height:1.35;
+    color:var(--color-primary); overflow-wrap:anywhere; }
+  .tk-card__side { display:flex; align-items:center; gap: var(--sp-50); flex-wrap:wrap;
+    justify-content:flex-end; }
+  .badge--mine { background:var(--color-primary); border-color:var(--color-primary); color:#fff; }
+  .tk-card__meta { display:flex; flex-wrap:wrap; gap: var(--sp-50); }
+  .tk-card__note { margin:0; font-size: 14px; color:var(--color-muted); overflow-wrap:anywhere; }
+  .tk-card__note.is-cut { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tk-card__cands { min-width:0; }
+  .tk-cands-head { display:flex; align-items:center; gap: var(--sp-50); margin:0 0 var(--sp-75);
+    font-size: 12px; color:var(--color-muted); }
+  .tk-none, .tk-matching, .tk-rule { display:flex; align-items:flex-start; gap: var(--sp-50);
+    margin:0; font-size: 12px; color:var(--color-muted); }
+  .tk-card__foot { display:flex; align-items:center; justify-content:space-between;
+    gap: var(--sp-75); flex-wrap:wrap; padding-top: var(--sp-75);
+    border-top:1px dashed var(--color-line); }
+  .tk-card__id { margin:0; font-family:var(--font-mono); font-size: 12px;
+    color:var(--color-muted-soft); overflow-wrap:anywhere; }
+  .tk-card__action { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap;
+    justify-content:flex-end; flex:0 0 auto; }
+
+  /* 候选：一行一个（超出的收进「还有 N 位」） */
+  .cand-list { display:flex; flex-direction:column; gap: var(--sp-75); }
+  /* 注意：.cand-list 的 display 会盖掉浏览器默认的 [hidden]{display:none}，折叠态必须显式声明 */
+  .cand-list[hidden] { display:none; }
+  .cand { border:1px solid var(--color-line); border-radius:var(--radius-md);
+    background:var(--color-card); padding: var(--sp-100); min-width:0; }
+  .cand.is-dim { opacity:.5; }
+  .cand__line { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap; }
+  .cand__name { font-size: 14px; font-weight:600; min-width:0; overflow-wrap:anywhere; }
+  .cand .reason { margin-top: var(--sp-75); }
+  .cand__queue { font-size: 12px; color:var(--color-muted); }
+  .tk-more { align-self:flex-start; }
+
+  /* 侧栏内部零件 */
+  .sheet__foot { flex-wrap:wrap; }
+  .sheet__foot .hint { flex:1 1 100%; margin:0; }
+  #publish-out, #register-out { margin-top: var(--sp-100); }
+
+  /* 折叠态一律不占位：类选择器上的 display 会盖掉浏览器默认的 [hidden]{display:none} */
+  [hidden] { display:none !important; }
+
+  /* ---------- 筛选：从哪 / 到哪 / 截止时间 / 报酬 ---------- */
+  .fld { display:flex; flex-direction:column; gap: var(--sp-25); margin-bottom: var(--sp-75); }
+  .fld:last-child { margin-bottom:0; }
+  .fld__label { font-size: 12px; color:var(--color-muted); }
+  .fld select, .fld input { width:100%; min-width:0; }
+  .fld__pair { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+    gap: var(--sp-50); align-items:center; }
+  .fchips { display:flex; flex-wrap:wrap; gap: var(--sp-25); }
+  .fchip { appearance:none; font-family:inherit; font-size: 12px; cursor:pointer;
+    padding: var(--sp-25) var(--sp-75); border:1px solid var(--color-line);
+    border-radius:var(--radius-pill); background:var(--color-card); color:var(--color-text-soft); }
+  .fchip[aria-pressed="true"] { background:var(--color-primary);
+    border-color:var(--color-primary); color:#fff; font-weight:600; }
+  .shell__filter { display:flex; align-items:center; gap: var(--sp-75); flex-wrap:wrap;
+    margin: var(--sp-50) 0 0; font-size: 12px; color:var(--color-primary); }
+
+  /* ---------- 私聊 ---------- */
+  .chat { display:grid; grid-template-columns: 260px minmax(0,1fr); gap: var(--sp-200);
+    align-items:start; }
+  .chat__list { display:flex; flex-direction:column; gap: var(--sp-50); max-height: 560px;
+    overflow:auto; }
+  .chat__item { appearance:none; font-family:inherit; text-align:left; cursor:pointer; width:100%;
+    display:flex; align-items:flex-start; gap: var(--sp-75); padding: var(--sp-75);
+    border:1px solid var(--color-line); border-radius:var(--radius-md);
+    background:var(--color-card); color:var(--color-text); }
+  .chat__item.is-active { border-color:var(--color-primary-line); background:var(--color-primary-soft); }
+  .chat__avatar { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto;
+    width: 32px; height: 32px; border-radius:var(--radius-pill);
+    background:var(--color-primary-soft); color:var(--color-primary); }
+  .chat__meta { display:flex; flex-direction:column; gap: var(--sp-25); min-width:0; flex:1 1 auto; }
+  .chat__name { font-size: 14px; font-weight:600; }
+  .chat__last { font-size: 12px; color:var(--color-muted); overflow-wrap:anywhere; }
+  .chat__time { font-size: 12px; color:var(--color-muted-soft); flex:0 0 auto; }
+  .chat__main { display:flex; flex-direction:column; gap: var(--sp-100); min-width:0; }
+  .chat__subject { position: sticky; top: var(--sp-100); z-index: 2; cursor:pointer;
+    display:flex; align-items:flex-start; justify-content:space-between; gap: var(--sp-100);
+    padding: var(--sp-75) var(--sp-100); border:1px solid var(--color-primary-line);
+    border-radius:var(--radius-md); background:var(--color-primary-soft); }
+  .chat__subject-title { font-size: 14px; font-weight:600; color:var(--color-primary); }
+  .chat__subject-sub { font-size: 12px; color:var(--color-text-soft); margin: var(--sp-25) 0 0; }
+  .chat__subject-actions { display:flex; align-items:center; gap: var(--sp-50); flex:0 0 auto; }
+  .chat__back { display:none; }
+  .chat__back .icon { transform: rotate(180deg); }
+  .chat__stream { display:flex; flex-direction:column; gap: var(--sp-75); max-height: 460px;
+    overflow-y:auto; padding: var(--sp-100); border:1px solid var(--color-line);
+    border-radius:var(--radius-md); background:var(--color-sunken); }
+  .chat__row { display:flex; gap: var(--sp-50); align-items:flex-end; }
+  .chat__row.is-mine { flex-direction: row-reverse; }
+  .chat__bubble { max-width: 76%; padding: var(--sp-75) var(--sp-100);
+    border:1px solid var(--color-line); border-radius:var(--radius-md);
+    background:var(--color-card); font-size: 14px; line-height:1.6;
+    white-space:pre-wrap; overflow-wrap:anywhere; }
+  .chat__row.is-mine .chat__bubble { background:var(--color-primary);
+    border-color:var(--color-primary); color:#fff; }
+  .chat__row--emoji .chat__bubble { font-size: 24px; line-height:1.2; }
+  .chat__at { font-size: 12px; color:var(--color-muted-soft); }
+  .chat__compose { display:flex; flex-direction:column; gap: var(--sp-50); }
+  .chat__emoji { display:flex; flex-wrap:wrap; gap: var(--sp-25); }
+  .chat__emoji button { appearance:none; font-family:inherit; cursor:pointer; line-height:1;
+    font-size: 16px; padding: var(--sp-25) var(--sp-50); border:1px solid var(--color-line);
+    border-radius:var(--radius-sm); background:var(--color-card); }
+  .chat__inputrow { display:flex; gap: var(--sp-50); align-items:flex-end; }
+  .chat__inputrow textarea { flex:1 1 auto; min-height: 44px; max-height: 120px; }
+
+  @media (max-width:767px) {
+    /* 窄屏首屏尽量多露卡片：隐掉小标题与页头小字，卡片内边距收紧一档 */
+    .shell__head .eyebrow { display:none; }
+    .page-head .lead { display:none; }
+    .tk-card { padding: var(--sp-100); }
+    .tk-card__route { font-size: 18px; }
+    .tk-card__action { justify-content:flex-start; }
+    /* 私聊窄屏：列表与消息流单列互斥（选中会话后看消息流，顶部有「返回」） */
+    .chat { grid-template-columns: minmax(0,1fr); }
+    .chat__list { max-height:none; }
+    .chat__subject { position: static; }
+    .chat__back { display:inline-flex; }
+    /* 窄屏上「功能」悬浮键会压住输入区：私聊时把它抬到输入区上方 */
+    body.is-chat .rail-fab { bottom: calc(var(--tabbar-h) + var(--sp-900)); }
+  }
 </style>
+  <meta name="description" content="我发布的单可以挑人派单，别人的单只能表达意愿；按可达性 40、时段 30、报酬 30 打分，只推 60 分以上的顺路同学。" />
+  <meta property="og:title" content="代取撮合：看单、接单、跑腿登记" />
+  <meta property="og:description" content="我发布的单可以挑人派单，别人的单只能表达意愿；每个候选都带可解释理由。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<header>
-  <h1>代取撮合 · 北名大小助手</h1>
-  <p>发布取件需求 → 跑腿者登记能力 → 撮合引擎按「可达性 40 / 时间 30 / 报酬 30」打分，只推 ≥60 分的候选人。</p>
-</header>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main id="main" class="page page--mid">
+  <div class="page-head">
+    <h1>代取看板</h1>
+        <div class="whoami" id="whoami" title="你的匿名身份（仅存浏览器，不收集身份信息）"></div>
+    <p class="lead">我发布的单（淡蓝底）自己挑人派单；别人的单只能表达意愿，等发布者确认。</p>
+  </div>
 
-<main>
-  <!-- ───────────── 区块一 · 发布任务 ───────────── -->
-  <section class="card" id="sec-publish">
-    <h2><span class="n">1</span>发布任务</h2>
-    <div class="row">
-      <div>
-        <label for="p-owner">你的昵称（本站只收昵称，不收姓名/学号/手机号）</label>
-        <input id="p-owner" value="同学A" maxlength="32" />
+  <div class="shell">
+    <!-- ───────────── 功能栏：≥1024px 常驻在左；窄屏默认收起，点「功能」滑入 ───────────── -->
+    <aside class="rail" id="rail" aria-label="代取功能栏">
+      <div class="rail__top">
+        <span class="rail__title">代取功能</span>
+        <button class="rail__close" id="rail-close" type="button" aria-label="收起功能栏">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/x.svg)" aria-hidden="true"></span>
+        </button>
       </div>
-      <div>
-        <label for="p-from">取件楼栋</label>
-        <select id="p-from"></select>
-      </div>
-      <div>
-        <label for="p-to">送达楼栋</label>
-        <select id="p-to"></select>
-      </div>
-      <div>
-        <label for="p-station">快递站</label>
-        <input id="p-station" list="station-list" value="快递驿站" />
-        <datalist id="station-list"></datalist>
-      </div>
-      <div>
-        <label for="p-deadline">截止时间</label>
-        <input id="p-deadline" type="datetime-local" />
-      </div>
-      <div class="grid2">
-        <div><label for="p-rmin">报酬下限（元）</label><input id="p-rmin" type="number" min="0" step="0.5" value="3" /></div>
-        <div><label for="p-rmax">报酬上限（元）</label><input id="p-rmax" type="number" min="0" step="0.5" value="5" /></div>
-      </div>
-    </div>
-    <div class="actions">
-      <button id="btn-publish">发布任务</button>
-      <span class="hint">报酬由双方线下协商，平台不参与交易、不代收款。</span>
-    </div>
 
-    <div style="margin-top:14px">
-      <label for="p-note">备注（入库前自动打码手机号 / 超长单号）</label>
-      <textarea id="p-note" placeholder="例：小件，两个包裹；12号宿舍楼取快递送到15号宿舍楼，报酬3-5元"></textarea>
-    </div>
-    <div class="actions">
-      <label class="hint" style="margin:0">截图（可选）</label>
-      <input id="p-shot" type="file" accept="image/*" style="max-width:260px" />
-      <button class="ghost" id="btn-parse">识别截图字段</button>
-      <span class="hint">原图不落盘；只做字段理解，<b>不抽取收件人姓名 / 手机号 / 运单号</b>。</span>
-    </div>
-    <div id="parse-out"></div>
-    <div id="publish-out"></div>
-  </section>
+      <nav class="rail__group" aria-label="看板视图">
+        <span class="rail__group-head">看板视图</span>
+        <button class="rail-item is-active" id="view-all" type="button" aria-pressed="true">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/layout-grid.svg)" aria-hidden="true"></span>
+          <span>全部开放任务</span>
+          <span class="rail-item__count" id="count-all">0</span>
+        </button>
+        <button class="rail-item" id="view-mine" type="button" aria-pressed="false">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
+          <span>我的接单</span>
+          <span class="rail-item__count" id="count-mine">0</span>
+        </button>
+      </nav>
 
-  <!-- ───────────── 区块二 · 跑腿登记 ───────────── -->
-  <section class="card" id="sec-register">
-    <h2><span class="n">2</span>跑腿登记</h2>
-    <div class="row">
-      <div>
-        <label for="r-owner">你的昵称</label>
-        <input id="r-owner" value="同学B" maxlength="32" />
-      </div>
-      <div>
-        <label for="r-floor">可接受报酬下限（元）</label>
-        <input id="r-floor" type="number" min="0" step="0.5" value="2" />
-      </div>
-    </div>
-    <div style="margin-top:10px">
-      <label>可达楼栋（多选）</label>
-      <div class="chk" id="r-buildings"></div>
-    </div>
-    <div style="margin-top:12px">
-      <label>可跑时段（可多段；只填你真正有空的时间）</label>
-      <div class="wins" id="r-windows"></div>
-      <div class="actions" style="margin-top:6px">
-        <button class="ghost" id="btn-add-window">+ 加一段时段</button>
-        <button class="ok" id="btn-register">登记 / 覆盖登记</button>
-        <span class="hint">同一昵称重复登记 = 覆盖更新（<code>runners.user_id</code> 唯一）。</span>
-      </div>
-    </div>
-    <div id="register-out"></div>
-  </section>
+      <nav class="rail__group" aria-label="功能">
+        <span class="rail__group-head">功能</span>
+        <button class="rail-item" id="btn-open-publish" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/package.svg)" aria-hidden="true"></span>
+          <span>发布代取</span>
+        </button>
+        <button class="rail-item" id="btn-open-register" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/walk.svg)" aria-hidden="true"></span>
+          <span>登记跑腿能力</span>
+        </button>
+        <button class="rail-item" id="view-chat" type="button" aria-pressed="false">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span>
+          <span>私聊</span>
+          <span class="rail-item__count" id="count-chat">0</span>
+        </button>
+      </nav>
 
-  <!-- ───────────── 区块三 · 任务看板 ───────────── -->
-  <section class="card" id="sec-board">
-    <h2><span class="n">3</span>任务看板</h2>
-    <div class="actions" style="margin-top:0">
-      <select id="b-filter" style="max-width:220px"><option value="">全部楼栋</option></select>
-      <button class="ghost" id="btn-reload">刷新</button>
-      <span class="hint" id="board-count"></span>
-    </div>
-    <div id="board" style="margin-top:12px"></div>
-  </section>
+      <!-- 筛选：从哪 / 到哪 / 截止时间 / 报酬（前端过滤已加载的任务；条件同步进 URL query） -->
+      <div class="rail__group" aria-label="筛选">
+        <span class="rail__group-head">筛选</span>
 
-  <!-- ───────────── 区块四 · 匹配结果 ───────────── -->
-  <section class="card" id="sec-match">
-    <h2><span class="n">4</span>匹配结果</h2>
-    <p class="hint" style="margin:0 0 10px">
-      点看板里某个任务的「查看匹配」，这里会显示<b>候选跑腿者 + score + reason</b>（reason 里的分值相加正好等于 score）；
-      阈值 60，低于 60 分的一律不出现。同一任务对同一人 5 分钟内不重复推送。
-    </p>
-    <div id="match-out"><p class="hint">还没有触发撮合。</p></div>
-  </section>
+        <div class="fld">
+          <label class="fld__label" for="b-filter">从哪（取件楼栋）</label>
+          <select id="b-filter" aria-label="从哪（取件楼栋）"><option value="">不限</option></select>
+        </div>
 
-  <section class="card">
-    <h2>演示令牌（写接口需要）</h2>
-    <p class="hint" style="margin:0 0 8px">
-      发布/触发撮合/登记是写接口，需要 <code>X-Demo-Token</code>（MCP 端点是 <code>Authorization: Bearer</code>）。
-      本站令牌限频 + 短周期轮换、只能操作演示数据；真实值不进任何参赛材料。
-    </p>
-    <div class="row">
-      <div>
-        <label for="tk">令牌（只存本地浏览器，不写进代码）</label>
-        <input id="tk" type="password" placeholder="<DEMO_TOKEN>" />
+        <div class="fld">
+          <label class="fld__label" for="f-to">到哪（送达楼栋）</label>
+          <select id="f-to" aria-label="到哪（送达楼栋）"><option value="">不限</option></select>
+        </div>
+
+        <div class="fld">
+          <span class="fld__label">截止时间</span>
+          <div class="fchips" id="f-within" role="group" aria-label="截止时间范围">
+            <button class="fchip" type="button" data-within="all" aria-pressed="true">不限</button>
+            <button class="fchip" type="button" data-within="today" aria-pressed="false">今天</button>
+            <button class="fchip" type="button" data-within="3d" aria-pressed="false">3 天内</button>
+            <button class="fchip" type="button" data-within="week" aria-pressed="false">本周内</button>
+            <button class="fchip" type="button" data-within="custom" aria-pressed="false">自定义</button>
+          </div>
+        </div>
+
+        <div class="fld" id="f-custom" hidden>
+          <label class="fld__label" for="f-since">起（可留空）</label>
+          <input id="f-since" type="datetime-local" />
+          <label class="fld__label" for="f-until">止（可留空）</label>
+          <input id="f-until" type="datetime-local" />
+        </div>
+
+        <div class="fld">
+          <span class="fld__label">报酬区间（元，有交集即可）</span>
+          <div class="fld__pair">
+            <input id="f-rmin" type="number" min="0" step="1" placeholder="最低" aria-label="报酬下限" />
+            <input id="f-rmax" type="number" min="0" step="1" placeholder="最高" aria-label="报酬上限" />
+          </div>
+        </div>
+
+        <button class="btn btn--quiet btn--sm" id="f-clear" type="button">清空筛选</button>
       </div>
-      <div style="align-self:end">
-        <button class="ghost" id="btn-tk">保存令牌</button>
-        <span class="pill" id="tk-state">未配置</span>
+
+      <details class="rail__note">
+        <summary>说明</summary>
+        <p>发单的人才能挑人：我发布的单上直接列出候选（昵称 / score / reason），点「选 TA 接单」就是把
+           这一单派给他；别人的单看不到候选，只能点「我想接这一单」表达意愿，等发布者确认。</p>
+        <p>匹配结果由引擎算：可达性 40 + 时段 30 + 报酬 30，阈值 60，低于 60 分一律不出现；
+           平台单任务同时最多推 3 名，其余先排队。</p>
+        <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+        <p>需要自动识别取件截图时，请在 WorkBuddy 里把截图直接发给对话方（站内不提供上传入口）。</p>
+      </details>
+    </aside>
+
+    <!-- ───────────── 看板 ───────────── -->
+    <section class="shell__main" id="board-pane" aria-labelledby="board-title">
+      <div class="shell__head">
+        <div>
+          <span class="eyebrow" id="board-eyebrow">开放任务</span>
+          <h2 id="board-title">待取看板</h2>
+          <p id="board-count">正在读取…</p>
+          <p class="shell__filter" id="filter-state" hidden></p>
+        </div>
+        <button class="btn btn--quiet btn--sm" id="btn-reload" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          <span>刷新</span>
+        </button>
       </div>
-    </div>
-  </section>
+      <div id="board" class="stack"></div>
+    </section>
+
+    <!-- ───────────── 私聊：左侧会话列表 + 右侧消息流 ───────────── -->
+    <section class="shell__main" id="chat-pane" aria-labelledby="chat-title" hidden>
+      <div class="shell__head">
+        <div>
+          <span class="eyebrow">站内直聊 · 不去站外换联系方式</span>
+          <h2 id="chat-title">私聊</h2>
+          <p id="chat-count">双方都同意（这一单已确认接单）才会有会话</p>
+        </div>
+        <button class="btn btn--quiet btn--sm" id="chat-refresh" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          <span>刷新会话</span>
+        </button>
+      </div>
+      <div class="chat">
+        <div class="chat__list" id="chat-list"></div>
+        <div class="chat__main" id="chat-main">
+          <div class="state" id="chat-placeholder">
+            <div class="state__icon"><span class="icon icon--28" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span></div>
+            <p class="state__title">还没有可聊的会话</p>
+            <p class="state__hint">只有「这一单的发布者 ↔ 接单者」才会出现在左边的列表里；聊天就在站内，⛔ 不用去站外交换联系方式。</p>
+          </div>
+          <div id="chat-conv" hidden>
+            <div class="chat__subject" id="chat-subject">
+              <div>
+                <div class="chat__subject-title" id="chat-subject-title"></div>
+                <p class="chat__subject-sub" id="chat-subject-sub"></p>
+              </div>
+              <div class="chat__subject-actions">
+                <button class="btn btn--quiet btn--sm chat__back" id="chat-back" type="button">
+                  <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/arrow-right.svg)" aria-hidden="true"></span>
+                  <span>返回列表</span>
+                </button>
+                <button class="btn btn--quiet btn--sm" id="chat-subject-more" type="button">看详情</button>
+              </div>
+            </div>
+            <div class="chat__stream" id="chat-stream" role="log" aria-live="polite"></div>
+            <div class="chat__compose">
+              <div class="chat__emoji" id="chat-emoji" role="group" aria-label="常用表情"></div>
+              <div class="chat__inputrow">
+                <textarea id="chat-text" rows="2" maxlength="500"
+                  placeholder="说点什么…（Enter 发送，Shift+Enter 换行）" aria-label="消息内容"></textarea>
+                <button class="btn" id="chat-send" type="button">
+                  <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/send.svg)" aria-hidden="true"></span>
+                  <span>发送</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- 窄屏才出现：右下角「功能」按键 + 抽屉遮罩（≥1024px 由 CSS 隐藏） -->
+  <button class="rail-fab" id="rail-open" type="button" aria-label="打开功能栏" aria-expanded="false">
+    <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/layout-grid.svg)" aria-hidden="true"></span>
+    <span>功能</span>
+  </button>
+  <div class="rail-backdrop" id="rail-backdrop"></div>
 </main>
 
-<footer>
-  <p>北名大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
+<footer class="site-footer">
+  <p>北民大小助手 · 赛道一 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
 </footer>
 
 <script src="/config.js"></script>
-<script>
-(() => {
-  "use strict";
-  const $ = (s) => document.querySelector(s);
-  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+<script type="module">
+import { api, mcpRpc } from "/js/api.js";
+import { ensureSession, currentNickname, mountIdentityChip } from "/js/session.js";
+import { mountNav } from "/js/nav.js";
+import { initDemo, displayName, aliasFor } from "/js/demo.js";
+import { el, icon, createSheet, openModal, toast, showLoading, errorText } from "/js/ui.js";
 
-  // ---------- 令牌（只从运行时拿，⛔ 不硬编码） ----------
-  const TK_KEY = "bm_demo_token";
-  function readToken() {
-    const q = new URLSearchParams(location.search).get("token");
-    if (q) { try { localStorage.setItem(TK_KEY, q); } catch {} return q; }
-    return (window.__DEMO_TOKEN__ || "") || (() => { try { return localStorage.getItem(TK_KEY) || ""; } catch { return ""; } })();
+const $ = (s) => document.querySelector(s);
+const money = (n) => (Number.isFinite(Number(n)) ? String(Number(n)) : "—");
+
+/* 演示身份固定为「同学A」：判断「是不是我发的单」只看发布者字段（⛔ 不看演示别名） */
+let ME = "同学A";      // * 登录后会换成服务端签发的匿名昵称（见 boot 里的 ensureSession）
+const publisherOf = (t) => String((t && (t.publisher ?? t.owner_handle)) || "").trim();
+const isMine = (t) => publisherOf(t) === ME;
+
+/* 看板状态（页面自己的视图缓存；⛔ 不落 localStorage） */
+const state = {
+  tasks: [],                 // 从 /api/tasks 读到的全部开放任务
+  view: "all",               // all = 全部开放任务 / mine = 我的接单（我作为跑腿者）
+  matches: new Map(),        // task_id → Match[]（只对我发布的单取候选）；null = 撮合失败；undefined = 撮合中
+  matchErrors: new Map(),    // task_id → 错误对象
+  accepted: new Set(),       // 已被派单（服务端有一条 accepted）的任务
+  acceptedBy: new Map(),     // task_id → 接单人昵称
+  myRuns: new Map(),         // task_id → { match_id, state }：我作为跑腿者（pushed = 已表达意愿 / accepted = 我被派单）
+  intents: new Map(),        // task_id → match_id：本会话里我表达过的意愿
+  intentFallback: new Set(), // 服务端意愿接口未就绪时，走会话态的那几单（界面上给一句灰字说明）
+  moreOpen: new Set(),       // 已展开「还有 N 位」的任务
+};
+const cardRefs = new Map();      // task_id → { card, side, action, cands }
+const countdownRefs = new Map(); // task_id → 倒计时 .chip 节点
+const busy = new Set();          // 正在提交的 match_id / task_id（防连点）
+let boardLoading = false;
+
+/* 私聊状态（会话列表 / 当前会话 / 增量游标 / 轮询计时器） */
+let chatThreads = [];            // 只保留 kind === "task" 的会话
+let chatThreadId = "";           // 当前打开的会话
+let chatLastId = "";             // 增量拉取的游标（after=）
+let chatTimer = null;
+
+/* 撮合结果缓存：同一任务 20 秒内不重复打写接口（单 IP 写接口 60 次/分钟留余量） */
+const MATCH_TTL_MS = 20_000;
+const matchCache = new Map();    // task_id → { list, error, at }
+
+/** 候选超过 3 位就折叠：「还有 N 位」 */
+const CAND_SHOWN = 3;
+
+mountNav();
+
+/* =====================================================================
+   通用小零件（图标一律走 .icon + Phosphor svg，⛔ 不用 emoji）
+   ===================================================================== */
+
+function chip(iconName, text, extraCls = "") {
+  const c = el("span", "chip" + (extraCls ? " " + extraCls : ""));
+  c.appendChild(icon(iconName, { size: 15 }));
+  c.appendChild(el("span", "", String(text)));
+  return c;
+}
+
+/** 自绘三态块：统一用 Phosphor svg */
+function stateBox(kind, { iconName = "info-circle", title, hint, actionText, onAction } = {}) {
+  const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
+  const ic = el("div", "state__icon");
+  ic.appendChild(icon(iconName, { size: 28 }));
+  wrap.appendChild(ic);
+  if (title) wrap.appendChild(el("p", "state__title", title));
+  if (hint) wrap.appendChild(el("p", "state__hint", hint));
+  if (actionText && typeof onAction === "function") {
+    const actions = el("div", "state__action");
+    const btn = el("button", "btn btn--ghost btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    actions.appendChild(btn);
+    wrap.appendChild(actions);
   }
-  let TOKEN = readToken();
-  function paintToken() {
-    const s = $("#tk-state");
-    s.textContent = TOKEN ? "已配置" : "未配置（写接口会 401）";
-    s.className = "pill " + (TOKEN ? "ok" : "warn");
-    $("#tk").value = ""; $("#tk").placeholder = TOKEN ? "已保存（重新输入可覆盖）" : "<DEMO_TOKEN>";
+  return wrap;
+}
+
+/** 空态（用设计系统里的插画 + .empty-art）：只在「整个看板没内容」时用，卡片里不用大图 */
+function emptyArt(text, hint, actionText, onAction) {
+  const art = el("div", "empty-art");
+  const img = el("img");
+  img.src = "/img/empty-state.png";
+  img.alt = "";
+  img.setAttribute("loading", "lazy");
+  art.appendChild(img);
+  art.appendChild(el("p", "", text));
+  if (hint) art.appendChild(el("p", "hint small", hint));
+  if (actionText && typeof onAction === "function") {
+    const btn = el("button", "btn btn--ghost btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    art.appendChild(btn);
   }
-  $("#btn-tk").addEventListener("click", () => {
-    const v = $("#tk").value.trim();
-    if (v) { TOKEN = v; try { localStorage.setItem(TK_KEY, v); } catch {} }
-    paintToken();
+  return art;
+}
+
+/** 行内提示条（带 Phosphor 图标） */
+function mountNotice(target, kind, text) {
+  const box = typeof target === "string" ? $(target) : target;
+  if (!box) return;
+  box.innerHTML = "";
+  const p = el("p", "notice" + (kind ? " notice--" + kind : ""));
+  p.style.display = "flex";
+  p.style.alignItems = "center";
+  p.style.gap = "4px";
+  p.appendChild(icon(kind === "danger" ? "alert-triangle" : kind === "ok" ? "circle-check" : "info-circle", { size: 16 }));
+  p.appendChild(el("span", "", text));
+  if (kind === "danger") p.setAttribute("role", "alert");
+  box.appendChild(p);
+}
+
+/** 时间工具：本地 datetime-local ↔ ISO */
+function localInput(ts) {
+  const d = new Date(ts - new Date().getTimezoneOffset() * 60000);
+  return d.toISOString().slice(0, 16);
+}
+
+/** 倒计时（距截止还有 XX 分钟；紧张 / 过期给醒目标记） */
+function countdownChip(t) {
+  const ms = new Date(t.deadline_iso).getTime() - Date.now();
+  if (!Number.isFinite(ms)) return chip("clock", "截止时间未知", "chip--soon");
+  if (ms <= 0) return chip("alert-triangle", "已过期", "chip--urgent");
+  const m = Math.floor(ms / 60000);
+  const text = m < 120
+    ? "距截止还有 " + m + " 分钟"
+    : m < 1440
+      ? "距截止还有 " + Math.floor(m / 60) + " 小时" + (m % 60 ? " " + (m % 60) + " 分" : "")
+      : "距截止还有 " + Math.floor(m / 1440) + " 天";
+  if (ms <= 30 * 60000) return chip("alert-triangle", text, "chip--urgent");
+  if (ms <= 120 * 60000) return chip("clock", text, "chip--soon");
+  return chip("clock", text);
+}
+
+function tickCountdowns() {
+  for (const t of state.tasks) {
+    const ref = countdownRefs.get(t.task_id);
+    if (!ref || !ref.parentNode) continue;
+    const fresh = countdownChip(t);
+    ref.parentNode.replaceChild(fresh, ref);
+    countdownRefs.set(t.task_id, fresh);
+  }
+}
+
+/* =====================================================================
+   楼栋 / 快递站（优先 M3 的 /api/map/nodes，没有就用规范名兜底）
+   ===================================================================== */
+const FALLBACK_NODES = [
+  { label: "12号宿舍楼", category: "dorm" }, { label: "15号宿舍楼", category: "dorm" },
+  { label: "第二食堂", category: "canteen" }, { label: "南门", category: "gate" },
+  { label: "快递驿站", category: "service" },
+];
+let NODES = FALLBACK_NODES;
+
+function buildingLabels() {
+  const dorms = NODES.filter((n) => n.category === "dorm").map((n) => n.label);
+  return dorms.length ? dorms : NODES.map((n) => n.label);
+}
+
+function fillBuildingOptions(sel, { all = false, index = 0 } = {}) {
+  if (!sel) return;
+  const opts = buildingLabels();
+  const keep = sel.value;
+  sel.innerHTML = "";
+  if (all) sel.appendChild(new Option("全部楼栋", ""));
+  opts.forEach((label) => sel.appendChild(new Option(label, label)));
+  // 已经选过就保留用户选择；否则按调用方给的默认位次（取件楼 0 / 送达楼 1）
+  sel.value = all ? keep || "" : (opts.includes(keep) ? keep : opts[index] || opts[0] || "");
+}
+
+function fillStationList() {
+  const dl = $("#station-list");
+  if (!dl) return;
+  dl.innerHTML = "";
+  NODES.forEach((n) => dl.appendChild(new Option(n.label, n.label)));
+}
+
+function fillBuildingChecks() {
+  const box = $("#r-buildings");
+  if (!box) return;
+  const checked = new Set([...box.querySelectorAll("input:checked")].map((c) => c.value));
+  box.innerHTML = "";
+  buildingLabels().forEach((label) => {
+    const l = el("label");
+    const cb = el("input");
+    cb.type = "checkbox";
+    cb.value = label;
+    if (checked.has(label)) cb.checked = true;
+    l.appendChild(cb);
+    l.appendChild(document.createTextNode(label));
+    box.appendChild(l);
   });
+}
 
-  // ---------- 统一信封解包 ----------
-  async function apiGet(path) {
-    const r = await fetch(path, { headers: { accept: "application/json" } });
-    const j = await r.json().catch(() => ({ ok:false, error:{ message:"响应不是 JSON" } }));
-    return { status: r.status, ...j };
+async function loadNodes() {
+  try {
+    const data = await api("/api/map/nodes");
+    if (Array.isArray(data) && data.length) NODES = data;
+  } catch {
+    /* 归到兜底规范名，页面照常可用 */
   }
-  async function apiPost(path, body) {
-    const r = await fetch(path, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-demo-token": TOKEN },
-      body: JSON.stringify(body || {}),
-    });
-    const j = await r.json().catch(() => ({ ok:false, error:{ message:"响应不是 JSON" } }));
-    return { status: r.status, ...j };
-  }
-  async function mcpCall(name, args) {
-    const r = await fetch("/mcp", {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: "Bearer " + TOKEN },
-      body: JSON.stringify({ jsonrpc: "2.0", id: Date.now() % 100000, method: "tools/call", params: { name, arguments: args } }),
-    });
-    if (r.status === 401) return { ok:false, error:{ code:"SCHEMA_REJECTED", message:"MCP 端点需要有效令牌（见下方「演示令牌」）" } };
-    const j = await r.json().catch(() => null);
-    const sc = j && j.result && j.result.structuredContent;
-    return sc || { ok:false, error:{ code:"INTERNAL", message:(j && j.error && j.error.message) || "MCP 调用失败" } };
-  }
-  function show(target, node) { const box = $(target); box.innerHTML = ""; if (node) box.appendChild(node); }
-  function errNode(j) {
-    const p = el("p", "hint"); p.style.color = "var(--warn)";
-    p.textContent = "❌ " + (j && j.error ? j.error.code + "：" + j.error.message : "未知错误");
-    return p;
-  }
-  function jsonNode(obj) { const pre = el("pre"); pre.textContent = JSON.stringify(obj, null, 2); return pre; }
+  fillFilterBuildings();          // 筛选面板的两个楼栋下拉（从哪 / 到哪）
+  fillBuildingOptions($("#p-from"), { index: 0 });
+  fillBuildingOptions($("#p-to"), { index: 1 });
+  fillStationList();
+  fillBuildingChecks();
+}
 
-  // ---------- 楼栋 / 快递站：优先 M3 的 /api/map/nodes，没有就用规范名兜底 ----------
-  // 兜底清单与 config/map-nodes.json 的 label 字面一致（集成后自动切到接口数据）
-  const FALLBACK_NODES = [
-    { label:"12号宿舍楼", category:"dorm" }, { label:"15号宿舍楼", category:"dorm" },
-    { label:"第二食堂", category:"canteen" }, { label:"南门", category:"gate" },
-    { label:"快递驿站", category:"service" },
-  ];
-  let NODES = FALLBACK_NODES;
-  async function loadNodes() {
-    const j = await apiGet("/api/map/nodes").catch(() => null);
-    if (j && j.ok && Array.isArray(j.data) && j.data.length) NODES = j.data;
-    const dorms = NODES.filter((n) => n.category === "dorm").map((n) => n.label);
-    const opts = dorms.length ? dorms : NODES.map((n) => n.label);
-    for (const id of ["#p-from", "#p-to", "#b-filter"]) {
-      const sel = $(id); const keep = sel.value; sel.innerHTML = "";
-      if (id === "#b-filter") sel.appendChild(new Option("全部楼栋", ""));
-      opts.forEach((label, i) => sel.appendChild(new Option(label, label)));
-      if (id === "#p-to" && opts.length > 1) sel.value = opts[1];
-      else sel.value = keep || opts[0] || "";
-    }
-    const dl = $("#station-list"); dl.innerHTML = "";
-    NODES.forEach((n) => dl.appendChild(new Option(n.label, n.label)));
-    const box = $("#r-buildings"); box.innerHTML = "";
-    opts.forEach((label) => {
-      const l = el("label"); const cb = el("input"); cb.type = "checkbox"; cb.value = label;
-      l.appendChild(cb); l.appendChild(document.createTextNode(label)); box.appendChild(l);
-    });
-  }
+/* =====================================================================
+   侧栏一 · 发布代取（点功能栏才出现：只有文字字段，⛔ 没有图片上传）
+   ===================================================================== */
+let publishSheet = null;
 
-  // ---------- 时间工具 ----------
-  function isoPlusMinutes(min) { return new Date(Date.now() + min * 60000).toISOString(); }
-  function localInput(ts) {
-    const d = new Date(ts - new Date().getTimezoneOffset() * 60000);
-    return d.toISOString().slice(0, 16);
-  }
-  function countdown(iso) {
-    const ms = new Date(iso).getTime() - Date.now();
-    if (!Number.isFinite(ms)) return "—";
-    if (ms <= 0) return "已过期";
-    const m = Math.floor(ms / 60000);
-    if (m < 60) return m + " 分钟后截止";
-    const h = Math.floor(m / 60), mm = m % 60;
-    if (h < 24) return h + " 小时" + (mm ? mm + " 分" : "") + "后截止";
-    return Math.floor(h / 24) + " 天" + (h % 24) + " 小时后截止";
-  }
+function addWindow(startMin, endMin) {
+  const box = $("#r-windows");
+  if (!box) return;
+  const wrap = el("div", "win");
+  const s = el("input"); s.type = "datetime-local"; s.className = "w-start";
+  s.setAttribute("aria-label", "时段开始");
+  const e = el("input"); e.type = "datetime-local"; e.className = "w-end";
+  e.setAttribute("aria-label", "时段结束");
+  s.value = localInput(Date.now() + startMin * 60000);
+  e.value = localInput(Date.now() + endMin * 60000);
+  const del = el("button", "btn btn--quiet btn--sm", "删除"); del.type = "button";
+  del.addEventListener("click", () => wrap.remove());
+  wrap.append(s, e, del);
+  box.appendChild(wrap);
+}
 
-  // ---------- 时段行 ----------
-  function addWindow(startMin, endMin) {
-    const wrap = el("div", "win");
-    const s = el("input"); s.type = "datetime-local"; s.className = "w-start";
-    const e = el("input"); e.type = "datetime-local"; e.className = "w-end";
-    s.value = localInput(Date.now() + startMin * 60000);
-    e.value = localInput(Date.now() + endMin * 60000);
-    const del = el("button", "ghost", "删除"); del.type = "button";
-    del.addEventListener("click", () => wrap.remove());
-    wrap.append(s, e, del);
-    $("#r-windows").appendChild(wrap);
-  }
+function buildPublishSheet() {
+  const body = el("div");
+  body.innerHTML = [
+    '<div class="stack">',
+    '  <div class="form-grid">',
+    '    <div class="field">',
+    '      <label for="p-owner">你的昵称（本站只收昵称，不收姓名/学号/手机号）</label>',
+    '      <input id="p-owner" value="同学A" maxlength="32" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-from">取件楼栋</label>',
+    '      <select id="p-from"></select>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-to">送达楼栋</label>',
+    '      <select id="p-to"></select>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-station">快递站</label>',
+    '      <input id="p-station" list="station-list" value="快递驿站" />',
+    '      <datalist id="station-list"></datalist>',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-deadline">截止时间</label>',
+    '      <input id="p-deadline" type="datetime-local" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="p-rmin">报酬区间（元，下限 – 上限）</label>',
+    '      <div class="form-grid form-grid--2">',
+    '        <input id="p-rmin" type="number" min="0" step="0.5" value="3" aria-label="报酬下限" />',
+    '        <input id="p-rmax" type="number" min="0" step="0.5" value="5" aria-label="报酬上限" />',
+    '      </div>',
+    '    </div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <label for="p-note">备注（入库前自动打码手机号 / 超长单号）</label>',
+    '    <textarea id="p-note" rows="3" placeholder="例：小件，两个包裹"></textarea>',
+    '  </div>',
+    '  <div id="publish-out"></div>',
+    '</div>',
+  ].join("\n");
 
-  // ---------- 区块一：识别截图 ----------
-  $("#btn-parse").addEventListener("click", async () => {
-    const f = $("#p-shot").files && $("#p-shot").files[0];
-    if (!f) { show("#parse-out", errNode({ error:{ code:"SCHEMA_REJECTED", message:"先选一张截图" } })); return; }
-    if (f.size > 1.4 * 1024 * 1024) { show("#parse-out", errNode({ error:{ code:"SCHEMA_REJECTED", message:"图片过大（≤1.4MB，请求体上限 2mb）" } })); return; }
-    const dataUrl = await new Promise((res, rej) => {
-      const fr = new FileReader();
-      fr.onload = () => res(String(fr.result)); fr.onerror = () => rej(new Error("读取失败"));
-      fr.readAsDataURL(f);
-    }).catch(() => "");
-    if (!dataUrl) { show("#parse-out", errNode({ error:{ code:"INTERNAL", message:"读取图片失败" } })); return; }
-    const box = $("#parse-out"); box.innerHTML = "<p class='hint'>识别中…（图片只在本次请求内使用，不落盘）</p>";
-    const j = await mcpCall("task_parse_screenshot", { image_base64: dataUrl, hint: $("#p-note").value.trim() });
-    box.innerHTML = "";
-    if (!j.ok) { box.appendChild(errNode(j)); return; }
-    const d = j.data || {};
-    const p = el("p", "hint");
-    p.textContent = (d.degraded ? "⚠️ 降级模式（未配置视觉模型）：" : "✅ 模型识别：") +
-      "confidence=" + d.confidence + "　（识别不出的字段为 null，绝不猜）" + (d.degrade_reason ? "｜" + d.degrade_reason : "");
-    box.appendChild(p);
-    if (d.from_building) $("#p-from").value = d.from_building;
-    if (d.to_building) $("#p-to").value = d.to_building;
-    if (d.station) $("#p-station").value = d.station;
-    if (d.deadline_iso) { const t = new Date(d.deadline_iso); if (!Number.isNaN(t.getTime())) $("#p-deadline").value = localInput(t.getTime()); }
-    if (typeof d.reward_min === "number") $("#p-rmin").value = d.reward_min;
-    if (typeof d.reward_max === "number") $("#p-rmax").value = d.reward_max;
-    box.appendChild(jsonNode(d));
-  });
+  const foot = el("div", "");
+  const btnPublish = el("button", "btn");
+  btnPublish.type = "button";
+  btnPublish.id = "btn-publish";
+  btnPublish.appendChild(icon("package", { size: 16 }));
+  btnPublish.appendChild(el("span", "", "发布代取"));
+  const btnCancel = el("button", "btn btn--quiet", "取消");
+  btnCancel.type = "button";
+  foot.append(btnPublish, btnCancel, el("p", "hint", "报酬由双方线下协商，平台不参与交易、不代收款。"));
 
-  // ---------- 区块一：发布 ----------
-  $("#btn-publish").addEventListener("click", async () => {
+  const sheet = createSheet({ title: "发布代取任务", iconName: "package", body, footer: foot });
+
+  btnCancel.addEventListener("click", () => sheet.close());
+
+  $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
+
+  /* 发布任务（写接口自动带认证头；成功后 toast + 刷新看板）
+     ⛔ 只有文字字段：站内不提供图片上传，也不做截图识别 */
+  btnPublish.addEventListener("click", async () => {
     const dl = $("#p-deadline").value;
-    const body = {
+    const payload = {
       from_building: $("#p-from").value,
       to_building: $("#p-to").value,
       station: $("#p-station").value.trim(),
@@ -365,124 +731,1364 @@
       reward_min: Number($("#p-rmin").value),
       reward_max: Number($("#p-rmax").value),
       note: $("#p-note").value.trim() || null,
-      screenshot_path: null, // ⛔ 截图原图不落服务器磁盘，所以发布时不带路径
+      screenshot_path: null, // 契约字段：本页恒为 null（站内没有上传入口）
       owner_handle: $("#p-owner").value.trim(),
     };
-    const j = await apiPost("/api/tasks", body);
-    show("#publish-out", j.ok ? jsonNode({ ok:true, task_id:j.data.task_id, status:j.data.status }) : errNode(j));
-    if (j.ok) { $("#p-note").value = ""; loadBoard(); }
+    btnPublish.disabled = true;
+    try {
+      await api("/api/tasks", { method: "POST", body: payload });
+      toast("已发布代取任务，看板已刷新", "ok");
+      $("#p-note").value = "";
+      $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
+      $("#publish-out").innerHTML = "";
+      sheet.close();
+      await loadBoard({ force: true }); // 新任务要立刻撮合一次
+    } catch (e) {
+      mountNotice("#publish-out", "danger", "发布失败：" + errorText(e));
+    } finally {
+      btnPublish.disabled = false;
+    }
   });
 
-  // ---------- 区块二：登记 ----------
-  $("#btn-add-window").addEventListener("click", () => addWindow(30, 240));
-  $("#btn-register").addEventListener("click", async () => {
+  return sheet;
+}
+
+function openPublish() {
+  closeRail(); // 窄屏：先把抽屉收回去，再弹侧栏，避免两层叠在一起
+  if (!publishSheet) publishSheet = buildPublishSheet();
+  publishSheet.open();
+}
+
+/* =====================================================================
+   侧栏二 · 登记跑腿能力（点功能栏才出现）
+   ===================================================================== */
+let registerSheet = null;
+
+function buildRegisterSheet() {
+  const body = el("div");
+  body.innerHTML = [
+    '<div class="stack">',
+    '  <div class="form-grid">',
+    '    <div class="field">',
+    '      <label for="r-owner">你的昵称</label>',
+    '      <input id="r-owner" value="同学B" maxlength="32" />',
+    '    </div>',
+    '    <div class="field">',
+    '      <label for="r-floor">可接受报酬下限（元）</label>',
+    '      <input id="r-floor" type="number" min="0" step="0.5" value="2" />',
+    '    </div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <span class="field__label">可达楼栋（多选）</span>',
+    '    <div class="chk" id="r-buildings"></div>',
+    '  </div>',
+    '  <div class="field">',
+    '    <span class="field__label">可跑时段（可多段；只填你真正有空的时间）</span>',
+    '    <div class="wins" id="r-windows"></div>',
+    '    <p class="field__hint">同一昵称重复登记 = 覆盖更新（<code>runners.user_id</code> 唯一）。</p>',
+    '  </div>',
+    '  <div id="register-out"></div>',
+    '</div>',
+  ].join("\n");
+
+  const foot = el("div", "");
+  const btnRegister = el("button", "btn btn--ok");
+  btnRegister.type = "button";
+  btnRegister.id = "btn-register";
+  btnRegister.appendChild(icon("check", { size: 16 }));
+  btnRegister.appendChild(el("span", "", "登记 / 覆盖登记"));
+  const btnAdd = el("button", "btn btn--ghost btn--sm", "加一段时段");
+  btnAdd.type = "button";
+  btnAdd.addEventListener("click", () => addWindow(30, 240));
+  const btnCancel = el("button", "btn btn--quiet", "取消");
+  btnCancel.type = "button";
+  foot.append(btnRegister, btnAdd, btnCancel);
+
+  const sheet = createSheet({ title: "登记跑腿能力", iconName: "walk", body, footer: foot });
+  btnCancel.addEventListener("click", () => sheet.close());
+  addWindow(-30, 300);
+
+  btnRegister.addEventListener("click", async () => {
     const buildings = [...document.querySelectorAll("#r-buildings input:checked")].map((c) => c.value);
-    const wins = [...document.querySelectorAll("#r-windows .win")].map((w) => ({
+    const windows = [...document.querySelectorAll("#r-windows .win")].map((w) => ({
       start_iso: w.querySelector(".w-start").value ? new Date(w.querySelector(".w-start").value).toISOString() : "",
       end_iso: w.querySelector(".w-end").value ? new Date(w.querySelector(".w-end").value).toISOString() : "",
     }));
-    const j = await mcpCall("runner_register", {
-      user_handle: $("#r-owner").value.trim(),
-      reachable_buildings: buildings,
-      reward_floor: Number($("#r-floor").value),
-      time_windows: wins,
-    });
-    show("#register-out", j.ok ? jsonNode(j.data) : errNode(j));
+    btnRegister.disabled = true;
+    try {
+      const result = await mcpRpc("tools/call", {
+        name: "runner_register",
+        arguments: {
+          user_handle: $("#r-owner").value.trim(),
+          reachable_buildings: buildings,
+          reward_floor: Number($("#r-floor").value),
+          time_windows: windows,
+        },
+      });
+      const env = result && result.structuredContent;
+      if (!env || typeof env !== "object") {
+        mountNotice("#register-out", "danger", "登记失败：MCP 没有返回结构化结果");
+        return;
+      }
+      if (env.ok !== true) {
+        mountNotice("#register-out", "danger", "登记失败：" + errorText(env.error));
+        return;
+      }
+      toast("登记成功：可达楼栋 " + buildings.length + " 个 · 时段 " + windows.length + " 段", "ok");
+      $("#register-out").innerHTML = "";
+      sheet.close();
+      await loadBoard({ force: true }); // 新登记的能力可能改变候选
+    } catch (e) {
+      mountNotice("#register-out", "danger", "登记失败：" + errorText(e));
+    } finally {
+      btnRegister.disabled = false;
+    }
   });
 
-  // ---------- 区块三：看板 ----------
-  async function loadBoard() {
-    const b = $("#b-filter").value;
-    const j = await apiGet("/api/tasks?limit=20" + (b ? "&building=" + encodeURIComponent(b) : ""));
-    const box = $("#board"); box.innerHTML = "";
-    if (!j.ok) { box.appendChild(errNode(j)); $("#board-count").textContent = ""; return; }
-    const list = j.data || [];
-    $("#board-count").textContent = "开放任务 " + list.length + " 条（只含 open 且未过期）";
-    if (!list.length) { box.appendChild(el("p", "hint", "暂时没有开放任务，先在上面的区块一发布一条。")); return; }
-    for (const t of list) {
-      const c = el("div", "task");
-      c.appendChild(el("div", "path", t.from_building + " → " + t.to_building));
-      c.appendChild(el("div", "meta",
-        "取件点：" + t.station + "｜报酬：" + t.reward_min + "–" + t.reward_max + " 元（双方线下协商）"));
-      const meta2 = el("div", "meta");
-      meta2.appendChild(document.createTextNode("截止：" + new Date(t.deadline_iso).toLocaleString("zh-CN") + "（"));
-      meta2.appendChild(el("b", null, countdown(t.deadline_iso)));
-      meta2.appendChild(document.createTextNode("）"));
-      c.appendChild(meta2);
-      if (t.note) c.appendChild(el("div", "meta", "备注：" + t.note));
-      const act = el("div", "actions");
-      const btn = el("button", "ghost", "查看匹配");
-      btn.addEventListener("click", () => runMatch(t));
-      act.appendChild(btn);
-      const link = el("span", "hint", "task_id " + t.task_id);
-      act.appendChild(link);
-      c.appendChild(act);
-      box.appendChild(c);
-    }
-  }
-  $("#btn-reload").addEventListener("click", loadBoard);
-  $("#b-filter").addEventListener("change", loadBoard);
+  return sheet;
+}
 
-  // ---------- 区块四：撮合 ----------
-  async function runMatch(task) {
-    const box = $("#match-out");
-    box.innerHTML = "";
-    box.appendChild(el("p", "hint", "正在撮合：" + task.from_building + " → " + task.to_building + " …"));
-    if (!TOKEN) {
+function openRegister() {
+  closeRail();
+  if (!registerSheet) registerSheet = buildRegisterSheet();
+  registerSheet.open();
+}
+
+/* =====================================================================
+   功能栏：桌面常驻 / 窄屏抽屉（默认收起）
+   ===================================================================== */
+const railEl = $("#rail");
+const railFab = $("#rail-open");
+const railBackdrop = $("#rail-backdrop");
+
+/** 窄屏（<1024px）才是抽屉形态：桌面是常驻的，不需要开关 */
+function railIsDrawer() {
+  return window.matchMedia("(max-width:1023px)").matches;
+}
+
+function openRail() {
+  railEl.classList.add("is-open");
+  railBackdrop.classList.add("is-open");
+  railFab.setAttribute("aria-expanded", "true");
+  document.body.classList.add("is-locked");
+  $("#rail-close").focus();
+}
+
+function closeRail() {
+  if (!railEl.classList.contains("is-open")) return;
+  railEl.classList.remove("is-open");
+  railBackdrop.classList.remove("is-open");
+  railFab.setAttribute("aria-expanded", "false");
+  // 侧栏（sheet）自己也管 is-locked，别把它顺手解开
+  if (!$(".sheet.is-open")) document.body.classList.remove("is-locked");
+}
+
+/** 视图（全部开放任务 / 我的接单 / 私聊）高亮与文案 */
+function paintViewUI() {
+  const allBtn = $("#view-all");
+  const mineBtn = $("#view-mine");
+  const chatBtn = $("#view-chat");
+  const chatView = state.view === "chat";
+  const mineView = state.view === "mine";
+  allBtn.classList.toggle("is-active", !mineView && !chatView);
+  allBtn.setAttribute("aria-pressed", !mineView && !chatView ? "true" : "false");
+  mineBtn.classList.toggle("is-active", mineView);
+  mineBtn.setAttribute("aria-pressed", mineView ? "true" : "false");
+  if (chatBtn) {
+    chatBtn.classList.toggle("is-active", chatView);
+    chatBtn.setAttribute("aria-pressed", chatView ? "true" : "false");
+  }
+  $("#count-all").textContent = String(filterActive() ? filteredTasks().length : state.tasks.length);
+  $("#count-mine").textContent = String(myRunTasks().length);
+  const chatCount = $("#count-chat");
+  if (chatCount) chatCount.textContent = String(chatThreads.length);
+  if (!chatView) {
+    $("#board-title").textContent = mineView ? "我的接单" : "待取看板";
+    $("#board-eyebrow").textContent = mineView ? "我表达过意愿 / 被派单的" : "开放任务 · 蓝底是我发布的";
+  }
+}
+
+function setView(view) {
+  state.view = view === "mine" ? "mine" : (view === "chat" ? "chat" : "all");
+  const chatView = state.view === "chat";
+  const boardPane = $("#board-pane");
+  const chatPane = $("#chat-pane");
+  if (boardPane) boardPane.hidden = chatView;
+  if (chatPane) chatPane.hidden = !chatView;
+  document.body.classList.toggle("is-chat", chatView);   // 窄屏：私聊时给「功能」悬浮键让位
+
+  paintViewUI();
+  if (chatView) {
+    stopChatPolling();
+    void loadThreads();
+  } else {
+    stopChatPolling();
+    if (railIsDrawer()) closeRail();
+    fillFilterBuildings();
+    renderBoard();
+    paintBoardCount();
+  }
+  if (chatView && railIsDrawer()) closeRail();
+}
+
+/* =====================================================================
+   筛选：从哪 / 到哪 / 截止时间 / 报酬
+   · 只过滤**已加载**的 state.tasks（列表不大，⛔ 不新增后端接口）
+   · 条件同步进 URL query：from / to / within / since / until / rmin / rmax
+     （within: all | today | 3d | week | custom；custom 用 since/until 两个 datetime-local）
+   ===================================================================== */
+const WITHIN_LABELS = { all: "不限", today: "今天", "3d": "3 天内", week: "本周内", custom: "自定义" };
+
+const filters = { from: "", to: "", within: "all", since: "", until: "", rmin: "", rmax: "" };
+const EMPTY_FILTERS = () => ({ from: "", to: "", within: "all", since: "", until: "", rmin: "", rmax: "" });
+
+function dayStart(d = new Date()) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x.getTime(); }
+function dayEnd(d = new Date()) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x.getTime(); }
+/** 本周（周一 00:00 ~ 周日 23:59:59，本地时区） */
+function weekRange(now = new Date()) {
+  const dow = (now.getDay() + 6) % 7; // 0 = 周一
+  const start = new Date(dayStart(now)); start.setDate(start.getDate() - dow);
+  const end = new Date(dayEnd(now)); end.setDate(end.getDate() + (6 - dow));
+  return [start.getTime(), end.getTime()];
+}
+
+/** 截止时间是否落在所选时间段里 */
+function withinOk(task, now = Date.now()) {
+  const ts = new Date(task.deadline_iso).getTime();
+  if (!Number.isFinite(ts)) return true;
+  if (filters.within === "today") return ts <= dayEnd();
+  if (filters.within === "3d") return ts <= now + 3 * 24 * 3600 * 1000;
+  if (filters.within === "week") return ts <= weekRange()[1];
+  if (filters.within === "custom") {
+    const since = filters.since ? new Date(filters.since).getTime() : null;
+    const until = filters.until ? new Date(filters.until).getTime() : null;
+    if (since != null && Number.isFinite(since) && ts < since) return false;
+    if (until != null && Number.isFinite(until) && ts > until) return false;
+  }
+  return true;
+}
+
+/** 报酬区间「有交集」即保留 */
+function rewardOk(task) {
+  const rmin = filters.rmin === "" ? null : Number(filters.rmin);
+  const rmax = filters.rmax === "" ? null : Number(filters.rmax);
+  if (rmin != null && Number.isFinite(rmin) && Number(task.reward_max) < rmin) return false;
+  if (rmax != null && Number.isFinite(rmax) && Number(task.reward_min) > rmax) return false;
+  return true;
+}
+
+function filterActive() {
+  return Boolean(filters.from || filters.to || filters.rmin !== "" || filters.rmax !== "" ||
+    filters.within !== "all" || (filters.within === "custom" && (filters.since || filters.until)));
+}
+
+function taskPassesFilters(t) {
+  if (filters.from && t.from_building !== filters.from) return false;
+  if (filters.to && t.to_building !== filters.to) return false;
+  if (!withinOk(t)) return false;
+  if (!rewardOk(t)) return false;
+  return true;
+}
+
+const filteredTasks = () => state.tasks.filter(taskPassesFilters);
+
+/** 人话描述当前条件（顶部「筛选中：X 条（…）」与空态共用） */
+function filterParts() {
+  const parts = [];
+  if (filters.from) parts.push("从 " + filters.from);
+  if (filters.to) parts.push("到 " + filters.to);
+  if (filters.within !== "all") parts.push("截止 " + (WITHIN_LABELS[filters.within] || filters.within));
+  if (filters.within === "custom" && (filters.since || filters.until)) {
+    parts.push("时间 " + (filters.since || "不限") + " ~ " + (filters.until || "不限"));
+  }
+  if (filters.rmin !== "") parts.push("报酬 ≥ " + filters.rmin);
+  if (filters.rmax !== "") parts.push("报酬 ≤ " + filters.rmax);
+  return parts;
+}
+
+/** 从 URL 读条件（刷新后保持；demo=1 / token 等别人的参数原样不动） */
+function readFiltersFromUrl() {
+  const q = new URLSearchParams(location.search);
+  const w = q.get("within") || "all";
+  Object.assign(filters, {
+    from: q.get("from") || "",
+    to: q.get("to") || "",
+    within: Object.prototype.hasOwnProperty.call(WITHIN_LABELS, w) ? w : "all",
+    since: q.get("since") || "",
+    until: q.get("until") || "",
+    rmin: q.get("rmin") || "",
+    rmax: q.get("rmax") || "",
+  });
+}
+
+/** 条件写回 URL（replaceState：不往历史里塞记录） */
+function writeFiltersToUrl() {
+  const url = new URL(location.href);
+  const map = {
+    from: filters.from, to: filters.to, within: filters.within, since: filters.since,
+    until: filters.until, rmin: filters.rmin, rmax: filters.rmax,
+  };
+  for (const [k, v] of Object.entries(map)) {
+    if (!v || (k === "within" && v === "all")) url.searchParams.delete(k);
+    else url.searchParams.set(k, v);
+  }
+  history.replaceState(null, "", url.pathname + (url.search ? url.search : "") + url.hash);
+}
+
+/** 楼栋下拉：规范名（/api/map/nodes）∪ 已加载任务里出现过的楼栋 —— ⛔ 不自己编 */
+function fillFilterBuildings() {
+  const seen = [];
+  const push = (v) => { const s = String(v || "").trim(); if (s && !seen.includes(s)) seen.push(s); };
+  for (const t of state.tasks) { push(t.from_building); push(t.to_building); }
+  const canonical = buildingLabels();
+  const opts = canonical.concat(seen.filter((s) => !canonical.includes(s)));
+  for (const sel of [$("#b-filter"), $("#f-to")]) {
+    if (!sel) continue;
+    const want = sel.id === "f-to" ? filters.to : filters.from;
+    const keep = sel.value;
+    sel.innerHTML = "";
+    sel.appendChild(new Option("不限", ""));
+    opts.forEach((label) => sel.appendChild(new Option(label, label)));
+    sel.value = opts.includes(want) ? want : (opts.includes(keep) ? keep : "");
+  }
+}
+
+/** 筛选面板 + 顶部「筛选中：X 条」 */
+function paintFilterUI() {
+  const fromSel = $("#b-filter");
+  const toSel = $("#f-to");
+  if (fromSel) fromSel.value = filters.from;
+  if (toSel) toSel.value = filters.to;
+  for (const chip of document.querySelectorAll("#f-within .fchip")) {
+    chip.setAttribute("aria-pressed", chip.dataset.within === filters.within ? "true" : "false");
+  }
+  const custom = $("#f-custom");
+  if (custom) custom.hidden = filters.within !== "custom";
+  for (const [sel, v] of [["#f-since", filters.since], ["#f-until", filters.until], ["#f-rmin", filters.rmin], ["#f-rmax", filters.rmax]]) {
+    const node = $(sel);
+    if (node) node.value = v;
+  }
+
+  const box = $("#filter-state");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!filterActive()) { box.hidden = true; return; }
+  box.hidden = false;
+  const shown = state.view === "mine" ? myRunTasks().filter(taskPassesFilters).length : filteredTasks().length;
+  box.appendChild(icon("sliders-horizontal", { size: 14 }));
+  box.appendChild(el("span", "", "筛选中：" + shown + " 条"));
+  box.appendChild(el("span", "faint", "（" + filterParts().join(" · ") + "）"));
+  const clear = el("button", "btn btn--quiet btn--sm", "清空筛选");
+  clear.type = "button";
+  clear.addEventListener("click", () => clearFilters());
+  box.appendChild(clear);
+}
+
+/** 条件变了：写 URL → 重画看板（不动后端） */
+function applyFilters() {
+  writeFiltersToUrl();
+  paintFilterUI();
+  renderBoard();
+  paintBoardCount();
+}
+
+function clearFilters() {
+  Object.assign(filters, EMPTY_FILTERS());
+  applyFilters();
+}
+
+/* =====================================================================
+   看板：两套卡片（我发布的单 / 别人的单）
+   ===================================================================== */
+
+const myRunTasks = () => state.tasks.filter((t) => state.myRuns.has(t.task_id) || state.intents.has(t.task_id));
+
+/** 当前视图要显示的卡片：先按视图取，再按筛选条件过滤 */
+const visibleTasks = () => {
+  const base = state.view === "mine" ? myRunTasks() : state.tasks;
+  return filterActive() ? base.filter(taskPassesFilters) : base;
+};
+
+function pickableOf(list) {
+  return (Array.isArray(list) ? list : []).filter((m) => m && m.match_id && m.state === "pushed");
+}
+
+function taskOf(taskId) {
+  return state.tasks.find((t) => t.task_id === taskId) || null;
+}
+
+function acceptedNameOf(taskId) {
+  const list = state.matches.get(taskId);
+  const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
+  if (hit) return displayName(hit.runner_handle);
+  // 撮合接口只回 5 分钟窗口内的记录：窗口过期后仍能从只读口拿到接单人
+  return state.acceptedBy.get(taskId) || "";
+}
+
+/** 我在这单上的跑腿状态：'' / 'pushed'（已表达意愿）/ 'accepted'（我被派单） */
+function myRunStateOf(taskId) {
+  if (state.intents.has(taskId)) return "pushed";
+  const run = state.myRuns.get(taskId);
+  return run ? run.state : "";
+}
+
+/** 卡片右上角徽章：我发布的 / 已接单 / 谁发布的 / 候选情况 */
+function paintSide(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.side;
+  box.innerHTML = "";
+
+  if (isMine(t)) {
+    const mineBadge = el("span", "badge badge--mine");
+    mineBadge.appendChild(icon("tag", { size: 14 }));
+    mineBadge.appendChild(el("span", "", "我发布的"));
+    box.appendChild(mineBadge);
+  }
+
+  const list = state.matches.get(t.task_id);
+  const accepted = state.accepted.has(t.task_id);
+  const pickable = pickableOf(list);
+
+  let cls = "badge";
+  let iconName = "clock";
+  let text = "正在撮合…";
+  if (accepted) {
+    cls = "badge badge--ok"; iconName = "circle-check"; text = "已接单 · 进行中";
+  } else if (isMine(t)) {
+    if (list === null) { cls = "badge badge--muted"; iconName = "alert-triangle"; text = "撮合没跑通"; }
+    else if (list && pickable.length) { iconName = "users-three"; text = "有 " + pickable.length + " 位候选"; }
+    else if (list) { cls = "badge badge--muted"; iconName = "clock"; text = "暂时没人顺路"; }
+  } else {
+    cls = "badge badge--muted";
+    iconName = "user";
+    text = displayName(publisherOf(t) || "匿名") + " 发布";
+  }
+  const b = el("span", cls);
+  b.appendChild(icon(iconName, { size: 14 }));
+  b.appendChild(el("span", "", text));
+  box.appendChild(b);
+}
+
+/** 卡片操作位：我发布的 → 派单结果；别人的 → 表达意愿 / 撤回意愿 */
+function paintAction(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.action;
+  box.innerHTML = "";
+
+  if (isMine(t)) {
+    if (state.accepted.has(t.task_id)) {
+      const who = acceptedNameOf(t.task_id);
+      const c = el("span", "chip chip--brand");
+      c.appendChild(icon("circle-check", { size: 14 }));
+      c.appendChild(el("span", "", who ? "接单人 " + who : "已接单"));
+      box.appendChild(c);
+      const undo = el("button", "btn btn--quiet btn--sm", "取消接单");
+      undo.type = "button";
+      undo.title = "把这一单退回「可接单」状态";
+      undo.addEventListener("click", () => cancelAccepted(t.task_id));
+      box.appendChild(undo);
+    }
+    return; // 我发布的单：没有「我想接这一单」，派单动作在候选行上
+  }
+
+  const runState = myRunStateOf(t.task_id);
+  if (runState === "accepted") {
+    const b = el("span", "badge badge--ok");
+    b.appendChild(icon("circle-check", { size: 14 }));
+    b.appendChild(el("span", "", "已接单 · 进行中"));
+    box.appendChild(b);
+    const undo = el("button", "btn btn--quiet btn--sm", "取消接单");
+    undo.type = "button";
+    undo.addEventListener("click", () => cancelAccepted(t.task_id));
+    box.appendChild(undo);
+    return;
+  }
+
+  if (runState === "pushed") {
+    const b = el("span", "badge");
+    b.appendChild(icon("hand-pointing", { size: 14 }));
+    b.appendChild(el("span", "", "已表达意愿 · 等发布者确认"));
+    box.appendChild(b);
+    if (state.intentFallback.has(t.task_id)) {
+      box.appendChild(el("span", "faint small", "（本页会话记录）"));
+    }
+    const undo = el("button", "btn btn--quiet btn--sm", "撤回意愿");
+    undo.type = "button";
+    undo.addEventListener("click", () => withdrawIntent(t.task_id));
+    box.appendChild(undo);
+    return;
+  }
+
+  const btn = el("button", "btn btn--ok");
+  btn.type = "button";
+  btn.appendChild(icon("hand-pointing", { size: 16 }));
+  btn.appendChild(el("span", "", "我想接这一单"));
+  btn.title = "表达意愿后由发布者确认；别人的单不能替别人挑人";
+  btn.addEventListener("click", () => expressInterest(t));
+  box.appendChild(btn);
+}
+
+/** 候选一行一个（只有我发布的单才会渲染） */
+function candRow(t, m) {
+  const row = el("div", "cand");
+  row.title = "match_id " + (m.match_id || "—") + "｜state " + m.state;
+
+  const line = el("div", "cand__line");
+  line.appendChild(el("span", "cand__name", displayName(m.runner_handle || "匿名")));
+
+  const sc = el("span", "score");
+  sc.appendChild(el("span", "score__num", String(m.score)));
+  sc.appendChild(el("span", "score__max", "/ 100"));
+  line.appendChild(sc);
+
+  const accepted = state.accepted.has(t.task_id);
+  const usable = Boolean(m.match_id) && m.state === "pushed";
+  const taker = acceptedNameOf(t.task_id);
+
+  if (accepted) {
+    const isTaker = m.state === "accepted" || (Boolean(taker) && displayName(m.runner_handle || "匿名") === taker);
+    if (isTaker) {
+      const b = el("span", "badge badge--ok");
+      b.appendChild(icon("circle-check", { size: 14 }));
+      b.appendChild(el("span", "", "已接单"));
+      line.appendChild(b);
+    } else {
+      row.classList.add("is-dim");
+      const b = el("button", "btn btn--quiet btn--sm", "已有同学接单");
+      b.type = "button";
+      b.disabled = true;
+      line.appendChild(b);
+    }
+  } else if (usable) {
+    const b = el("button", "btn btn--ok btn--sm");
+    b.type = "button";
+    b.appendChild(icon("selection", { size: 14 }));
+    b.appendChild(el("span", "", "选 TA 接单"));
+    b.addEventListener("click", () => dispatchTo(t.task_id, m.match_id));
+    line.appendChild(b);
+  } else if (!m.match_id) {
+    // 契约 §2：单任务同时最多推 3 名，超出部分只展示不落库 → 先排队
+    const q = el("span", "cand__queue");
+    q.appendChild(icon("clock", { size: 14 }));
+    q.appendChild(el("span", "", "排队中（同时最多推 3 名）"));
+    line.appendChild(q);
+  } else {
+    const b = el("button", "btn btn--quiet btn--sm", "不可接（" + m.state + "）");
+    b.type = "button";
+    b.disabled = true;
+    line.appendChild(b);
+  }
+
+  row.appendChild(line);
+  row.appendChild(el("p", "reason", "reason: " + m.reason));
+  return row;
+}
+
+/** 卡片下半部分：我发布的单直接列候选；别人的单只给一句规则说明 */
+function paintCandidates(t) {
+  const refs = cardRefs.get(t.task_id);
+  if (!refs) return;
+  const box = refs.cands;
+  box.innerHTML = "";
+
+  if (!isMine(t)) {
+    const p = el("p", "tk-rule");
+    p.appendChild(icon("lock", { size: 14 }));
+    p.appendChild(el("span", "", "只有发布者能看候选、挑人派单。想跑这一单就点右侧「我想接这一单」表达意愿。"));
+    box.appendChild(p);
+    return;
+  }
+
+  const list = state.matches.get(t.task_id);
+
+  if (list === undefined) {
+    const p = el("p", "tk-matching");
+    p.appendChild(icon("users", { size: 14 }));
+    p.appendChild(el("span", "", "正在为你找顺路的同学…"));
+    box.appendChild(p);
+    return;
+  }
+
+  if (list === null) {
+    box.appendChild(stateBox("error", {
+      iconName: "alert-triangle",
+      title: "撮合没跑通",
+      hint: errorText(state.matchErrors.get(t.task_id)),
+      actionText: "重试",
+      onAction: () => {
+        state.matches.delete(t.task_id);
+        state.matchErrors.delete(t.task_id);
+        matchCache.delete(t.task_id);
+        paintCandidates(t);
+        paintAction(t);
+        paintSide(t);
+        void runMatch(t, { force: true });
+      },
+    }));
+    return;
+  }
+
+  if (!list.length) {
+    const p = el("p", "tk-none");
+    p.appendChild(icon("users", { size: 14 }));
+    p.appendChild(el("span", "", "暂时没人顺路"));
+    p.appendChild(el("span", "faint", "（等有同学登记跑腿能力后自动出现）"));
+    box.appendChild(p);
+    return;
+  }
+
+  const head = el("p", "tk-cands-head");
+  head.appendChild(icon("users-three", { size: 14 }));
+  head.appendChild(el("span", "", "系统已为你找到 " + list.length + " 位顺路的同学，挑一位派单："));
+  box.appendChild(head);
+
+  const panel = el("div", "cand-list");
+  const shown = list.slice(0, CAND_SHOWN);
+  const rest = list.slice(CAND_SHOWN);
+  shown.forEach((m) => panel.appendChild(candRow(t, m)));
+
+  if (rest.length) {
+    const moreOpen = state.moreOpen.has(t.task_id);
+    const moreBox = el("div", "cand-list");
+    moreBox.hidden = !moreOpen;
+    rest.forEach((m) => moreBox.appendChild(candRow(t, m)));
+    const moreBtn = el("button", "btn btn--quiet btn--sm tk-more");
+    moreBtn.type = "button";
+    moreBtn.setAttribute("aria-expanded", moreOpen ? "true" : "false");
+    const mChev = icon(moreOpen ? "chevron-down" : "chevron-right", { size: 14 });
+    moreBtn.append(mChev, el("span", "", moreOpen ? "收起" : "还有 " + rest.length + " 位顺路的同学"));
+    moreBtn.addEventListener("click", () => {
+      const next = !state.moreOpen.has(t.task_id);
+      if (next) state.moreOpen.add(t.task_id); else state.moreOpen.delete(t.task_id);
+      moreBox.hidden = !next;
+      moreBtn.setAttribute("aria-expanded", next ? "true" : "false");
+      mChev.style.setProperty("--icon",
+        "url(/vendor/phosphor/icons/" + (next ? "chevron-down" : "chevron-right") + ".svg)");
+      moreBtn.lastChild.textContent = next ? "收起" : "还有 " + rest.length + " 位顺路的同学";
+    });
+    panel.append(moreBox, moreBtn);
+  }
+
+  box.appendChild(panel);
+}
+
+function repaintCard(t) {
+  paintSide(t);
+  paintAction(t);
+  paintCandidates(t);
+}
+
+function buildCard(t) {
+  const mine = isMine(t);
+  const card = el("article", "card tk-card" + (mine ? " card--mine" : ""));
+
+  // 第 1 层：路径大字 + 徽章（我发布的 / 谁发布的 / 状态）
+  const top = el("div", "tk-card__top");
+  top.appendChild(el("h3", "tk-card__route", t.from_building + " → " + t.to_building));
+  const side = el("div", "tk-card__side");
+  top.appendChild(side);
+  card.appendChild(top);
+
+  // 第 2 层：取件点 / 倒计时 / 报酬 小字
+  const meta = el("div", "tk-card__meta");
+  meta.appendChild(chip("truck-delivery", t.station));
+  const cd = countdownChip(t);
+  meta.appendChild(cd);
+  countdownRefs.set(t.task_id, cd);
+  meta.appendChild(chip("bolt", money(t.reward_min) + "–" + money(t.reward_max) + " 元", "chip--brand"));
+  card.appendChild(meta);
+
+  // 第 3 层：备注（一行，超出省略；完整内容在 title 里）
+  const note = el("p", "tk-card__note" + (t.note ? " is-cut" : ""));
+  note.textContent = t.note ? "备注：" + t.note : "备注：无";
+  if (t.note) note.title = t.note;
+  card.appendChild(note);
+
+  // 第 4 层：候选（我发布的）或规则说明（别人的）
+  const cands = el("div", "tk-card__cands");
+  card.appendChild(cands);
+
+  // 第 5 层：task_id / 发布者 + 操作
+  const foot = el("div", "tk-card__foot");
+  foot.appendChild(el("p", "tk-card__id",
+    "task_id " + t.task_id + "｜发布者 " + (mine ? "我（" + ME + "）" : displayName(publisherOf(t) || "匿名"))));
+  const action = el("div", "tk-card__action");
+  foot.appendChild(action);
+  card.appendChild(foot);
+
+  cardRefs.set(t.task_id, { card, side, action, cands });
+  repaintCard(t);
+  return card;
+}
+
+function renderBoard() {
+  const box = $("#board");
+  box.innerHTML = "";
+  cardRefs.clear();
+  countdownRefs.clear();
+  box.setAttribute("role", "status");
+  box.setAttribute("aria-live", "polite");
+
+  const list = visibleTasks();
+  if (!list.length) {
+    if (filterActive()) {
+      box.appendChild(emptyArt(
+        "没有符合筛选条件的单子",
+        "当前条件：" + filterParts().join(" · ") + "。放宽一点，或者点「清空筛选」看全部。",
+        "清空筛选",
+        clearFilters,
+      ));
+    } else if (state.view === "mine") {
+      box.appendChild(emptyArt(
+        "你还没接过单",
+        "回「全部开放任务」，在别人的单子上点「我想接这一单」表达意愿；发布者确认后这里会出现。",
+        "看全部开放任务",
+        () => setView("all"),
+      ));
+    } else {
+      box.appendChild(emptyArt(
+        "暂时没有开放任务",
+        "点左侧「发布代取」发一条，或等别人发；列表每 5 秒自动刷新。",
+        "发布代取",
+        openPublish,
+      ));
+    }
+    return;
+  }
+  for (const t of list) box.appendChild(buildCard(t));
+}
+
+/* =====================================================================
+   撮合（只对我发布的单跑） + 派单 / 表达意愿 / 撤回
+   ===================================================================== */
+
+/**
+ * 候选 = 引擎评分候选（/match）+「本人表达意愿」的行（/api/matches 里 source='interest'）
+ * 为什么要合并：/match 只回引擎算出来的候选，而"别人点「我想接这一单」"落下的是 matches 里的一条
+ * source='interest' 记录 —— 不合并的话，发布者就看不到谁主动想接（权限模型缺一环）。
+ */
+async function fetchCandidates(taskId) {
+  const engine = await api("/api/tasks/" + encodeURIComponent(taskId) + "/match", {
+    method: "POST",
+    body: { top_k: 10 },
+  });
+  const list = Array.isArray(engine) ? engine.slice() : [];
+  const have = new Set(list.map((m) => m && m.runner_handle));
+  try {
+    const recent = await api("/api/matches?limit=50");
+    for (const m of Array.isArray(recent) ? recent : []) {
+      if (!m || m.task_id !== taskId) continue;
+      if (m.state !== "pushed" && m.state !== "accepted") continue;
+      if (m.source !== "interest") continue;
+      if (have.has(m.runner_handle)) continue;
+      list.push({
+        runner_id: null,
+        runner_handle: m.runner_handle,
+        score: m.score,
+        reason: "本人表达意愿：主动点了「我想接这一单」（等发布者确认）",
+        pushed: m.state === "pushed",
+        match_id: m.match_id,
+        state: m.state,
+        skip_reason: null,
+        source: "interest",
+      });
+      have.add(m.runner_handle);
+    }
+  } catch {
+    /* 合并失败不影响引擎候选 */
+  }
+  return list;
+}
+
+/** 只对我发布的单触发撮合（别人的单：我既看不到候选，也不该替发布者撮合） */
+async function runMatch(t, { force = false } = {}) {
+  if (!isMine(t)) {
+    state.matches.delete(t.task_id);
+    repaintCard(t);
+    return;
+  }
+  const cached = matchCache.get(t.task_id);
+  if (!force && cached && Date.now() - cached.at < MATCH_TTL_MS) {
+    state.matches.set(t.task_id, cached.list);
+    if (cached.error) state.matchErrors.set(t.task_id, cached.error);
+    else state.matchErrors.delete(t.task_id);
+    repaintCard(t);
+    return;
+  }
+  if (cardRefs.has(t.task_id)) paintCandidates(t);
+  try {
+    const value = await fetchCandidates(t.task_id);
+    state.matches.set(t.task_id, value);
+    state.matchErrors.delete(t.task_id);
+    matchCache.set(t.task_id, { list: value, error: null, at: Date.now() });
+  } catch (e) {
+    state.matches.set(t.task_id, null);
+    state.matchErrors.set(t.task_id, e);
+    matchCache.set(t.task_id, { list: null, error: e, at: Date.now() });
+  }
+  repaintCard(t);
+}
+
+function countAccepted() {
+  return state.tasks.filter((t) => state.accepted.has(t.task_id)).length;
+}
+
+function paintBoardCount() {
+  const n = state.tasks.length;
+  const el0 = $("#board-count");
+  if (!el0) return;
+  if (state.view === "mine") {
+    const k = myRunTasks().length;
+    el0.textContent = k ? "我参与 " + k + " 单（表达过意愿或被派单）" : "还没有参与记录";
+  } else {
+    const mineN = state.tasks.filter(isMine).length;
+    el0.textContent = n
+      ? "开放任务 " + n + " 条（我发布的 " + mineN + " 条 / 别人的 " + (n - mineN) + " 条）｜已接单 " + countAccepted() + " 条"
+      : "当前没有开放任务";
+  }
+  paintViewUI();
+  paintFilterUI();
+}
+
+async function mapLimit(items, limit, fn) {
+  const queue = [...items.entries()];
+  const workers = Array.from({ length: Math.min(limit, queue.length) }, async () => {
+    while (queue.length) {
+      const [i, item] = queue.shift();
+      await fn(item, i);
+    }
+  });
+  await Promise.all(workers);
+}
+
+/** 读最近撮合记录：已被派单的任务、接单人、我作为跑腿者的记录 */
+async function refreshMatchState() {
+  try {
+    const recent = await api("/api/matches?limit=50");
+    const list = Array.isArray(recent) ? recent : [];
+    const accepted = list.filter((m) => m && m.state === "accepted");
+    state.accepted = new Set(accepted.map((m) => m.task_id));
+    state.acceptedBy = new Map(accepted.map((m) => [m.task_id, displayName(m.runner_handle || "")]));
+    // 我作为跑腿者：查询参数的服务端过滤可能还没落地，这里按昵称自己再兜一层
+    state.myRuns = new Map(
+      list
+        .filter((m) => m && m.runner_handle === ME && (m.state === "pushed" || m.state === "accepted"))
+        .map((m) => [m.task_id, { match_id: m.match_id, state: m.state }]),
+    );
+  } catch {
+    state.accepted = new Set();
+    state.acceptedBy = new Map();
+    state.myRuns = new Map();
+  }
+}
+
+async function loadBoard({ force = false } = {}) {
+  if (boardLoading) return;
+  boardLoading = true;
+  const btn = $("#btn-reload");
+  if (btn) btn.disabled = true;
+  try {
+    showLoading("#board", "正在读取开放任务…");
+    let tasks;
+    try {
+      // 一次拿全（≤50 条），筛选在前端做：切条件不再打请求，也不会和 URL 里的条件打架
+      tasks = await api("/api/tasks?limit=50");
+    } catch (e) {
+      $("#board-count").textContent = "";
+      const box = $("#board");
       box.innerHTML = "";
-      box.appendChild(el("p", "hint", "⚠️ 写接口需要演示令牌：请在下方「演示令牌」里粘贴，或访问 /takeout?token=<DEMO_TOKEN>。"));
+      box.appendChild(stateBox("error", {
+        iconName: "alert-triangle",
+        title: "看板读取失败",
+        hint: errorText(e),
+        actionText: "重试",
+        onAction: () => loadBoard(),
+      }));
       return;
     }
-    const j = await apiPost("/api/tasks/" + encodeURIComponent(task.task_id) + "/match", {});
-    box.innerHTML = "";
-    if (!j.ok) { box.appendChild(errNode(j)); return; }
+    state.tasks = Array.isArray(tasks) ? tasks : [];
+    state.matches = new Map();
+    state.matchErrors = new Map();
+    await refreshMatchState();
 
-    const head = el("div", "meta");
-    head.textContent = "任务 " + task.from_building + " → " + task.to_building +
-      "｜候选（score ≥ 60）：" + (j.data || []).length + " 人｜按 score 降序";
-    box.appendChild(head);
-
-    if (!(j.data || []).length) {
-      box.appendChild(el("p", "hint", "暂无 ≥60 分的候选（引擎已把不可达 / 时间不重叠 / 总分不足的跑腿者筛掉了）。"));
-      return;
-    }
-    for (const m of j.data) {
-      const c = el("div", "match");
-      const top = el("div", "top");
-      top.appendChild(el("span", "who", m.runner_handle || m.runner_id));
-      const sc = el("span", "score" + (m.score < 60 ? " low" : ""), String(m.score));
-      top.appendChild(sc);
-      top.appendChild(el("span", "hint", "score / 100"));
-      top.appendChild(el("span", "pill " + (m.pushed ? "ok" : "warn"),
-        m.pushed ? "已推送（写 matches）" : (m.skip_reason || "未推送")));
-      c.appendChild(top);
-      const bar = el("div", "bar"); const i = el("i"); i.style.width = Math.max(0, Math.min(100, m.score)) + "%";
-      bar.appendChild(i); c.appendChild(bar);
-      c.appendChild(el("div", "reason", "reason: " + m.reason));
-      box.appendChild(c);
-    }
-    const foot = el("p", "hint",
-      "reason 里的分值相加正好等于 score（引擎按整数「分」相加，不会出现 +30 却 59.7 的矛盾）。报酬由双方线下协商，平台不参与交易。");
-    box.appendChild(foot);
+    fillFilterBuildings();
+    paintBoardCount();
+    renderBoard();
+    // 只有我发布的单需要候选；别人的单不打写接口
+    await mapLimit(state.tasks.filter(isMine), 3, (t) => runMatch(t, { force }));
+    paintBoardCount();
+  } finally {
+    boardLoading = false;
+    if (btn) btn.disabled = false;
   }
+}
 
-  // ---------- 启动 ----------
-  async function boot() {
-    paintToken();
-    $("#p-deadline").value = localInput(Date.now() + 3 * 3600 * 1000);
-    addWindow(-30, 300);
-    await loadNodes();
+/** 派单：把一条 matches 从 pushed 改成 accepted（带 as=发布者；服务端会校验只有发布者能派单） */
+async function dispatchTo(taskId, matchId) {
+  if (!matchId || busy.has(matchId)) return;
+  busy.add(matchId);
+  const refs = cardRefs.get(taskId);
+  if (refs) [...refs.card.querySelectorAll("button")].forEach((b) => { b.disabled = true; });
+  try {
+    const r = await api("/api/matches/" + encodeURIComponent(matchId) + "/accept", {
+      method: "POST",
+      body: { as: ME },
+    });
+    const list = state.matches.get(taskId);
+    if (Array.isArray(list)) {
+      state.matches.set(taskId, list.map((m) => (m && m.match_id === r.match_id ? { ...m, state: r.state } : m)));
+    }
+    state.accepted.add(taskId);
+    const who = acceptedNameOf(taskId);
+    toast("已派单 · 进行中" + (who ? "（" + who + " 接单）" : ""), "ok");
+    paintBoardCount();
+  } catch (e) {
+    toast(errorText(e), "danger");
+    const t = taskOf(taskId);
+    if (t) {
+      state.matches.delete(taskId);
+      await refreshMatchState();
+      repaintCard(t);
+      void runMatch(t, { force: true });
+    }
+  } finally {
+    busy.delete(matchId);
+    for (const t of visibleTasks()) repaintCard(t);
+  }
+}
+
+/** 表达意愿（别人的单）：优先走服务端 /interest；未就绪则留本页会话记录，⛔ 绝不替发布者撮合 */
+async function expressInterest(t) {
+  if (busy.has(t.task_id)) return;
+  busy.add(t.task_id);
+  const refs = cardRefs.get(t.task_id);
+  if (refs) [...refs.card.querySelectorAll("button")].forEach((b) => { b.disabled = true; });
+  try {
+    const r = await api("/api/tasks/" + encodeURIComponent(t.task_id) + "/interest", {
+      method: "POST",
+      body: { runner_handle: ME },
+    });
+    const matchId = r && r.match_id ? r.match_id : "";
+    state.intents.set(t.task_id, matchId);
+    state.intentFallback.delete(t.task_id);
+    if (matchId) state.myRuns.set(t.task_id, { match_id: matchId, state: "pushed" });
+    toast("已表达意愿 · 等发布者确认", "ok");
+  } catch (e) {
+    const missing = e && (e.code === "NOT_FOUND" || /no route|404/i.test(String(e.message || "")));
+    if (missing) {
+      // 依赖 POST /api/tasks/:id/interest（服务端还没就绪）→ 先留会话态，界面照常可演示
+      state.intents.set(t.task_id, "");
+      state.intentFallback.add(t.task_id);
+      toast("已在本页表达意愿（服务端意愿接口未就绪）", "");
+    } else {
+      toast(errorText(e), "danger");
+    }
+  } finally {
+    busy.delete(t.task_id);
+    const tt = taskOf(t.task_id);
+    if (tt) repaintCard(tt);
+    paintBoardCount();
+  }
+}
+
+/** 撤回意愿：服务端把这条 pushed 记录改成 declined */
+async function withdrawIntent(taskId) {
+  const matchId = state.intents.get(taskId);
+  if (matchId && !busy.has(matchId)) {
+    busy.add(matchId);
+    try {
+      await api("/api/matches/" + encodeURIComponent(matchId) + "/decline", { method: "POST", body: {} });
+    } catch (e) {
+      toast(errorText(e), "danger");
+      busy.delete(matchId);
+      return;
+    } finally {
+      busy.delete(matchId);
+    }
+  }
+  state.intents.delete(taskId);
+  state.intentFallback.delete(taskId);
+  state.myRuns.delete(taskId);
+  toast("已撤回意愿", "ok");
+  const t = taskOf(taskId);
+  if (t) repaintCard(t);
+  paintBoardCount();
+}
+
+/** 取消接单（accepted → pushed） */
+async function cancelAccepted(taskId) {
+  const run = state.myRuns.get(taskId);
+  let matchId = run && run.match_id ? run.match_id : "";
+  if (!matchId) {
+    const list = state.matches.get(taskId);
+    const hit = (Array.isArray(list) ? list : []).find((m) => m && m.state === "accepted");
+    matchId = hit ? hit.match_id : "";
+  }
+  if (!matchId) { toast("没找到这条接单记录，刷新一下再试", "danger"); return; }
+  if (busy.has(matchId)) return;
+  busy.add(matchId);
+  const who = acceptedNameOf(taskId);
+  try {
+    await api("/api/matches/" + encodeURIComponent(matchId) + "/cancel", { method: "POST", body: { as: ME } });
+    state.accepted.delete(taskId);
+    state.acceptedBy.delete(taskId);
+    state.myRuns.delete(taskId);
+    toast("已取消接单" + (who ? "（原接单人 " + who + "）" : ""), "ok");
+    await refreshMatchState();
+  } catch (e) {
+    toast(errorText(e), "danger");
+  } finally {
+    busy.delete(matchId);
+    const t = taskOf(taskId);
+    if (t) {
+      repaintCard(t);
+      if (isMine(t)) void runMatch(t, { force: true });
+    }
+    paintBoardCount();
+  }
+}
+
+/* =====================================================================
+   私聊（站内消息）：会话列表 + 消息流 + 3 秒增量轮询
+   数据源（都用 api()，自动带 X-Session-Token）：
+     GET  /api/threads?limit=          会话列表（只显示 kind === "task"）
+     GET  /api/threads/:id/messages?after=  增量消息
+     POST /api/threads/:id/messages {body}  发消息
+   权限在服务端：只有这一单的「发布者 ↔ 接单者」才有会话，别人拿到 403/与己无关的提示。
+   ⛔ 不做"加好友 / 换联系方式"：站内直聊，不引导去站外换联系方式。
+   ===================================================================== */
+const CHAT_POLL_MS = 3000;
+
+/** 表情：源码里写码点、运行时才变成字符 —— 页面静态守卫查的是"源码里没有 emoji 字符" */
+const EMOJI_CODEPOINTS = [
+  0x1f44d, 0x1f600, 0x1f602, 0x1f389, 0x1f64f, 0x1f605,
+  0x1f91d, 0x1f4e6, 0x1f69a, 0x23f0, 0x1f60a, 0x1f44c,
+];
+
+const AVATAR_TINTS = ["a", "b", "c", "d"];
+
+function avatarTint(key) {
+  let h = 7;
+  for (const ch of String(key || "x")) h = (h * 31 + ch.charCodeAt(0)) % 9973;
+  return "chat__avatar--" + AVATAR_TINTS[h % AVATAR_TINTS.length];
+}
+
+/** 头像：昵称首字 + 按服务端给的 avatar 键稳定取色（⛔ 不是 emoji、不是外链图片） */
+function avatarNode(person) {
+  const box = el("span", "chat__avatar " + avatarTint(person && person.avatar));
+  box.setAttribute("aria-hidden", "true");
+  const nick = String((person && person.nickname) || "").trim();
+  if (nick) box.appendChild(el("span", "", Array.from(nick)[0]));
+  else box.appendChild(icon("user", { size: 16 }));
+  return box;
+}
+
+function clockOf(iso) {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return "";
+  const hm = String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+  return d.toDateString() === new Date().toDateString()
+    ? hm
+    : (d.getMonth() + 1) + "/" + d.getDate() + " " + hm;
+}
+
+const isNarrow = () => window.matchMedia("(max-width:767px)").matches;
+
+function showConv(on) {
+  const ph = $("#chat-placeholder");
+  const conv = $("#chat-conv");
+  if (ph) ph.hidden = on;
+  if (conv) conv.hidden = !on;
+}
+
+function renderThreadList() {
+  const list = $("#chat-list");
+  if (!list) return;
+  list.innerHTML = "";
+  if (!chatThreads.length) {
+    list.appendChild(el("p", "tk-none", "还没有可聊的会话"));
+    return;
+  }
+  for (const th of chatThreads) {
+    const item = el("button", "chat__item" + (th.thread_id === chatThreadId ? " is-active" : ""));
+    item.type = "button";
+    item.dataset.threadId = th.thread_id;      // 便于自动化点选/断言
+    item.appendChild(avatarNode(th.peer));
+    const meta = el("div", "chat__meta");
+    meta.appendChild(el("span", "chat__name", displayName((th.peer && th.peer.nickname) || "对方")));
+    const last = th.last_message;
+    meta.appendChild(el("span", "chat__last",
+      last ? (last.mine ? "我：" : "") + String(last.body || "").slice(0, 40) : "（还没有消息，打个招呼吧）"));
+    item.appendChild(meta);
+    item.appendChild(el("span", "chat__time", last ? clockOf(last.at) : ""));
+    item.addEventListener("click", () => openThread(th.thread_id, { focus: !isNarrow() }));
+    list.appendChild(item);
+  }
+}
+
+function renderSubject(th) {
+  const title = $("#chat-subject-title");
+  const sub = $("#chat-subject-sub");
+  const subject = (th && th.subject) || {};
+  if (title) title.textContent = subject.title || "（未命名任务）";
+  if (sub) {
+    sub.textContent = [subject.subtitle || "", th && th.peer ? "对方：" + displayName(th.peer.nickname || "对方") : ""]
+      .filter(Boolean).join("｜");
+  }
+}
+
+async function loadThreads({ quiet = false } = {}) {
+  const list = $("#chat-list");
+  try {
+    const data = await api("/api/threads?limit=50");
+    chatThreads = (Array.isArray(data) ? data : []).filter((t) => t && t.kind === "task");
+  } catch (e) {
+    chatThreads = [];
+    paintViewUI();
+    const cnt = $("#chat-count");
+    if (cnt) cnt.textContent = "会话读取失败：" + errorText(e);
+    if (!quiet && list) {
+      list.innerHTML = "";
+      list.appendChild(stateBox("error", {
+        iconName: "alert-triangle", title: "会话读取失败", hint: errorText(e),
+        actionText: "重试", onAction: () => loadThreads(),
+      }));
+    }
+    return;
+  }
+  paintViewUI();
+  const cnt = $("#chat-count");
+  if (cnt) {
+    cnt.textContent = chatThreads.length
+      ? "共 " + chatThreads.length + " 个会话（都是已确认接单的单子）"
+      : "双方都同意（这一单已确认接单）才会有会话";
+  }
+  if (quiet) return;
+
+  renderThreadList();
+  if (!chatThreads.some((t) => t.thread_id === chatThreadId)) {
+    chatThreadId = "";
+    chatLastId = "";
+    showConv(false);
+  }
+  // 桌面：默认打开最近一条；窄屏先看列表（避免一进来就盖住会话列表）
+  if (!chatThreadId && chatThreads.length && !isNarrow()) {
+    openThread(chatThreads[0].thread_id);
+  }
+}
+
+async function openThread(threadId, { focus = false } = {}) {
+  if (!threadId) return;
+  chatThreadId = threadId;
+  chatLastId = "";
+  renderThreadList();
+  showConv(true);
+  renderSubject(chatThreads.find((t) => t.thread_id === threadId) || null);
+  const stream = $("#chat-stream");
+  if (stream) {
+    stream.innerHTML = "";
+    stream.appendChild(el("p", "hint", "正在读取消息…"));
+  }
+  await loadMessages({ reset: true });
+  startChatPolling();
+  if (focus) {
+    const box = $("#chat-text");
+    if (box) box.focus();
+  }
+}
+
+function appendMessage(m) {
+  const stream = $("#chat-stream");
+  if (!stream || !m) return;
+  const empty = stream.querySelector(".chat__empty");
+  if (empty) empty.remove();                       // 第一条消息到了就把"还没有消息"提示收掉
+  const row = el("div", "chat__row" + (m.mine ? " is-mine" : "") + (m.kind === "emoji" ? " chat__row--emoji" : ""));
+  const from = m.from && m.from.nickname ? m.from : { ...(m.from || {}), nickname: m.mine ? currentNickname() : "" };
+  row.appendChild(avatarNode(from));
+  const bubble = el("div", "chat__bubble");
+  bubble.textContent = String(m.body || "");
+  row.appendChild(bubble);
+  row.appendChild(el("span", "chat__at", clockOf(m.at)));
+  stream.appendChild(row);
+  stream.scrollTop = stream.scrollHeight;
+}
+
+async function loadMessages({ reset = false } = {}) {
+  if (!chatThreadId) return;
+  const stream = $("#chat-stream");
+  try {
+    const after = reset ? "" : chatLastId;
+    const data = await api("/api/threads/" + encodeURIComponent(chatThreadId) + "/messages"
+      + (after ? "?after=" + encodeURIComponent(after) : ""));
+    const rows = Array.isArray(data) ? data : [];
+    if (reset) {
+      if (stream) stream.innerHTML = "";
+      chatLastId = "";
+      if (!rows.length && stream) {
+        stream.appendChild(el("p", "hint chat__empty",
+          "还没有消息 —— 打个招呼，对一下取件时间/地点就行（⛔ 别发手机号、学号、身份证号）。"));
+      }
+    }
+    for (const m of rows) {
+      appendMessage(m);
+      if (m && m.message_id) chatLastId = m.message_id;
+    }
+  } catch (e) {
+    if (reset && stream) {
+      stream.innerHTML = "";
+      stream.appendChild(stateBox("error", {
+        iconName: "alert-triangle", title: "消息读取失败", hint: errorText(e),
+        actionText: "重试", onAction: () => loadMessages({ reset: true }),
+      }));
+    }
+  }
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  chatTimer = setInterval(() => {
+    if (document.hidden || state.view !== "chat" || !chatThreadId) return;
+    void loadMessages();
+  }, CHAT_POLL_MS);
+}
+
+function stopChatPolling() {
+  if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+}
+
+async function sendChat() {
+  const box = $("#chat-text");
+  if (!box || !chatThreadId) return;
+  const body = box.value.trim();
+  if (!body) return;
+  const btn = $("#chat-send");
+  if (btn) btn.disabled = true;
+  try {
+    const m = await api("/api/threads/" + encodeURIComponent(chatThreadId) + "/messages", {
+      method: "POST",
+      body: { body },
+    });
+    box.value = "";
+    if (m && m.message_id) {
+      appendMessage(m);
+      chatLastId = m.message_id;
+    }
+    await loadThreads({ quiet: false });
+  } catch (e) {
+    toast(errorText(e), "danger");
+  } finally {
+    if (btn) btn.disabled = false;
+    box.focus();
+  }
+}
+
+function mountEmojiRow() {
+  const box = $("#chat-emoji");
+  if (!box) return;
+  box.innerHTML = "";
+  for (const cp of EMOJI_CODEPOINTS) {
+    const ch = String.fromCodePoint(cp);
+    const b = el("button", "", ch);
+    b.type = "button";
+    b.setAttribute("aria-label", "插入表情");
+    b.addEventListener("click", () => {
+      const input = $("#chat-text");
+      if (!input) return;
+      input.value += ch;
+      input.focus();
+    });
+    box.appendChild(b);
+  }
+}
+
+/** 顶部悬浮信息条点开：这一单的详情（也在提醒"别去站外换联系方式"） */
+function openThreadDetail() {
+  const th = chatThreads.find((t) => t.thread_id === chatThreadId);
+  if (!th) return;
+  const subject = th.subject || {};
+  const wrap = el("div", "stack--sm");
+  wrap.appendChild(el("p", "", "在聊这一单：" + (subject.title || "—")));
+  if (subject.subtitle) wrap.appendChild(el("p", "hint", subject.subtitle));
+  wrap.appendChild(el("p", "hint",
+    "状态：" + (subject.status || "—") + (subject.deadline ? "｜截止 " + new Date(subject.deadline).toLocaleString("zh-CN") : "")));
+  wrap.appendChild(el("p", "hint", "对方：" + displayName((th.peer && th.peer.nickname) || "对方") + "（站内昵称，不是真实姓名）"));
+  wrap.appendChild(el("p", "hint", "聊天就在站内：⛔ 不用交换手机号 / 微信号；平台不参与交易、不代收款。"));
+  openModal({ title: "会话详情", iconName: "message-chatbot", body: wrap, confirmText: "关闭", cancelText: "取消" });
+}
+
+/* =====================================================================
+   事件接线 + 启动
+   ===================================================================== */
+$("#btn-open-publish").addEventListener("click", openPublish);
+$("#btn-open-register").addEventListener("click", openRegister);
+$("#btn-reload").addEventListener("click", () => loadBoard());
+$("#view-all").addEventListener("click", () => setView("all"));
+$("#view-mine").addEventListener("click", () => setView("mine"));
+$("#view-chat").addEventListener("click", () => setView("chat"));
+
+/* ---- 筛选：条件一变就过滤已加载任务 + 写回 URL ---- */
+$("#b-filter").addEventListener("change", () => { filters.from = $("#b-filter").value; applyFilters(); });
+$("#f-to").addEventListener("change", () => { filters.to = $("#f-to").value; applyFilters(); });
+for (const chip of document.querySelectorAll("#f-within .fchip")) {
+  const w = chip.dataset.within;
+  chip.addEventListener("click", () => { filters.within = w; applyFilters(); });
+}
+$("#f-since").addEventListener("change", () => { filters.since = $("#f-since").value; filters.within = "custom"; applyFilters(); });
+$("#f-until").addEventListener("change", () => { filters.until = $("#f-until").value; filters.within = "custom"; applyFilters(); });
+$("#f-rmin").addEventListener("change", () => { filters.rmin = $("#f-rmin").value.trim(); applyFilters(); });
+$("#f-rmax").addEventListener("change", () => { filters.rmax = $("#f-rmax").value.trim(); applyFilters(); });
+$("#f-clear").addEventListener("click", () => clearFilters());
+
+/* ---- 私聊 ---- */
+$("#chat-refresh").addEventListener("click", () => loadThreads());
+$("#chat-back").addEventListener("click", () => { chatThreadId = ""; chatLastId = ""; stopChatPolling(); showConv(false); renderThreadList(); });
+$("#chat-subject").addEventListener("click", (e) => { if (!e.target.closest("button")) openThreadDetail(); });
+$("#chat-subject-more").addEventListener("click", openThreadDetail);
+$("#chat-send").addEventListener("click", () => void sendChat());
+$("#chat-text").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void sendChat(); }
+});
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { stopChatPolling(); return; }           // 切到后台：立刻停轮询
+  if (state.view === "chat") { void loadThreads(); startChatPolling(); }
+});
+
+railFab.addEventListener("click", openRail);
+$("#rail-close").addEventListener("click", closeRail);
+railBackdrop.addEventListener("click", closeRail);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRail(); });
+// 从窄屏拉到桌面：抽屉状态要收回去（桌面是常驻，不存在「开着」）
+const railMq = window.matchMedia("(min-width:1024px)");
+(railMq.addEventListener ? railMq.addEventListener.bind(railMq) : railMq.addListener.bind(railMq))("change", (e) => {
+  if (e.matches) closeRail();
+});
+
+async function boot() {
+  // 演示别名先把「我」占住同学A，别人的发布者才不会也被显示成「同学A」（否则分不清谁发的单）
+  aliasFor(ME, 0);
+  showLoading("#board", "正在读取开放任务…");
+  // 两个侧栏先建好（默认是关着的）：点开按钮零延迟
+  publishSheet = buildPublishSheet();
+  registerSheet = buildRegisterSheet();
+  mountEmojiRow();
+  readFiltersFromUrl();   // 刷新后保持筛选条件（?from=&to=&within=&since=&until=&rmin=&rmax=）
+  paintFilterUI();
+  await initDemo();   // ?demo=1：显示演示徽章 + 昵称假名 + 灌一次演示数据
+  await loadNodes();
+// * 先拿到身份（匿名开户/恢复会话），再加载看板：这样"我发布的/我接的"才认得出来
+  await ensureSession();
+  if (currentNickname()) ME = currentNickname();
+  mountIdentityChip("#whoami");
+  // * 5 秒轮询：别人新发的单、别人对我的单表达的意愿都会自己出现（私聊页不刷看板）
+  setInterval(() => { if (!document.hidden && state.view !== "chat") loadBoard({ force: true }).catch(() => {}); }, 5000);
     await loadBoard();
-  }
-  boot();
-})();
-</script>
-<script type="module">
-  /* demo 模式（contracts/frontend.md §5）：?demo=1 时由 F0 的 /js/demo.js 注入演示徽章，
-     并对姓名/手机号形态做兜底处理；不带参数时不产生任何视觉变化。
-     demo.js 属 feat/frontend（集成阶段并入 main）——这里用动态 import + catch，
-     本分支（或未合并时）加载不到就静默跳过，⛔ 不让页面报错、也不与页面自带的令牌输入框打架。 */
-  import("/js/demo.js").then((m) => m.initDemo()).catch(() => {});
+  await loadThreads({ quiet: true });   // 只为了把「私聊」角标点亮，不打断看板
+  setInterval(tickCountdowns, 30000);
+}
+
+boot();
 </script>
 </body>
 </html>

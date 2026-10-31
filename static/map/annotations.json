@@ -1,0 +1,5 @@
+{
+  "_comment": "人工标注。用 /tools/annotate.html 在底图上打点、填颜色与备注，导出 JSON 后覆盖本文件即可在地图上生效（无需改代码）。",
+  "_format": "{ points: [ { x_pct, y_pct, color, note, category } ] }，x_pct/y_pct 是相对底图的百分比（左上角 0,0）",
+  "points": []
+}

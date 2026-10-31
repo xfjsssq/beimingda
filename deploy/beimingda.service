@@ -1,0 +1,74 @@
+[Unit]
+Description=beimingda (北民大小助手) - campus services Agent, Express + better-sqlite3
+Documentation=https://github.com/xfjsssq/beimingda
+# 只要网络就绪即可；本服务不依赖数据库/Redis 等外部组件（SQLite 单文件）
+After=network-online.target
+Wants=network-online.target
+
+# 崩溃自愈的"刹车"：5 分钟内最多 10 次启动，超了就停下并标记 failed（防止刷爆机器）
+# ⚠️ 这两个键属于 [Unit] 段（systemd ≥ 229）；写进 [Service] 会被忽略并在 journal 里告警
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+[Service]
+Type=simple
+User=agentuser
+Group=agentuser
+
+# 仓库根目录（server.js 里的 ROOT 由它推导，static/ config/ fixtures/ pano/ 都相对它解析）
+WorkingDirectory=/home/agentuser/beimingda
+
+# 环境变量：本应用自己也会读仓库根的 .env（src/server.js::loadDotEnv，且**不覆盖**已存在的环境变量）。
+#   ⚠️ 不要在 .env 和下面的 Environment= 里同时设同一个变量：不同 systemd 版本对
+#      EnvironmentFile 与 Environment 的覆盖顺序表述不一致，容易"改了没生效"。
+#      建议：**所有业务变量只写在 .env**；下面只保留 NODE_ENV。
+#   ⚠️ systemd 的 EnvironmentFile 语法比应用自带的解析器严格：
+#      · 值里出现空格或 # 必须整体加双引号（例：DEMO_TOKEN="a b#c"）
+#      · 行尾注释可以写，但别把 # 紧贴在值后面又指望 systemd 帮你剥掉
+#      · 前缀 `-` 表示文件不存在也不报错（首次部署、只有 .env.example 的情况）
+EnvironmentFile=-/home/agentuser/beimingda/.env
+Environment=NODE_ENV=production
+
+ExecStart=/usr/bin/node src/server.js
+# ⚠️ 若 node 不是装在这个路径（用 nvm/volta/包管理器），改成 `command -v node` 的输出；
+#    路径写错会得到 status=203/EXEC，不是应用报错，别去查代码。
+# ⚠️ 改完 src/** 或 static/** 必须 restart —— 生产模式没有热重载（npm run dev 才有 --watch）
+
+# 崩溃自愈：进程退出（不管退出码）5 秒后拉起；与服务器上既有配置保持一致
+# （配合 [Unit] 段的 StartLimitIntervalSec / StartLimitBurst 做"刹车"）
+Restart=always
+RestartSec=5
+
+# 停机：server.js 监听 SIGTERM 并 server.close()，给 15 秒收尾（在途请求 + SQLite 落盘）
+KillSignal=SIGTERM
+TimeoutStopSec=15
+
+# 日志进 journald（journalctl -u beimingda）；systemd 默认还给 journald，这里写死便于复制
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=beimingda
+
+# ---- 权限收窄（默认就是普通用户，这里再加一层）----
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictRealtime=true
+LockPersonality=true
+# ⛔ 不要加 MemoryDenyWriteExecute=true：V8 的 JIT 需要"可写+可执行"内存，加了会启动即崩。
+
+# 唯一需要写的地方：SQLite 库文件与它的 -wal / -shm 兄弟文件
+#   ⚠️ 必须与 .env 里的 DB_PATH 指向同一个目录，否则报 SQLITE_CANTOPEN（见 部署与运维.md）
+#   ⚠️ DB_PATH 默认是 ./data/beimingda.db（相对 WorkingDirectory）→ 正好落在这条里
+ReadWritePaths=/home/agentuser/beimingda/data
+# 若以后真的把"打码后的代取截图"落盘（.gitignore 里预留了 static/uploads/），再放开这行：
+# ReadWritePaths=/home/agentuser/beimingda/static/uploads
+
+# 备份脚本跑在 cron 里、不经过本 unit，所以本 unit 不需要写 /home/agentuser/backups
+
+[Install]
+WantedBy=multi-user.target

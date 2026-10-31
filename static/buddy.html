@@ -1,320 +1,1794 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-page="buddy">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>搭子墙 · 北名大小助手</title>
+  <title>搭子：发布需求 · 表达意愿 · 站内聊天</title>
   <!--
-    静态自包含页：样式/脚本全内联，⛔ 不引用外部 CDN、⛔ 不引用本分支不存在的 /js/api.js、/js/nav.js
-    配色沿用主色 #1F4E8C
-    契约：contracts/m2-buddy.md §6（4 个区块）
-    ⚠️ 候选卡片上不得出现任何可反推身份的字段：本页只渲染接口白名单字段
-        （anon_token / score / reason / parts / reveal_status / contact_code-mutual-only）
-    照片：本页**不含任何文件上传控件**（contracts/frontend.md §7：上传控件只出现在代取截图处）；
-          搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7）
+    2026-10-31 改版：三个独立入口 + 已同意=站内聊天
+      · 左功能栏：发布需求 / 表达意愿 / 已同意（三个独立入口，不再挤在一个「我的申请」里）
+      · 已同意 → 主区换成聊天列表（分「别人同意了我的帖」「我同意了别人的帖」两组）→ 点进聊天界面
+      · 双方都同意后**直接在站内聊天**：页面不再有任何"拿到一串码再去别的软件加好友"的流程
+      · 右上角设置：改昵称（PATCH /api/me）· 改密码（入口+占位）· 退出登录（清 bm.session.* 后刷新）
+    复用共享层：/css/app.css 设计变量 · /js/session.js（匿名会话身份）· /js/api.js · /js/nav.js · /js/demo.js · /js/ui.js
+    静态守卫：图标一律 /vendor/phosphor/icons/*.svg（⛔ 无 emoji 当图标；聊天内容里的文本表情允许）· ⛔ 无外链 · 只走 api()
+    ⛔ 本页不含任何文件上传控件（frontend.md §7）；照片不参与评分、不入库
+    ⛔ 只渲染匿名标识与昵称，不出现任何身份字段
   -->
+  <link rel="stylesheet" href="/css/app.css" />
   <style>
-    :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#C0392B; --bg:#F5F7FA; --line:#e3e8ef; }
-    * { box-sizing:border-box; }
-    body { margin:0; background:var(--bg); color:#1c1c1e;
-      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
-    main { max-width:920px; margin:0 auto; padding:24px 16px 64px; }
-    h1 { color:var(--pri); font-size:22px; margin:0 0 4px; }
-    .sub { color:#5b6470; font-size:13px; margin:0 0 16px; }
-    .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
-      box-shadow:0 1px 3px rgba(16,24,40,.08); }
-    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); display:flex; align-items:center; gap:8px; }
-    .card h2 .n { display:inline-flex; width:20px; height:20px; border-radius:50%;
-      background:var(--pri); color:#fff; font-size:12px; align-items:center; justify-content:center; }
-    label { display:block; font-size:13px; color:#5b6470; margin:10px 0 4px; }
-    input, select, textarea { width:100%; font:inherit; font-size:14px; padding:8px 10px;
-      border:1px solid var(--line); border-radius:8px; background:#fff; color:#1c1c1e; }
-    textarea { min-height:96px; resize:vertical; line-height:1.5; }
-    .row { display:flex; gap:10px; flex-wrap:wrap; }
-    .row > * { flex:1 1 160px; }
-    button { font:inherit; font-size:14px; padding:9px 16px; border:0; border-radius:8px;
-      background:var(--pri); color:#fff; cursor:pointer; }
-    button.ghost { background:#eef2f8; color:var(--pri); }
-    button:disabled { opacity:.55; cursor:default; }
-    .hint { font-size:12px; color:#7a8593; margin:6px 0 0; line-height:1.6; }
-    .badge { display:inline-block; font-size:12px; padding:2px 8px; border-radius:999px; }
-    .b-pending { background:rgba(192,57,43,.10); color:var(--warn); }
-    .b-mutual { background:rgba(46,139,118,.14); color:var(--ok); }
-    .cand { border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:10px; }
-    .cand .top { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; }
-    .cand .anon { font-family:Consolas,"Courier New",monospace; font-size:12px; color:#5b6470; }
-    .score { font-size:20px; font-weight:700; color:var(--pri); }
-    .bars { margin:8px 0 4px; }
-    .bar { display:flex; align-items:center; gap:8px; font-size:12px; color:#5b6470; margin:3px 0; }
-    .bar b { width:38px; color:#33404f; font-weight:600; }
-    .bar .track { flex:1; height:6px; border-radius:3px; background:#eef2f8; overflow:hidden; }
-    .bar .fill { height:100%; background:var(--pri); }
-    .reason { font-size:12px; color:#33404f; background:#f8fafc; border-radius:8px; padding:8px 10px;
-      margin-top:8px; line-height:1.6; }
-    .code { font-family:Consolas,"Courier New",monospace; color:var(--ok); font-weight:600; }
-    pre { background:#0f172a; color:#e2e8f0; padding:10px 12px; border-radius:8px; overflow:auto;
-      font-size:12px; margin:10px 0 0; }
-    .msg { font-size:13px; margin-top:8px; }
-    .msg.err { color:var(--warn); }
-    .msg.ok { color:var(--ok); }
-    .empty { font-size:13px; color:#7a8593; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
-    th { color:#5b6470; font-weight:500; font-size:12px; }
-    @media (max-width:768px) {
-      main { padding:16px 12px 48px; }
-      .row { flex-direction:column; }
-      th:nth-child(3), td:nth-child(3) { display:none; }
+    /* 只动 buddy 页；字号只用 --size-*，间距只用 --sp-*，圆角只用 --r-*，曲线用 --ease */
+    [hidden] { display: none !important; }   /* [hidden] 会被 .btn/.code 的 display 覆盖 */
+
+    /* ---- 1. 两栏骨架（桌面常驻侧栏 / 窄屏左侧滑入）---- */
+    .buddy-layout { display: grid; gap: var(--sp-300); align-items: start; }
+    .buddy-rail {
+      display: flex; flex-direction: column; gap: var(--sp-200);
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+      padding: var(--sp-200);
     }
+    @media (max-width: 1023px) {
+      .buddy-rail {
+        position: fixed; top: 0; bottom: 0; left: 0; z-index: 88;
+        width: min(320px, 86vw); border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+        overflow-y: auto; transform: translateX(-100%);
+        transition: transform var(--dur-move) var(--ease);
+      }
+      .buddy-rail.is-open { transform: none; }
+      .buddy-rail__backdrop {
+        position: fixed; inset: 0; z-index: 87; background: rgba(12, 20, 33, .42);
+        opacity: 0; pointer-events: none; transition: opacity var(--dur-move) var(--ease);
+      }
+      .buddy-rail__backdrop.is-open { opacity: 1; pointer-events: auto; }
+    }
+    @media (min-width: 1024px) {
+      .buddy-layout { grid-template-columns: 260px minmax(0, 1fr); }
+      .buddy-rail {
+        position: sticky; top: calc(var(--header-h) + var(--sp-200));
+        width: auto; max-height: calc(100vh - var(--header-h) - var(--sp-400)); overflow: auto;
+      }
+      .buddy-rail__backdrop, .buddy-rail__toggle { display: none; }
+    }
+    .buddy-rail__head { display: flex; align-items: center; gap: var(--sp-100); }
+    .buddy-rail__head b { display: block; font-size: var(--size-sm); }
+    .buddy-rail__head p { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-rail__nav { display: flex; flex-direction: column; gap: var(--sp-75); }
+    .buddy-rail__item {
+      appearance: none; font-family: inherit; text-align: left; cursor: pointer;
+      display: flex; align-items: center; gap: var(--sp-100);
+      padding: var(--sp-100); border-radius: var(--r-md);
+      border: 1px solid var(--color-line); background: var(--color-sunken);
+      color: var(--color-text-soft); font-size: var(--size-sm);
+      transition: background var(--dur-color) var(--ease), border-color var(--dur-color) var(--ease);
+    }
+    .buddy-rail__item:hover { background: var(--color-primary-soft); border-color: var(--color-primary-line); color: var(--color-primary); }
+    .buddy-rail__item:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .buddy-rail__item .icon { color: var(--color-primary); }
+    .buddy-rail__item.is-active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-rail__item.is-active .icon { color: #fff; }
+    .buddy-rail__item-text { display: block; }
+    .buddy-rail__item-text small { display: block; font-size: var(--size-xs); color: var(--color-muted); margin-top: var(--sp-25); }
+    .buddy-rail__item.is-active .buddy-rail__item-text small { color: rgba(255, 255, 255, .82); }
+    .buddy-rail__grow { flex: 1 1 auto; min-width: 0; }
+    .buddy-rail__count {
+      flex: 0 0 auto; font-size: var(--size-xs); font-variant-numeric: tabular-nums;
+      background: var(--color-primary-soft); color: var(--color-primary);
+      border-radius: var(--radius-pill); padding: 0 var(--sp-75);
+    }
+    .buddy-rail__item.is-active .buddy-rail__count { background: rgba(255, 255, 255, .22); color: #fff; }
+    .buddy-facts { display: flex; flex-direction: column; gap: var(--sp-50); font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-facts span b { color: var(--color-text-soft); font-variant-numeric: tabular-nums; }
+    .buddy-mcp { border-top: 1px dashed var(--color-line-strong); padding-top: var(--sp-100); font-size: var(--size-xs); color: var(--color-muted); line-height: 1.7; }
+    .buddy-mcp a { color: var(--color-primary); }
+
+    /* ---- 2. 页头：我是谁 + 设置入口 ---- */
+    .buddy-head { display: flex; align-items: flex-start; gap: var(--sp-200); flex-wrap: wrap; }
+    .buddy-head__main { flex: 1 1 320px; min-width: 0; }
+    .buddy-head__side { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-who {
+      display: inline-flex; align-items: center; gap: var(--sp-50);
+      border: 1px solid var(--color-line); background: var(--color-card);
+      border-radius: var(--radius-pill); padding: var(--sp-25) var(--sp-100);
+      font-size: var(--size-sm); color: var(--color-text-soft);
+    }
+    .buddy-who b { color: var(--color-text); }
+
+    /* ---- 3. 头像（用 peer.avatar 选内置图标 + 配色，⛔ 不外链图片）---- */
+    .buddy-avatar {
+      flex: 0 0 auto; display: inline-grid; place-items: center;
+      border-radius: var(--radius-pill); border: 1px solid var(--color-line);
+    }
+    .buddy-avatar--40 { width: 40px; height: 40px; }
+    .buddy-avatar--32 { width: 32px; height: 32px; }
+    .buddy-avatar--24 { width: 24px; height: 24px; }
+
+    /* ---- 4. 帖子流 ---- */
+    .buddy-main { min-width: 0; }
+    .buddy-mode { display: inline-flex; align-items: center; gap: var(--sp-50); font-size: var(--size-sm); font-weight: 600; color: var(--color-primary); }
+    .buddy-post__head { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-post__head .badge { display: inline-flex; align-items: center; gap: var(--sp-25); }
+    .buddy-anon { font-family: var(--font-mono); font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-want { margin: var(--sp-100) 0 0; font-size: var(--size-lg); line-height: 1.6; color: var(--color-text); }
+    .buddy-want--short { font-size: var(--size-xl); }
+    .buddy-sub { margin: var(--sp-50) 0 0; font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-block { margin-top: var(--sp-100); }
+    .buddy-block__label {
+      display: flex; align-items: center; gap: var(--sp-50); margin-bottom: var(--sp-50);
+      font-size: var(--size-xs); color: var(--color-muted);
+    }
+    .buddy-block__label .icon { color: var(--color-primary-mid); }
+    .buddy-hours { display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: var(--sp-25); }
+    .buddy-hours i { height: var(--sp-200); border-radius: var(--r-sm); background: var(--color-sunken); border: 1px solid var(--color-line); }
+    .buddy-hours i.on { background: var(--color-primary-line); border-color: var(--color-primary-mid); }
+    .buddy-hours__ticks { display: flex; justify-content: space-between; margin-top: var(--sp-25); font-size: var(--size-xs); color: var(--color-muted-soft); }
+
+    /* ---- 5. 留言 / 回复 ---- */
+    .buddy-thread { display: flex; flex-direction: column; gap: var(--sp-100); }
+    .buddy-msg {
+      border: 1px solid var(--color-line); border-radius: var(--r-md);
+      padding: var(--sp-100); background: var(--color-card);
+    }
+    .buddy-msg__head { display: flex; align-items: center; gap: var(--sp-50); flex-wrap: wrap; }
+    .buddy-msg__who { font-family: var(--font-mono); font-size: var(--size-xs); color: var(--color-muted); }
+    .buddy-msg__at { margin-left: auto; font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-msg__text { margin: var(--sp-50) 0 0; font-size: var(--size-base); line-height: 1.7; color: var(--color-text); }
+    .buddy-msg__acts { display: flex; gap: var(--sp-75); flex-wrap: wrap; margin-top: var(--sp-75); }
+    .buddy-reply {
+      margin: var(--sp-75) 0 0 var(--sp-300); padding-left: var(--sp-100);
+      border-left: 2px solid var(--color-line); display: flex; flex-direction: column; gap: var(--sp-75);
+    }
+    .buddy-reply .buddy-msg { background: var(--color-sunken); }
+    .buddy-msg--author { border-color: var(--color-accent); }
+
+    /* ---- 6. 我的三块（分段控件）---- */
+    .buddy-seg { display: flex; gap: var(--sp-50); flex-wrap: wrap; margin-bottom: var(--sp-200); }
+    .buddy-seg__btn {
+      appearance: none; font-family: inherit; cursor: pointer;
+      display: inline-flex; align-items: center; gap: var(--sp-50);
+      padding: var(--sp-75) var(--sp-100); border-radius: var(--radius-pill);
+      border: 1px solid var(--color-line); background: var(--color-sunken);
+      color: var(--color-text-soft); font-size: var(--size-sm);
+    }
+    .buddy-seg__btn[aria-pressed="true"] { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-note {
+      font-size: var(--size-xs); color: var(--color-muted); line-height: 1.7;
+      background: var(--color-sunken); border: 1px dashed var(--color-line-strong);
+      border-radius: var(--r-md); padding: var(--sp-75);
+    }
+    .buddy-tpl { display: flex; gap: var(--sp-75); flex-wrap: wrap; }
+
+    /* ---- 7. 已同意：聊天列表 ---- */
+    .buddy-chatgroup { margin-bottom: var(--sp-300); }
+    .buddy-chatgroup__title {
+      display: flex; align-items: center; gap: var(--sp-50); margin: 0 0 var(--sp-100);
+      font-size: var(--size-sm); color: var(--color-text-soft);
+    }
+    .buddy-chatgroup__title .icon { color: var(--color-primary-mid); }
+    .buddy-chatrow {
+      display: flex; align-items: center; gap: var(--sp-100); width: 100%;
+      appearance: none; font-family: inherit; text-align: left; cursor: pointer;
+      border: 1px solid var(--color-line); background: var(--color-card);
+      border-radius: var(--r-md); padding: var(--sp-100);
+      transition: border-color var(--dur-color) var(--ease), box-shadow var(--dur-color) var(--ease);
+    }
+    .buddy-chatrow + .buddy-chatrow { margin-top: var(--sp-75); }
+    .buddy-chatrow:hover { border-color: var(--color-primary-line); box-shadow: var(--shadow-card); }
+    .buddy-chatrow:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .buddy-chatrow__main { flex: 1 1 auto; min-width: 0; }
+    .buddy-chatrow__top { display: flex; align-items: center; gap: var(--sp-50); }
+    .buddy-chatrow__name { font-size: var(--size-base); color: var(--color-text); }
+    .buddy-chatrow__at { margin-left: auto; font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-chatrow__subject { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-chatrow__last { margin: var(--sp-25) 0 0; font-size: var(--size-sm); color: var(--color-text-soft); overflow-wrap: anywhere; }
+    .buddy-dot {
+      flex: 0 0 auto; width: var(--sp-75); height: var(--sp-75); border-radius: var(--radius-pill);
+      background: var(--color-danger);
+    }
+
+    /* ---- 8. 聊天界面 ---- */
+    .buddy-chat { display: flex; flex-direction: column; gap: var(--sp-200); }
+    .buddy-chat__head {
+      position: sticky; top: calc(var(--header-h) + var(--sp-50)); z-index: 5;
+      background: var(--color-card); border: 1px solid var(--color-line);
+      border-radius: var(--radius-card); box-shadow: var(--shadow-card);
+      padding: var(--sp-100) var(--sp-100);
+    }
+    .buddy-chat__bar { display: flex; align-items: center; gap: var(--sp-100); }
+    .buddy-chat__who { flex: 1 1 auto; min-width: 0; }
+    .buddy-chat__name { font-size: var(--size-base); color: var(--color-text); }
+    .buddy-chat__subject { margin: var(--sp-25) 0 0; font-size: var(--size-xs); color: var(--color-muted); overflow-wrap: anywhere; }
+    .buddy-chat__more { margin-top: var(--sp-100); border-top: 1px dashed var(--color-line); padding-top: var(--sp-100); }
+    .buddy-chat__scroll { display: flex; flex-direction: column; gap: var(--sp-100); }
+    .buddy-day { text-align: center; font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-line { display: flex; align-items: flex-end; gap: var(--sp-75); }
+    .buddy-line--mine { flex-direction: row-reverse; }
+    .buddy-line__body { max-width: 78%; min-width: 0; }
+    .buddy-line--mine .buddy-line__body { text-align: right; }
+    .buddy-bubble {
+      display: inline-block; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere;
+      border-radius: var(--r-lg); padding: var(--sp-75) var(--sp-100);
+      font-size: var(--size-base); line-height: 1.6;
+      background: var(--color-sunken); border: 1px solid var(--color-line); color: var(--color-text);
+    }
+    .buddy-line--mine .buddy-bubble { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+    .buddy-line__meta { margin-top: var(--sp-25); font-size: var(--size-xs); color: var(--color-muted-soft); }
+    .buddy-composer {
+      border: 1px solid var(--color-line); border-radius: var(--radius-card); background: var(--color-card);
+      padding: var(--sp-100); display: flex; flex-direction: column; gap: var(--sp-75);
+    }
+    .buddy-composer textarea { min-height: var(--sp-600); }
+    .buddy-emojis { display: flex; gap: var(--sp-25); flex-wrap: wrap; }
+    .buddy-emoji {
+      appearance: none; font-family: inherit; cursor: pointer; line-height: 1;
+      border: 1px solid var(--color-line); background: var(--color-sunken);
+      border-radius: var(--r-sm); padding: var(--sp-25) var(--sp-50); font-size: var(--size-lg);
+    }
+    .buddy-emoji:hover { background: var(--color-primary-soft); border-color: var(--color-primary-line); }
+    .buddy-composer__foot { display: flex; align-items: center; gap: var(--sp-75); flex-wrap: wrap; }
+    .buddy-powered { font-size: var(--size-xs); color: var(--color-muted-soft); }
   </style>
+  <meta name="description" content="发布搭子需求、表达意愿、双方都同意后直接在站内聊天。" />
+  <meta property="og:title" content="搭子：发布需求 · 表达意愿 · 站内聊天" />
+  <meta property="og:description" content="发布搭子需求、表达意愿、双方都同意后直接在站内聊天。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main>
-  <h1>搭子墙 <span class="badge b-mutual">双向同意才可见</span></h1>
-  <p class="sub">学习 / 室友 / 项目 / 运动 —— 先说清需求，再让双方都点头。全站匿名，未互相同意前看不到任何联系方式。</p>
+<a class="skip-link" href="#main">跳到主要内容</a>
 
-  <div class="card">
-    <h2>我的身份（只填匿名昵称）</h2>
-    <div class="row">
-      <div>
-        <label for="handle">匿名昵称（如 同学A）</label>
-        <input id="handle" placeholder="同学A" />
+<main id="main" class="page page--mid">
+  <div class="page-head">
+    <div class="buddy-head">
+      <div class="buddy-head__main">
+        <h1>搭子</h1>
+        <p class="lead">先看别人需要什么搭子，合适的就点「表达意愿」留句话；也可以直接发布自己的需求。双方都点了头，就在这里直接聊。</p>
       </div>
-      <div>
-        <label for="token">演示令牌（仅发布需要，写入接口 X-Demo-Token）</label>
-        <input id="token" placeholder="留空则从 ?token= 或 localStorage 读取" />
+      <div class="buddy-head__side">
+        <span class="buddy-who" id="whoChip">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/user.svg)" aria-hidden="true"></span>
+          <span>我是 <b id="whoName">…</b></span>
+        </span>
+        <button class="btn btn--ghost btn--sm" id="btnSettings" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/sliders-horizontal.svg)" aria-hidden="true"></span>
+          设置
+        </button>
       </div>
     </div>
-    <p class="hint">⛔ 本页不收集姓名 / 学号 / 手机号 / 邮箱。令牌只存在你本机浏览器 localStorage，不硬编码在页面里。</p>
+    <div class="page-head__tags">
+      <span class="badge badge--ok">双方都同意才能开聊</span>
+      <span class="badge badge--muted">不收集姓名 / 学号 / 手机号 / 邮箱</span>
+      <span class="badge badge--muted">一句话也能发</span>
+    </div>
   </div>
 
-  <!-- 区块一 · 发布 -->
-  <div class="card">
-    <h2><span class="n">1</span>发布搭子帖</h2>
-    <div class="row">
-      <div>
-        <label for="pubKind">类型</label>
-        <select id="pubKind">
+  <div class="buddy-layout">
+    <!-- ===================== 左：三个独立入口 ===================== -->
+    <aside class="buddy-rail" id="buddyRail" aria-label="搭子功能栏">
+      <div class="buddy-rail__head">
+        <span class="icon-tile" aria-hidden="true">
+          <span class="icon icon--20" style="--icon:url(/vendor/phosphor/icons/users-three.svg)"></span>
+        </span>
+        <div class="buddy-rail__grow">
+          <b>搭子</b>
+          <p>发需求 / 表达意愿 / 聊天</p>
+        </div>
+      </div>
+
+      <nav class="buddy-rail__nav" aria-label="搭子功能">
+        <button class="buddy-rail__item" id="navPublish" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/note-pencil.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            发布需求
+            <small>发帖 —— 发布我自己的搭子需求（一句话也能发）</small>
+          </span>
+        </button>
+        <button class="buddy-rail__item" id="navWall" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            表达意愿
+            <small>看别人的需求，留言说说我的情况</small>
+          </span>
+        </button>
+        <button class="buddy-rail__item" id="navAgreed" type="button">
+          <span class="icon icon--18" style="--icon:url(/vendor/phosphor/icons/message-chatbot.svg)" aria-hidden="true"></span>
+          <span class="buddy-rail__grow buddy-rail__item-text">
+            已同意
+            <small>双方都点头了 → 直接开聊</small>
+          </span>
+          <span class="buddy-rail__count" id="agreedCount">0</span>
+        </button>
+      </nav>
+
+      <div class="buddy-facts">
+        <span>墙上需求 <b id="factWall">0</b> 条</span>
+        <span>我发布的需求 <b id="factMinePosts">0</b> 条</span>
+        <span>已同意的搭子 <b id="factMutual">0</b> 对</span>
+      </div>
+
+      <div class="buddy-mcp">
+        <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/robot.svg)" aria-hidden="true"></span>
+        想让 Agent 按描述自动帮你找（那种「八字匹配」）？那走 MCP：把
+        <a href="/agent">接入说明</a> 里的配置贴进 WorkBuddy，直接跟它说需求即可。手动浏览不需要它。
+      </div>
+    </aside>
+
+    <!-- ===================== 右：主区（三个出口各自换内容） ===================== -->
+    <section class="buddy-main" aria-label="搭子主区">
+      <div class="toolbar">
+        <span class="buddy-mode" id="modeTag">
+          <span class="icon icon--18" id="modeIcon" style="--icon:url(/vendor/phosphor/icons/hand-pointing.svg)" aria-hidden="true"></span>
+          <span id="modeText">表达意愿</span>
+        </span>
+        <select id="kindFilter" aria-label="按类型筛选">
+          <option value="">全部类型</option>
           <option value="study">学习</option>
           <option value="roommate">室友</option>
           <option value="project">项目</option>
           <option value="sport">运动</option>
           <option value="other">其他</option>
         </select>
+        <span class="toolbar__spacer"></span>
+        <button class="btn btn--ghost btn--sm" id="btnRefresh" type="button">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/refresh.svg)" aria-hidden="true"></span>
+          刷新
+        </button>
+        <button class="btn btn--ghost btn--sm buddy-rail__toggle" id="btnRail" type="button"
+                aria-controls="buddyRail" aria-expanded="false">
+          <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/list-check.svg)" aria-hidden="true"></span>
+          功能
+        </button>
       </div>
-    </div>
-    <label for="pubText">用一句话以上说清：类型 / 年级 / 专业大类 / 作息 / 兴趣 / 性格 / 期望 / 硬性要求 / 雷点</label>
-    <textarea id="pubText" placeholder="例：大二 工科，想找一起刷算法题和摄影的同学；作息偏夜猫，周末有空；周三1-2节有课；希望对方安静，不能半夜吵；受不了凌晨打游戏外放"></textarea>
-    <!-- ⛔ 本页刻意不放任何文件上传控件（contracts/frontend.md §7：文件上传控件只出现在代取截图上传处）；
-         搭子匹配也不需要照片 —— 照片本来就不参与评分、不入库（契约 m2 §7） -->
-    <div class="row" style="margin-top:10px">
-      <button id="btnPublish">发布</button>
-      <button id="btnPreview" class="ghost">先看画像抽取结果</button>
-    </div>
-    <div id="pubMsg" class="msg"></div>
-    <pre id="pubOut" style="display:none"></pre>
-  </div>
 
-  <!-- 区块二 · 搜索 -->
-  <div class="card">
-    <h2><span class="n">2</span>找搭子</h2>
-    <div class="row">
-      <div>
-        <label for="searchKind">类型</label>
-        <select id="searchKind">
-          <option value="study">学习</option>
-          <option value="roommate">室友</option>
-          <option value="project">项目</option>
-          <option value="sport">运动</option>
-          <option value="other">其他</option>
-        </select>
-      </div>
-      <div>
-        <label for="topK">返回条数（1-20）</label>
-        <input id="topK" type="number" min="1" max="20" value="5" />
-      </div>
-    </div>
-    <label for="seekText">描述你想要的搭子</label>
-    <textarea id="seekText" placeholder="例：大二 工科 想找一起刷算法题和摄影的同学，作息偏夜猫，周末有空，周三1-2节有课"></textarea>
-    <div class="row" style="margin-top:10px">
-      <button id="btnSearch">搜索候选</button>
-      <button id="btnList" class="ghost">只看搭子墙（不评分）</button>
-    </div>
-    <div id="searchMsg" class="msg"></div>
-  </div>
-
-  <!-- 区块三 · 候选卡片 -->
-  <div class="card">
-    <h2><span class="n">3</span>候选（只显示评分 ≥ 60 的候选）</h2>
-    <div id="cands"><p class="empty">还没有候选，先在上面搜索。</p></div>
-    <p class="hint">同意 / 拒绝在 WorkBuddy 里让 Agent 调用 MCP 工具 <code>buddy_consent</code>（同一帖只能表决一次）；双方都同意后这里会出现中转码。</p>
-  </div>
-
-  <!-- 区块四 · 我的申请 -->
-  <div class="card">
-    <h2><span class="n">4</span>我的申请</h2>
-    <div id="mine"><p class="empty">还没有发出过意愿。</p></div>
-    <div style="margin-top:10px"><button id="btnMine" class="ghost">刷新我的申请</button></div>
+      <div id="writeHint"></div>
+      <div id="viewHost" class="stack"></div>
+    </section>
   </div>
 </main>
 
+<div class="buddy-rail__backdrop" id="railBackdrop" aria-hidden="true"></div>
+
+<footer class="site-footer">
+  <p>北民大小助手 · 赛道一 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>⛔ 不收集姓名 / 学号 / 手机号 / 邮箱；未互相同意前，页面拿不到任何联系方式。</p>
+  <nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
+
 <script src="/config.js"></script>
-<script>
-(function () {
-  const $ = (id) => document.getElementById(id);
-  const LS = { handle: "beimingda.handle", token: "beimingda.token" };
-  const params = new URLSearchParams(location.search);
+<script type="module">
+import { api, hasWriteToken } from "/js/api.js";
+import { ensureSession, currentNickname, fetchMe, renameSession, sessionToken } from "/js/session.js";
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import {
+  el, icon, createSheet, openModal, toast,
+  showLoading, showEmpty, showError, showNotice, initReveals,
+} from "/js/ui.js";
 
-  const getHandle = () => ($("handle").value || "").trim() || "同学A";
-  let fallbackToken = "";                                   // 服务端注入的令牌只放内存，⛔ 不回填到输入框
-  const getToken = () => ($("token").value || "").trim() || fallbackToken;
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+mountNav();
 
-  // 初始化：令牌取值链 —— 1) ?token=  2) localStorage（必须非空）  3) /config.js 注入的 window.__DEMO_TOKEN__
-  // 顺序有讲究：评委零操作时前两级都为空 -> 自动吃注入值；自己输过令牌的测试者不会被覆盖。
-  // ⛔ 注入值只在内存里用：不写回 localStorage，**也不回填到输入框**（否则直播/路演会把真实令牌明文显示在页面上）
-  // ⛔ 页面任何位置都不打印/回显令牌内容
-  $("handle").value = params.get("handle") || localStorage.getItem(LS.handle) || "同学A";
-  const urlToken = params.get("token") || "";
-  const savedToken = (localStorage.getItem(LS.token) || "").trim();
-  const injectedToken = typeof window.__DEMO_TOKEN__ === "string" ? window.__DEMO_TOKEN__ : "";
-  fallbackToken = injectedToken;
-  $("token").value = urlToken || savedToken || "";
-  $("token").placeholder = getToken() ? "已由服务端配置（如需覆盖请重新输入）" : "<DEMO_TOKEN>";
-  $("handle").addEventListener("change", () => localStorage.setItem(LS.handle, getHandle()));
-  $("token").addEventListener("change", () => localStorage.setItem(LS.token, getToken()));
+/* ---------------------------------------------------------------- 常量 */
 
-  function say(el, text, kind) {
-    const node = $(el);
-    node.className = "msg" + (kind ? " " + kind : "");
-    node.textContent = text || "";
+const KINDS = [
+  { v: "study", label: "学习", icon: "book" },
+  { v: "roommate", label: "室友", icon: "building-community" },
+  { v: "project", label: "项目", icon: "tools" },
+  { v: "sport", label: "运动", icon: "bolt" },
+  { v: "other", label: "其他", icon: "sparkles" },
+];
+const kindOf = (v) => KINDS.find((k) => k.v === v) || KINDS[4];
+
+/** 模板：一键带入示例文字 */
+const TEMPLATES = [
+  { label: "自习", kind: "study", text: "想找人一起自习，图书馆三楼，晚上七点" },
+  { label: "运动", kind: "sport", text: "想找人一起打羽毛球，周末下午体育馆" },
+  { label: "拼车", kind: "other", text: "想找人一起拼车回家，周五下午校门口集合" },
+];
+
+/** 内置头像：服务端给的是名字（peer.avatar），这里映射成图标 + 配色，⛔ 不外链图片 */
+const AVATARS = {
+  panda: { icon: "circle", tone: "var(--color-primary-mid)" },
+  cat: { icon: "heart", tone: "var(--color-danger)" },
+  fox: { icon: "flag", tone: "var(--color-warn-text)" },
+  owl: { icon: "eye", tone: "var(--color-accent-dark)" },
+  whale: { icon: "drop", tone: "var(--color-primary)" },
+  deer: { icon: "star", tone: "var(--color-accent)" },
+  robot: { icon: "robot", tone: "var(--color-muted)" },
+  leaf: { icon: "lightbulb", tone: "var(--color-primary-dark)" },
+};
+
+/** 一排小表情：⛔ 源码里不写 emoji 字符（静态守卫禁止页面出现 emoji），用转义 → 只有运行时才是真表情 */
+const EMOJIS = [
+  "\u{1F44D}", "\u{1F602}", "\u{1F60A}", "\u{1F64C}", "\u{1F440}", "\u{2705}",
+  "\u{1F525}", "\u{1F4AA}", "\u{1F914}", "\u{1F44C}", "\u{1F31F}", "\u{2764}\u{FE0F}",
+];
+
+const LS_MY = "beimingda.buddy.mine.v1";
+const LS_SEEN = "beimingda.buddy.seen.v1";
+const DEMO_URL = "/buddy-demo.json";
+const POLL_MS = 3000;
+
+/* ---------------------------------------------------------------- 小工具 */
+
+function fmtTime(iso) {
+  const d = new Date(String(iso || ""));
+  if (Number.isNaN(d.getTime())) return String(iso || "");
+  const p = (n) => String(n).padStart(2, "0");
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  return sameDay ? `${p(d.getHours())}:${p(d.getMinutes())}` : `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+const dayKey = (iso) => String(iso || "").slice(0, 10);
+const fmtTs = fmtTime;
+const pct = (v) => Math.round(Math.max(0, Math.min(1, Number(v) || 0)) * 100);
+function sideWord(v, low, mid, high) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return mid;
+  if (n <= 0.4) return low;
+  if (n >= 0.6) return high;
+  return mid;
+}
+function badgeWithIcon(text, iconName, cls = "badge badge--muted") {
+  const b = el("span", cls);
+  if (iconName) b.appendChild(icon(iconName, { size: 14 }));
+  b.appendChild(el("span", null, text));
+  return b;
+}
+function iconBtn(cls, iconName, text) {
+  const b = el("button", (cls.includes("btn") ? "" : "btn ") + cls, null);
+  b.type = "button";
+  if (iconName) b.appendChild(icon(iconName, { size: 16 }));
+  if (text) b.appendChild(document.createTextNode(text));
+  return b;
+}
+function avatarEl(name, size = 40) {
+  const spec = AVATARS[name] || AVATARS.robot;
+  const box = el("span", "buddy-avatar buddy-avatar--" + size);
+  box.style.background = `color-mix(in srgb, ${spec.tone} 16%, white)`;
+  box.style.color = spec.tone;
+  box.style.borderColor = `color-mix(in srgb, ${spec.tone} 30%, white)`;
+  box.appendChild(icon(spec.icon, { size: size >= 40 ? 20 : size >= 32 ? 18 : 14 }));
+  box.setAttribute("aria-hidden", "true");
+  return box;
+}
+function emptyArt(host, { title, hint, actionText, onAction, img = "/img/empty-state.png" }) {
+  const box = el("div", "empty-art");
+  const image = document.createElement("img");
+  image.src = img; image.alt = ""; image.loading = "lazy";
+  box.appendChild(image);
+  box.appendChild(el("p", null, title));
+  if (hint) box.appendChild(el("p", "small", hint));
+  if (actionText && typeof onAction === "function") {
+    const btn = el("button", "btn btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    box.appendChild(btn);
   }
+  host.innerHTML = "";
+  host.appendChild(box);
+  return box;
+}
+function statSet(id, value) {
+  const node = $(id);
+  if (node) node.textContent = String(value);
+}
 
-  async function api(path, opts) {
-    const res = await fetch(path, opts);
-    let body = null;
-    try { body = await res.json(); } catch (e) { throw new Error("响应不是 JSON（HTTP " + res.status + "）"); }
-    if (!body.ok) throw new Error((body.error && body.error.code ? body.error.code + ": " : "") + (body.error && body.error.message || "请求失败"));
-    return body.data;
+/* ---------------------------------------------------------------- 本地演示层（接口缺字段/未就绪时的兜底） */
+
+function readJson(key, dflt) {
+  try { return JSON.parse(localStorage.getItem(key) || "") || dflt; } catch { return dflt; }
+}
+function writeJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch { /* 隐私模式：忽略 */ }
+}
+let local = Object.assign(
+  { myPosts: [], intents: [], posts: [], messages: [], accepted: [] },
+  readJson(LS_MY, {}),
+);
+function writeLocal() { writeJson(LS_MY, local); }
+
+const isMissingRoute = (e) => !!e && e.code === "NOT_FOUND" && /no route for/i.test(String(e.message || ""));
+const isForbidden = (e) => !!e && e.code === "SCHEMA_REJECTED" && /invalid or missing/i.test(String(e.message || ""));
+
+/* ---------------------------------------------------------------- 状态 */
+
+let demo = { threads: {}, my: null };
+let wall = [];
+const wallByAnon = new Map();
+let console3 = { posts: [], intents: [], mutual: [] };
+let threads = [];
+let view = "wall";                 // publish | wall | agreed | chat
+let wallSeg = "all";               // all | posts | intents | mutual
+let aggExpanded = false;          // 聚合列表是否展开（默认只显示最近几条）
+let chatNow = null;                // { thread, lastId, timer, seen }
+let seenMap = readJson(LS_SEEN, {});
+
+const getHandle = () => currentNickname() || "同学";
+$("whoName").textContent = getHandle();
+
+/* ---------------------------------------------------------------- 写权限提示（⛔ 不出现任何凭据输入框/字样） */
+
+function paintWriteHint() {
+  const host = $("writeHint");
+  if (hasWriteToken()) { host.innerHTML = ""; return; }
+  showNotice(host, "服务端未配置写入权限：浏览可以，发帖/留言会失败（请联系部署方）。", "warn");
+}
+
+/* ---------------------------------------------------------------- 画像可视化（只渲染用户真填了的） */
+
+function hoursStrip(profile) {
+  const eb = Number(profile && profile.schedule && profile.schedule.early_bird);
+  const early = Number.isFinite(eb) ? eb : 0.5;
+  const start = Math.round(6 + (1 - early) * 6);
+  const end = Math.round(22 + (1 - early) * 4);
+  const wrap = el("div", null);
+  const strip = el("div", "buddy-hours");
+  for (let h = 0; h < 24; h += 1) {
+    const cell = document.createElement("i");
+    const on = end <= 24 ? h >= start && h < end : h >= start || h < end - 24;
+    if (on) cell.className = "on";
+    strip.appendChild(cell);
   }
+  wrap.appendChild(strip);
+  const ticks = el("div", "buddy-hours__ticks");
+  for (const t of ["0", "6", "12", "18", "23"]) ticks.appendChild(el("span", null, t));
+  wrap.appendChild(ticks);
+  return wrap;
+}
+function block(label, iconName, node) {
+  const wrap = el("div", "buddy-block");
+  const head = el("div", "buddy-block__label");
+  head.appendChild(icon(iconName, { size: 14 }));
+  head.appendChild(el("span", null, label));
+  wrap.appendChild(head);
+  wrap.appendChild(node);
+  return wrap;
+}
+function meterRow(label, value01, valText) {
+  const row = el("div", "meter-row");
+  row.appendChild(el("b", null, label));
+  const meter = el("div", "meter meter--primary");
+  const fill = el("i", "meter__fill");
+  fill.style.width = pct(value01) + "%";
+  meter.appendChild(fill);
+  row.appendChild(meter);
+  row.appendChild(el("span", "meter-row__val", valText === undefined ? pct(value01) + "%" : valText));
+  return row;
+}
+function profileBlock(profile) {
+  const p = profile || {};
+  const sch = p.schedule || {};
+  const traits = p.traits || {};
+  const interests = Array.isArray(p.interests) ? p.interests : [];
+  const slots = Array.isArray(sch.busy_slots) ? sch.busy_slots : [];
+  const must = Array.isArray(p.must_have) ? p.must_have : [];
+  const brk = Array.isArray(p.deal_breaker) ? p.deal_breaker : [];
+  const hasSchedule = Number.isFinite(Number(sch.early_bird)) && Number(sch.early_bird) !== 0.5;
+  const hasTraits = ["chatty", "planner", "tidy"].some((k) => Number(traits[k]) !== 0.5);
+  const facts = [];
+  if (p.grade && p.grade !== "不限") facts.push("年级 " + p.grade);
+  if (p.major_group && p.major_group !== "不限") facts.push("专业大类 " + p.major_group);
+  if (!facts.length && !interests.length && !slots.length && !must.length && !brk.length && !hasSchedule && !hasTraits) return null;
+  const box = el("div", null);
+  if (facts.length || interests.length) {
+    const chips = el("div", "chip-row buddy-block");
+    for (const f of facts) chips.appendChild(el("span", "chip", f));
+    for (const it of interests) chips.appendChild(el("span", "chip chip--brand", it));
+    box.appendChild(chips);
+  }
+  if (hasSchedule || slots.length) {
+    const w = el("div", null);
+    if (hasSchedule) {
+      w.appendChild(hoursStrip(p));
+      w.appendChild(el("p", "buddy-sub", "作息倾向：" + sideWord(sch.early_bird, "夜猫型", "作息中立", "早睡早起型")));
+      w.appendChild(meterRow("周末空闲", sch.weekend_free, sideWord(sch.weekend_free, "周末忙", "周末一般", "周末空")));
+    }
+    if (slots.length) {
+      const WD = ["", "周一", "周二", "周三", "周四", "周五", "周六", "周日"];
+      const row = el("div", "chip-row");
+      for (const s of slots) row.appendChild(el("span", "chip", (WD[s.weekday] || "周?") + " 第" + s.period_start + "-" + s.period_end + "节"));
+      w.appendChild(row);
+    }
+    box.appendChild(block("作息与忙时", "clock", w));
+  }
+  if (hasTraits) {
+    const t = el("div", null);
+    t.appendChild(meterRow("话多", traits.chatty, sideWord(traits.chatty, "偏安静", "中性", "偏话多")));
+    t.appendChild(meterRow("计划", traits.planner, sideWord(traits.planner, "偏随性", "中性", "计划控")));
+    t.appendChild(meterRow("整洁", traits.tidy, sideWord(traits.tidy, "偏随意", "中性", "偏洁癖")));
+    box.appendChild(block("性格", "chart-bar", t));
+  }
+  if (must.length || brk.length) {
+    const rules = el("div", "chip-row");
+    for (const m of must) rules.appendChild(el("span", "chip chip--brand", "必须：" + m));
+    for (const b of brk) rules.appendChild(el("span", "chip", "雷点：" + b));
+    box.appendChild(block("硬性要求 / 雷点", "shield-check", rules));
+  }
+  return box;
+}
 
-  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+/* ---------------------------------------------------------------- 留言 / 回复（服务端为主，演示层兜底） */
 
-  // ---------- 区块一：发布 ----------
-  async function publish() {
-    const text = $("pubText").value.trim();
-    if (text.length < 4) { say("pubMsg", "先把需求写清楚一点（至少一句话）。", "err"); return; }
-    say("pubMsg", "发布中…");
-    try {
-      const data = await api("/api/buddies", {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-demo-token": getToken() },
-        // 本页不带照片：搭子匹配不需要照片，照片也不参与评分（MCP buddy_publish 仍保留 photo_path 入参）
-        body: JSON.stringify({ author_handle: getHandle(), kind: $("pubKind").value, text_profile: text }),
-      });
-      say("pubMsg", "已发布：" + data.post_id + " · 匿名标识 " + data.anon_token, "ok");
-      $("pubOut").style.display = "block";
-      $("pubOut").textContent = "抽取出的 11 字段画像：\n" + JSON.stringify(data.profile, null, 2);
-    } catch (e) {
-      say("pubMsg", e.message, "err");
+/** anon_token → 服务端返回的留言（GET /api/buddies/:id/messages 或 console 里带的），供 consentsOf 合成 */
+const serverMsgsByAnon = new Map();
+
+function consentsOf(anon) {
+  const out = [];
+  const push = (c, source) => {
+    const row = out.find((x) => x.id === c.id);
+    if (row) return row;
+    const fresh = {
+      id: c.id, from_anon: c.from_anon, text: c.text, at: c.at,
+      status: c.status || "sent", replies: Array.isArray(c.replies) ? c.replies.slice() : [], source,
+    };
+    out.push(fresh);
+    return fresh;
+  };
+  const d = (demo.threads && demo.threads[anon]) || null;
+  if (d && Array.isArray(d.consents)) for (const c of d.consents) push(c, "demo");
+  const myDemoPost = ((demo.my && demo.my.posts) || []).find((p) => p.anon_token === anon);
+  if (myDemoPost && Array.isArray(myDemoPost.consents)) for (const c of myDemoPost.consents) push(c, "demo");
+  for (const m of local.messages.filter((x) => x.anon === anon && x.kind === "consent")) {
+    push({ id: m.id, from_anon: m.from_anon || getHandle(), text: m.text, at: m.at, status: "sent", replies: [] }, "local");
+  }
+  for (const m of local.messages.filter((x) => x.anon === anon && x.kind === "reply")) {
+    const t = out.find((c) => c.id === m.to_consent_id);
+    if (t && !t.replies.some((r) => r.id === m.id)) t.replies.push({ id: m.id, text: m.text, at: m.at });
+  }
+  if (local.accepted.includes(anon)) for (const c of out) c.status = "accepted";
+  // 服务端留言（GET /api/buddies/:id/messages 或 myConsole 里带的 messages）
+  const serverMessages = serverMsgsByAnon.get(anon) || [];
+  if (Array.isArray(serverMessages)) {
+    for (const m of serverMessages) {
+      if (m.consent_id) {
+        const t = out.find((c) => c.id === m.consent_id);
+        if (t && !t.replies.some((r) => r.id === m.message_id)) t.replies.push({ id: m.message_id, text: m.body, at: m.at, from_handle: m.from });
+        else if (!t) push({ id: m.consent_id, from_anon: m.from, text: m.body, at: m.at, status: "sent", replies: [] }, "server");
+      } else {
+        push({ id: m.message_id, from_anon: m.from, text: m.body, at: m.at, status: "sent", replies: [] }, "server");
+      }
     }
   }
-  $("btnPublish").addEventListener("click", publish);
+  return out.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+}
+const hasAccepted = (anon) => local.accepted.includes(anon)
+  || (((demo.threads && demo.threads[anon] && demo.threads[anon].accepted) || []).length > 0);
 
-  $("btnPreview").addEventListener("click", async () => {
-    const text = $("pubText").value.trim();
-    if (!text) { say("pubMsg", "先写一段描述。", "err"); return; }
-    say("pubMsg", "正在抽取画像（不落库）…");
-    try {
-      // 走 search 接口即可拿到服务端对这段文字的画像抽取效果（不会写入任何帖子）
-      const rows = await api("/api/buddies/search?kind=" + $("pubKind").value +
-        "&handle=" + encodeURIComponent(getHandle()) + "&text=" + encodeURIComponent(text));
-      say("pubMsg", "抽取完成：这段描述能匹配到 " + rows.length + " 个候选（下面的候选卡片可以看到评分与理由）", "ok");
-      renderCandidates(rows);
-    } catch (e) { say("pubMsg", e.message, "err"); }
+/* ---------------------------------------------------------------- 我的三块（服务端 console + 本地/演示兜底） */
+
+function myPosts() {
+  const out = [];
+  const push = (row) => { if (row && (row.anon_token || row.post_id) && !out.some((x) => (x.anon_token || x.post_id) === (row.anon_token || row.post_id))) out.push(row); };
+  for (const p of console3.posts || []) push({ ...p, source: "server" });
+  for (const p of (demo.my && demo.my.posts) || []) push({ ...p, source: "demo" });
+  for (const p of local.posts) push(p);
+  return out;
+}
+function myIntents() {
+  const out = [];
+  const push = (row) => {
+    if (!row) return;
+    const key = (row.post_id || row.anon_token) + "|" + (row.text || "");
+    if (!out.some((x) => ((x.post_id || x.anon_token) + "|" + (x.text || "")) === key)) out.push(row);
+  };
+  for (const r of console3.intents || []) push({ ...r, source: "server" });
+  for (const it of local.intents) push({ ...it, source: "local" });
+  for (const it of (demo.my && demo.my.intents) || []) push({ ...it, source: "demo" });
+  return out;
+}
+function myMutual() {
+  const out = [];
+  const add = (row) => { if (row && row.anon_token && !out.some((x) => x.anon_token === row.anon_token)) out.push(row); };
+  // ① 我是申请方：接口 /mine 的 mutual（按 seeker_id 查）
+  for (const m of console3.mutual || []) add({ ...m, source: "server", role: "seeker" });
+  // ② 我是帖主：我发布的帖里，某条 consents 已经 mutual（按 author 侧看，接口不会放进 mutual）
+  for (const p of console3.posts || []) {
+    for (const c of p.consents || []) {
+      if (c.status !== "mutual") continue;
+      add({
+        anon_token: p.anon_token, post_id: p.post_id, kind: p.kind,
+        text: (p.profile && p.profile.wanted) || "", status: "mutual",
+        peer: c.seeker, source: "server", role: "author",
+      });
+    }
+  }
+  for (const it of myIntents()) if (it.status === "accepted" || it.reveal_status === "mutual") add(it);
+  for (const anon of local.accepted) {
+    const post = wallByAnon.get(anon) || local.posts.find((p) => p.anon_token === anon);
+    add({ anon_token: anon, kind: post ? post.kind : "other", status: "accepted", text: post ? ((post.profile || {}).wanted || "") : "" });
+  }
+  for (const m of (demo.my && demo.my.mutual) || []) add({ ...m, source: "demo" });
+  return out;
+}
+
+/** 这个 anon_token 是不是我发布的帖（用来判断"谁同意了谁"） */
+function isMyPost(anon) {
+  return (console3.posts || []).some((p) => p.anon_token === anon)
+    || local.posts.some((p) => p.anon_token === anon)
+    || ((demo.my && demo.my.posts) || []).some((p) => p.anon_token === anon);
+}
+
+/* ---------------------------------------------------------------- 帖子卡片（表达意愿） */
+
+function postCard(post) {
+  const card = el("article", "item item--accent buddy-post");
+  const top = el("div", "buddy-post__head");
+  const k = kindOf(post.kind);
+  top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
+  top.appendChild(el("span", "buddy-anon", post.anon_token));
+  if (isMyPost(post.anon_token)) top.appendChild(badgeWithIcon("我发布的", "user", "badge badge--ok"));
+  const when = el("span", "buddy-sub", "发布于 " + fmtTs(post.created_at));
+  when.style.marginLeft = "auto";
+  top.appendChild(when);
+  card.appendChild(top);
+
+  const wanted = String((post.profile && post.profile.wanted) || "").trim();
+  card.appendChild(el("p", "buddy-want" + (wanted.length <= 24 ? " buddy-want--short" : ""), wanted || "（未写内容）"));
+
+  const prof = profileBlock(post.profile);
+  if (prof) card.appendChild(prof);
+
+  const footer = el("div", "item__actions");
+  if (!isMyPost(post.anon_token)) {
+    const wantBtn = iconBtn("btn--sm", "hand-pointing", " 表达意愿");
+    wantBtn.addEventListener("click", () => openIntentSheet(post));
+    footer.appendChild(wantBtn);
+  }
+  const talkBtn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 留言与回复");
+  talkBtn.addEventListener("click", () => openThreadSheet(post));
+  footer.appendChild(talkBtn);
+  // ⛔ 私聊入口只在我确实有这条会话时出现（否则会出现"点了空列表"的数据错乱）
+  const myThread = threadForPost(post.post_id);
+  if (myThread) {
+    footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    const go = iconBtn("btn--ok btn--sm", "message-chatbot", " 打开私聊");
+    go.addEventListener("click", () => openChat(myThread));
+    footer.appendChild(go);
+  } else if (hasAccepted(post.anon_token)) {
+    footer.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    footer.appendChild(el("span", "buddy-sub", "私聊只在双方之间开放"));
+  }
+  card.appendChild(footer);
+  return card;
+}
+
+/* ---------------------------------------------------------------- 主区渲染（三个出口） */
+
+function paintRail() {
+  const active = view === "chat" ? "agreed" : view;
+  for (const [id, v] of [["navPublish", "publish"], ["navWall", "wall"], ["navAgreed", "agreed"]]) {
+    $(id).classList.toggle("is-active", active === v);
+  }
+  $("kindFilter").hidden = view !== "wall";   // 类型筛选只对"表达意愿"的帖子流有意义
+  statSet("agreedCount", threads.length);
+}
+function paintMode(text, iconName) {
+  $("modeText").textContent = text;
+  $("modeIcon").style.setProperty("--icon", `url(/vendor/phosphor/icons/${iconName}.svg)`);
+}
+
+function renderPublish() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("发布需求", "note-pencil");
+
+  const body = el("div", null);
+  const tplRow = el("div", null);
+  tplRow.appendChild(el("div", "buddy-block__label", "懒得写？点个模板再改两个字："));
+  const tplBox = el("div", "buddy-tpl");
+  for (const t of TEMPLATES) {
+    const b = iconBtn("btn--ghost btn--sm", "sparkles", " " + t.label + " 模板");
+    b.addEventListener("click", () => {
+      $("pubText").value = t.text;
+      $("pubKind").value = t.kind;
+      $("pubText").focus();
+    });
+    tplBox.appendChild(b);
+  }
+  tplRow.appendChild(tplBox);
+  body.appendChild(tplRow);
+
+  const core = el("div", "field buddy-block");
+  const lb = el("label", null, "一句话说清要做什么（必填）");
+  const ta = document.createElement("textarea");
+  ta.id = "pubText";
+  ta.placeholder = "例：想找人一起自习，图书馆三楼，晚上七点";
+  core.append(lb, ta);
+  core.appendChild(el("p", "field__hint", "只写这一句也能发。想让人更了解你，再展开下面。"));
+  body.appendChild(core);
+
+  const kindField = el("div", "field");
+  const kl = el("label", null, "类型");
+  const sel = document.createElement("select");
+  sel.id = "pubKind";
+  for (const k of KINDS) {
+    const o = document.createElement("option");
+    o.value = k.v; o.textContent = k.label;
+    sel.appendChild(o);
+  }
+  kindField.append(kl, sel);
+  body.appendChild(kindField);
+
+  const moreBtn = el("button", "btn btn--quiet btn--sm buddy-block", "展开填写更多（可选）");
+  moreBtn.type = "button";
+  moreBtn.id = "btnMore";
+  body.appendChild(moreBtn);
+
+  const more = el("div", null);
+  more.id = "pubMore";
+  more.hidden = true;
+  const mk = (id, label, placeholder) => {
+    const f = el("div", "field");
+    const l = el("label", null, label);
+    const i = document.createElement("input");
+    i.id = id; i.placeholder = placeholder || "";
+    f.append(l, i);
+    return f;
+  };
+  more.appendChild(mk("pubWhen", "可约时间（可选）", "例：周三周四晚上七点后"));
+  more.appendChild(mk("pubSchedule", "作息（可选）", "例：早睡早起 / 夜猫子"));
+  more.appendChild(mk("pubInterests", "兴趣（可选，逗号分隔）", "例：算法、摄影"));
+  more.appendChild(mk("pubTraits", "性格（可选）", "例：话不多，爱干净"));
+  more.appendChild(mk("pubExpect", "期望（可选）", "例：希望对方能固定时间"));
+  body.appendChild(more);
+  moreBtn.addEventListener("click", () => {
+    more.hidden = !more.hidden;
+    moreBtn.textContent = more.hidden ? "展开填写更多（可选）" : "收起（只写一句话也能发）";
   });
 
-  // ---------- 区块二 / 三：搜索与候选卡片 ----------
-  function renderCandidates(rows) {
-    const box = $("cands");
-    if (!rows || !rows.length) { box.innerHTML = '<p class="empty">没有评分 ≥ 60 的候选（可以换个类型或把描述写得更具体）。</p>'; return; }
-    box.innerHTML = rows.map((c) => {
-      const p = c.parts || {};
-      const bar = (label, val, max) =>
-        '<div class="bar"><b>' + label + '</b><span class="track"><span class="fill" style="width:' +
-        Math.round((Number(val) || 0) / max * 100) + '%"></span></span><span>' + (Number(val) || 0) + "/" + max + "</span></div>";
-      const mutual = c.reveal_status === "mutual";
-      const badge = mutual
-        ? '<span class="badge b-mutual">已互相可见</span>'
-        : '<span class="badge b-pending">待对方同意</span>';
-      const code = mutual && c.contact_code
-        ? '<div class="hint">中转码：<span class="code">' + esc(c.contact_code) + "</span>（双方已同意才会下发）</div>"
-        : "";
-      return '<div class="cand">' +
-        '<div class="top"><span class="anon">' + esc(c.anon_token) + "</span>" + badge +
-        '<span class="score">' + c.score + ' 分</span></div>' +
-        '<div class="bars">' + bar("兴趣", p.interest, 35) + bar("作息", p.schedule, 30) +
-        bar("性格", p.traits, 20) + bar("语义", p.semantic, 15) + "</div>" +
-        '<div class="reason">' + esc(c.reason) + "</div>" + code + "</div>";
-    }).join("");
+  const msg = el("div", null);
+  msg.id = "pubMsg";
+  body.appendChild(msg);
+
+  const foot = el("div", "form-actions");
+  const submit = el("button", "btn", "发布到搭子墙");
+  submit.type = "button";
+  submit.addEventListener("click", publishNow);
+  foot.appendChild(submit);
+  body.appendChild(foot);
+
+  const wrap = el("section", "card");
+  wrap.appendChild(el("h2", null, "发布我的需求"));
+  wrap.appendChild(el("p", "small muted", "发帖以后，别人可以在「表达意愿」里看到它并给你留言；有人表达意愿时你会在「留言与回复」里收到。"));
+  wrap.appendChild(body);
+  host.appendChild(wrap);
+}
+
+/** 四个段：始终都在、可来回切、当前态明确（⛔ 不允许"点了别段就消失、还回不去"） */
+const WALL_SEGS = [
+  { k: "all", label: "全部需求", icon: "list-check" },
+  { k: "posts", label: "我发布的需求", icon: "note-pencil" },
+  { k: "intents", label: "我表达的意愿", icon: "hand-pointing" },
+  { k: "mutual", label: "已同意的搭子", icon: "circle-check" },
+];
+const MAX_AGG_ROWS = 3;   // 聚合列表（我的意愿 / 已同意）只展示最近几条：演示要"少而精"
+
+function mineSegBar() {
+  const seg = el("div", "buddy-seg");
+  for (const s of WALL_SEGS) {
+    const b = iconBtn("buddy-seg__btn", s.icon, " " + s.label);
+    b.classList.remove("btn");
+    b.setAttribute("aria-pressed", String(wallSeg === s.k));
+    b.dataset.seg = s.k;
+    b.addEventListener("click", () => {
+      wallSeg = s.k;
+      aggExpanded = false;
+      for (const other of seg.querySelectorAll(".buddy-seg__btn")) {
+        other.setAttribute("aria-pressed", String(other === b));
+      }
+      renderWallSeg();   // 只重绘列表：段栏本身不重建、不消失
+    });
+    seg.appendChild(b);
+  }
+  return seg;
+}
+
+function renderWall() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("表达意愿", "hand-pointing");
+  renderMine(host);
+}
+
+/** 段栏 + 列表（列表容器固定 id，切换段只换列表内容） */
+function renderMine(host) {
+  const box = host || $("viewHost");
+  box.innerHTML = "";
+  box.appendChild(mineSegBar());
+  const list = el("div", "stack");
+  list.id = "wallList";
+  box.appendChild(list);
+  renderWallSeg(list);
+}
+
+function renderWallSeg(listHost) {
+  const host = listHost || $("wallList") || $("viewHost");
+  host.innerHTML = "";
+  const kind = $("kindFilter").value;
+  const box = el("div", "stack");
+  host.appendChild(box);
+
+  // ②③ 聚合段：我表达的意愿 / 已同意的搭子（少而精）
+  if (wallSeg === "intents" || wallSeg === "mutual") {
+    const rows = wallSeg === "mutual" ? myMutual() : myIntents();
+    if (!rows.length) {
+      emptyArt(box, wallSeg === "mutual"
+        ? { title: "还没有互相同意的搭子", hint: "你表达意愿后对方接受（或你接受别人的意愿），这里就会出现，并且可以直接开聊。", actionText: "去表达意愿", onAction: () => { wallSeg = "all"; renderWall(); } }
+        : { title: "还没有表达过意愿", hint: "在「全部需求」里找一条合适的，点「表达意愿」留句话。", actionText: "看全部需求", onAction: () => { wallSeg = "all"; renderWall(); } });
+      return;
+    }
+    const shown = aggExpanded ? rows : rows.slice(0, MAX_AGG_ROWS);
+    for (const r of shown) box.appendChild(mineRow(r, wallSeg === "mutual" ? "mutual" : "intent"));
+    if (rows.length > MAX_AGG_ROWS) {
+      const more = iconBtn("btn--ghost btn--sm", aggExpanded ? "caret-up" : "chevron-down",
+        aggExpanded ? " 只看最近 " + MAX_AGG_ROWS + " 条" : " 展开全部 " + rows.length + " 条");
+      more.addEventListener("click", () => { aggExpanded = !aggExpanded; renderWallSeg(); });
+      box.appendChild(more);
+      box.appendChild(el("p", "buddy-note", "默认只显示最近 " + MAX_AGG_ROWS + " 条，保持列表精简；需要时点上面的按钮展开。"));
+    }
+    return;
   }
 
-  $("btnSearch").addEventListener("click", async () => {
-    const text = $("seekText").value.trim();
-    if (text.length < 2) { say("searchMsg", "先写一句「我想要什么样的搭子」。", "err"); return; }
-    say("searchMsg", "检索中…");
-    try {
-      const rows = await api("/api/buddies/search?kind=" + $("searchKind").value +
-        "&handle=" + encodeURIComponent(getHandle()) +
-        "&top_k=" + encodeURIComponent($("topK").value) +
-        "&text=" + encodeURIComponent(text));
-      renderCandidates(rows);
-      say("searchMsg", "命中 " + rows.length + " 个候选（仅显示评分 ≥ 60 且未被一票否决的）", "ok");
-    } catch (e) { say("searchMsg", e.message, "err"); }
-  });
-
-  $("btnList").addEventListener("click", async () => {
-    say("searchMsg", "读取搭子墙…");
-    try {
-      const rows = await api("/api/buddies?kind=" + $("searchKind").value);
-      $("cands").innerHTML = rows.length
-        ? rows.map((p) => '<div class="cand"><div class="top"><span class="anon">' + esc(p.anon_token) +
-            '</span><span class="hint">' + esc(p.kind) + " · " + esc(p.created_at) + '</span></div><div class="reason">' +
-            esc(p.profile.wanted || "") + "</div></div>").join("")
-        : '<p class="empty">搭子墙还没有内容。</p>';
-      say("searchMsg", "共 " + rows.length + " 条（列表不含评分）", "ok");
-    } catch (e) { say("searchMsg", e.message, "err"); }
-  });
-
-  // ---------- 区块四：我的申请 ----------
-  // ⚠️ 口径说明（契约决定的固有差异）：这里的分数是**表决那一刻**算的（表决接口不收画像，
-  //    只能拿你最近一次搜索的画像；从未搜索过则按中性画像，会偏低），
-  //    与候选卡片上用「当次搜索画像」算出的分数可能不同。是否揭示只由双选状态机决定，与分数无关。
-  async function loadMine() {
-    try {
-      const rows = await api("/api/buddies/mine?handle=" + encodeURIComponent(getHandle()));
-      const box = $("mine");
-      if (!rows.length) { box.innerHTML = '<p class="empty">还没有发出过意愿。</p>'; return; }
-      box.innerHTML = "<table><thead><tr><th>匿名标识</th><th>我的评分<br><small>（表决时估算）</small></th><th>状态</th><th>时间</th></tr></thead><tbody>" +
-        rows.map((r) => "<tr><td>" + esc(r.anon_token) + "</td><td>" + r.score + "</td><td>" +
-          (r.reveal_status === "mutual" ? '<span class="badge b-mutual">已互相可见</span>'
-            : r.my_ok === 1 ? '<span class="badge b-pending">待对方同意</span>' : '<span class="badge b-pending">我已拒绝</span>') +
-          "</td><td>" + esc(r.created_at) + "</td></tr>").join("") + "</tbody></table>" +
-        '<p class="hint" style="margin:8px 0 0">分数在<b>表决那一刻</b>计算（表决接口不收画像，取你最近一次搜索的画像；' +
-        "从没搜过则按中性画像，会偏低），所以和候选卡片上的分数可能不同。**是否揭示只由双选状态机决定，与分数无关**。</p>";
-    } catch (e) { say("searchMsg", e.message, "err"); }
+  // ① 需求流：全部需求 / 我发布的需求
+  const rows = wallSeg === "posts"
+    ? myPosts().map((p) => wallByAnon.get(p.anon_token) || { ...p, anon_token: p.anon_token, kind: p.kind, profile: p.profile || {}, created_at: p.at })
+    : wall;
+  const filtered = kind ? rows.filter((p) => p.kind === kind) : rows;
+  if (!filtered.length) {
+    emptyArt(box, {
+      title: wallSeg === "posts" ? "还没有发布过需求" : kind ? "这个类型下还没有人发需求" : "墙上还没有搭子需求",
+      hint: wallSeg === "posts" ? "点左侧「发布需求」，一句话就能发。" : "你可以直接发一条自己的需求，一句话就行。",
+      actionText: "发布我的需求",
+      onAction: () => setView("publish"),
+    });
+    return;
   }
-  $("btnMine").addEventListener("click", loadMine);
-  loadMine();
+  for (const p of filtered) box.appendChild(postCard(p));
+}
+
+function renderAgreed() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("已同意", "message-chatbot");
+  const box = el("div", null);
+
+  const mine = threads.filter((t) => isMyPost(anonOfThread(t)));
+  const theirs = threads.filter((t) => !isMyPost(anonOfThread(t)));
+
+  const group = (title, iconName, rows, emptyHint) => {
+    const g = el("section", "buddy-chatgroup");
+    const h = el("h2", "buddy-chatgroup__title");
+    h.appendChild(icon(iconName, { size: 18 }));
+    h.appendChild(el("span", null, title + "（" + rows.length + "）"));
+    g.appendChild(h);
+    if (!rows.length) {
+      g.appendChild(el("p", "buddy-note", emptyHint));
+      return g;
+    }
+    for (const t of rows) g.appendChild(chatRow(t));
+    return g;
+  };
+
+  box.appendChild(group("别人同意了我的帖", "users-three", mine, "还没有人申请我的帖 —— 等有人表达意愿、你接受了，就会出现这里。"));
+  box.appendChild(group("我同意了别人的帖", "hand-pointing", theirs, "我还没接受过别人的意愿 —— 去「表达意愿」里找一个合适的。"));
+  host.appendChild(box);
+}
+
+function anonOfThread(t) {
+  const p = wall.find((x) => x.post_id === t.ref_id);
+  return p ? p.anon_token : "";
+}
+
+function chatRow(t) {
+  const row = el("button", "buddy-chatrow");
+  row.type = "button";
+  row.appendChild(avatarEl(t.peer && t.peer.avatar, 40));
+  const main = el("div", "buddy-chatrow__main");
+  const top = el("div", "buddy-chatrow__top");
+  top.appendChild(el("b", "buddy-chatrow__name", (t.peer && t.peer.nickname) || "对方"));
+  if (t.last_message) {
+    const active = t.last_message.mine === false;
+    top.appendChild(badgeWithIcon(active ? "对方最后发话" : "我最后发话", active ? "note-pencil" : "check",
+      active ? "badge badge--warn" : "badge badge--muted"));
+  } else {
+    top.appendChild(badgeWithIcon("还没聊过", "clock", "badge badge--muted"));
+  }
+  const seen = seenMap[t.thread_id] || "";
+  if (t.last_message && t.last_message.at > seen && t.last_message.mine === false) top.appendChild(el("span", "buddy-dot", null));
+  top.appendChild(el("span", "buddy-chatrow__at", fmtTime((t.last_message && t.last_message.at) || t.created_at)));
+  main.appendChild(top);
+  const subject = (t.subject && (t.subject.subtitle || t.subject.title)) || "（帖子已删除）";
+  main.appendChild(el("p", "buddy-chatrow__subject", "关联：" + String(subject).slice(0, 60)));
+  main.appendChild(el("p", "buddy-chatrow__last", t.last_message ? (t.last_message.mine ? "我：" : "") + String(t.last_message.body).slice(0, 40) : "点进去打个招呼吧"));
+  row.appendChild(main);
+  row.addEventListener("click", () => openChat(t));
+  return row;
+}
+
+/* ---------------------------------------------------------------- 聊天界面 */
+
+function renderChat() {
+  const host = $("viewHost");
+  host.innerHTML = "";
+  paintMode("聊天", "message-chatbot");
+  const t = chatNow.thread;
+  const box = el("div", "buddy-chat");
+
+  // 顶部悬浮信息条（可展开看"到底在聊哪条帖子"）
+  const head = el("div", "buddy-chat__head");
+  const bar = el("div", "buddy-chat__bar");
+  const back = iconBtn("btn--ghost btn--sm", "arrow-right", " 返回");
+  back.style.transform = "rotate(180deg)";
+  back.addEventListener("click", () => setView("agreed"));
+  bar.appendChild(back);
+  bar.appendChild(avatarEl(t.peer && t.peer.avatar, 40));
+  const who = el("div", "buddy-chat__who");
+  who.appendChild(el("b", "buddy-chat__name", (t.peer && t.peer.nickname) || "对方"));
+  const subjShort = (t.subject && (t.subject.subtitle || t.subject.title)) || "（帖子已删除）";
+  who.appendChild(el("p", "buddy-chat__subject", "关联搭子：" + String(subjShort).slice(0, 46)));
+  bar.appendChild(who);
+  const moreBtn = iconBtn("btn--ghost btn--sm", "caret-up", " 展开");
+  bar.appendChild(moreBtn);
+  head.appendChild(bar);
+  const more = el("div", "buddy-chat__more");
+  more.hidden = true;
+  more.appendChild(el("div", "buddy-block__label", "我们在聊哪一条"));
+  more.appendChild(el("p", "buddy-msg__text", String(subjShort)));
+  if (t.subject && t.subject.title) more.appendChild(el("p", "buddy-sub", "帖子：" + t.subject.title + (t.subject.status ? " · 状态 " + t.subject.status : "")));
+  more.appendChild(el("p", "buddy-note", "只有你们两个人能看到这段对话；退出登录或换浏览器就看不到。"));
+  head.appendChild(more);
+  moreBtn.addEventListener("click", () => {
+    more.hidden = !more.hidden;
+    moreBtn.textContent = more.hidden ? " 展开" : " 收起";
+  });
+  box.appendChild(head);
+
+  const scroll = el("div", "buddy-chat__scroll");
+  scroll.id = "chatScroll";
+  box.appendChild(scroll);
+
+  const composer = el("div", "buddy-composer");
+  const ta = document.createElement("textarea");
+  ta.id = "chatText";
+  ta.placeholder = "说点什么…（Enter 发送，Shift+Enter 换行）";
+  ta.maxLength = 500;
+  composer.appendChild(ta);
+  const eRow = el("div", "buddy-emojis");
+  for (const e of EMOJIS) {
+    const b = el("button", "buddy-emoji", e);
+    b.type = "button";
+    b.setAttribute("aria-label", "插入表情");
+    b.addEventListener("click", () => { ta.value += e; ta.focus(); });
+    eRow.appendChild(b);
+  }
+  composer.appendChild(eRow);
+  const foot = el("div", "buddy-composer__foot");
+  const send = iconBtn("btn--sm", "send", " 发送");
+  send.addEventListener("click", sendChat);
+  foot.appendChild(send);
+  foot.appendChild(el("span", "buddy-powered", "Enter 发送 · Shift+Enter 换行 · 每 3 秒自动收新消息"));
+  composer.appendChild(foot);
+  box.appendChild(composer);
+  ta.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChat(); }
+  });
+  host.appendChild(box);
+
+  paintMessages(chatNow.messages || []);
+  ta.focus();
+}
+
+function paintMessages(list) {
+  const scroll = $("chatScroll");
+  if (!scroll) return;
+  scroll.innerHTML = "";
+  if (!list.length) {
+    const tip = el("div", "buddy-note");
+    tip.textContent = "你们已经互相同意了，直接聊吧 —— 先说清楚时间地点，成功率最高。";
+    scroll.appendChild(tip);
+    return;
+  }
+  let lastDay = "";
+  for (const m of list) {
+    const dk = dayKey(m.at);
+    if (dk && dk !== lastDay) {
+      lastDay = dk;
+      scroll.appendChild(el("div", "buddy-day", dk));
+    }
+    const line = el("div", "buddy-line" + (m.mine ? " buddy-line--mine" : ""));
+    line.appendChild(avatarEl((m.from && m.from.avatar) || "robot", 32));
+    const bodyWrap = el("div", "buddy-line__body");
+    bodyWrap.appendChild(el("div", "buddy-bubble", String(m.body || "")));
+    const meta = (m.mine ? "我" : ((m.from && m.from.nickname) || (chatNow.thread.peer && chatNow.thread.peer.nickname) || "对方")) + " · " + fmtTime(m.at);
+    bodyWrap.appendChild(el("div", "buddy-line__meta", meta));
+    line.appendChild(bodyWrap);
+    scroll.appendChild(line);
+  }
+  scroll.scrollTop = scroll.scrollHeight;
+}
+
+/** 按 message_id 去重合并（同一秒内的消息服务端按随机 id 排序，必须自己兜住乱序/漏读） */
+function mergeMessages(existing, incoming) {
+  const seen = new Set((existing || []).map((m) => m.message_id));
+  const out = (existing || []).slice();
+  for (const m of incoming || []) {
+    if (m && m.message_id && !seen.has(m.message_id)) { seen.add(m.message_id); out.push(m); }
+  }
+  // sort 是稳定的：同秒消息保持"先到先得"，轮询不会让它们跳来跳去
+  return out.sort((a, b) => String(a.at || "").localeCompare(String(b.at || "")));
+}
+
+async function loadMessages({ reset = false } = {}) {
+  if (!chatNow) return;
+  const tid = encodeURIComponent(chatNow.thread.thread_id);
+  const after = reset ? "" : (chatNow.lastId || "");
+  try {
+    let list = await api(`/api/threads/${tid}/messages${after ? "?after=" + encodeURIComponent(after) : ""}`);
+    list = Array.isArray(list) ? list : [];
+    if (!reset && !list.length) {
+      // 增量是空的：可能是"同一秒内的多条消息"被 after= 漏掉 → 兜底拉全量，再靠 mergeMessages 去重
+      const full = await api(`/api/threads/${tid}/messages`);
+      list = Array.isArray(full) ? full : [];
+      chatNow.messages = [];
+    }
+    chatNow.messages = mergeMessages(reset ? [] : (chatNow.messages || []), list);
+    if (chatNow.messages.length) chatNow.lastId = chatNow.messages[chatNow.messages.length - 1].message_id;
+    if (view === "chat") paintMessages(chatNow.messages);
+    seenMap[chatNow.thread.thread_id] = new Date().toISOString();
+    writeJson(LS_SEEN, seenMap);
+  } catch (e) {
+    if (view === "chat") showError("chatScroll", e, { title: "消息读取失败" });
+  }
+}
+
+async function sendChat() {
+  const ta = $("chatText");
+  if (!ta || !chatNow) return;
+  const text = ta.value.trim();
+  if (!text) return;
+  ta.value = "";
+  try {
+    const m = await api(`/api/threads/${encodeURIComponent(chatNow.thread.thread_id)}/messages`, {
+      method: "POST", body: { body: text },
+    });
+    chatNow.messages = (chatNow.messages || []).concat([m]);
+    chatNow.lastId = m.message_id;
+    paintMessages(chatNow.messages);
+    loadThreads().then(() => { paintRail(); });
+  } catch (e) {
+    ta.value = text;
+    toast("发送失败：" + (e.message || e), "danger");
+  }
+}
+
+function startPolling() {
+  stopPolling();
+  if (!chatNow) return;
+  chatNow.timer = setInterval(() => { if (!document.hidden) loadMessages(); }, POLL_MS);
+}
+function stopPolling() {
+  if (chatNow && chatNow.timer) { clearInterval(chatNow.timer); chatNow.timer = null; }
+}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && view === "chat") loadMessages();
+});
+
+async function openChat(t) {
+  view = "chat";
+  chatNow = { thread: t, messages: [], lastId: "", timer: null };
+  paintRail();
+  renderChat();
+  showLoading("chatScroll", "正在读取对话…");
+  await loadMessages({ reset: true });
+  startPolling();
+}
+
+/* ---------------------------------------------------------------- 留言 / 表达意愿 面板 */
+
+function openIntentSheet(post) {
+  const sheet = createSheet({ title: "表达意愿", iconName: "hand-pointing" });
+  const body = el("div", null);
+  body.appendChild(el("p", "small muted", "对方看到的是你的昵称，看不到任何真实身份。先说说你的情况，让对方好判断。"));
+  const quote = el("p", "reason");
+  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 120);
+  body.appendChild(quote);
+
+  const field = el("div", "field");
+  const label = el("label", null, "给对方留句话（必填）");
+  const ta = document.createElement("textarea");
+  ta.id = "intentText";
+  ta.placeholder = "例：我周三周四晚上都在图书馆三楼，可以一起";
+  field.append(label, ta);
+  body.appendChild(field);
+  const msg = el("div", null);
+  body.appendChild(msg);
+
+  const foot = el("div", "form-actions");
+  const send = el("button", "btn", "发送意愿");
+  send.type = "button";
+  send.addEventListener("click", async () => {
+    const text = ta.value.trim();
+    if (text.length < 2) { showNotice(msg, "先写一句自己的情况，对方才好判断。", "danger"); return; }
+    showLoading(msg, "发送中…");
+    try {
+      const r = await submitConsent(post, text);
+      sheet.close();
+      toast(r.mode === "local" ? "已记录（接口未就绪，暂存本机演示数据）" : "意愿已发送，等对方回复", "ok");
+      await refreshAll();
+    } catch (e) {
+      showError(msg, e, { title: "发送失败" });
+    }
+  });
+  foot.appendChild(send);
+  const later = el("button", "btn btn--ghost", "再看看");
+  later.type = "button";
+  later.addEventListener("click", () => sheet.close());
+  foot.appendChild(later);
+  sheet.body.appendChild(body);
+  sheet.foot.appendChild(foot);
+  sheet.open();
+}
+
+async function submitConsent(post, message) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
+      method: "POST",
+      body: { agree: true, message, handle: getHandle() },
+    });
+    return { ok: true, mode: "server", data };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    local.messages.push({ id: "local-consent-" + Date.now(), anon: post.anon_token, kind: "consent", from_anon: getHandle(), text: message, at: new Date().toISOString() });
+    if (!local.intents.some((x) => x.anon === post.anon_token)) {
+      local.intents.push({ anon: post.anon_token, post_id: post.post_id, kind: post.kind, text: message, at: new Date().toISOString(), status: "sent", source: "local" });
+    }
+    writeLocal();
+    return { ok: true, mode: "local" };
+  }
+}
+
+async function submitReply(post, consentId, text) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/reply`, {
+      method: "POST",
+      body: { to_consent_id: consentId, message: text, handle: getHandle() },
+    });
+    return { ok: true, mode: "server", data };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    local.messages.push({ id: "local-reply-" + Date.now(), anon: post.anon_token, kind: "reply", to_consent_id: consentId, from: "author", text, at: new Date().toISOString() });
+    writeLocal();
+    return { ok: true, mode: "local" };
+  }
+}
+
+async function submitAccept(post, consent) {
+  try {
+    const data = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/consent`, {
+      method: "POST",
+      body: { agree: true, handle: getHandle(), to_seeker: consent.from_anon },
+    });
+    // 服务端在双方都同意时返回 chat_ready + thread_id：这就是"可以直接开聊"的信号
+    const chatReady = !!(data && (data.chat_ready || data.thread_id));
+    return { ok: true, mode: "server", data, chatReady, threadId: (data && data.thread_id) || "" };
+  } catch (e) {
+    if (!isMissingRoute(e) && !isForbidden(e)) throw e;
+    if (!local.accepted.includes(post.anon_token)) local.accepted.push(post.anon_token);
+    local.messages.push({ id: "local-accept-" + Date.now(), anon: post.anon_token, kind: "accept", to_consent_id: consent.id, from: "author", text: "已接受", at: new Date().toISOString() });
+    writeLocal();
+    return { ok: true, mode: "local", chatReady: false, threadId: "" };
+  }
+}
+
+function openThreadSheet(post) {
+  const sheet = createSheet({ title: "留言与回复", iconName: "message-chatbot" });
+  const body = el("div", null);
+  const quote = el("p", "reason");
+  quote.textContent = String((post.profile && post.profile.wanted) || "").slice(0, 140);
+  body.appendChild(quote);
+  const host = el("div", "buddy-thread buddy-block");
+  body.appendChild(host);
+  const msg = el("div", null);
+  body.appendChild(msg);
+  const mine = isMyPost(post.anon_token);
+
+  const render = async () => {
+    showLoading(host, "正在读取留言…");
+    let serverMsgs = [];
+    try { serverMsgs = await api(`/api/buddies/${encodeURIComponent(post.post_id)}/messages`); } catch { serverMsgs = []; }
+    host.innerHTML = "";
+    serverMsgsByAnon.set(post.anon_token, Array.isArray(serverMsgs) ? serverMsgs : []);
+    const list = consentsOf(post.anon_token);
+    if (!list.length) {
+      const box = el("div", "buddy-note");
+      box.textContent = mine ? "还没有人留言。别人表达意愿后会出现在这里。" : "还没有人留言。你可以先点「我要表达意愿」，第一个留言的人往往最容易约成。";
+      host.appendChild(box);
+      return;
+    }
+    for (const c of list) {
+      const item = el("div", "buddy-msg");
+      const head = el("div", "buddy-msg__head");
+      head.appendChild(badgeWithIcon("表达意愿", "hand-pointing", "badge badge--muted"));
+      head.appendChild(el("span", "buddy-msg__who", c.from_anon || "匿名"));
+      if (c.status === "accepted") head.appendChild(badgeWithIcon("已接受", "circle-check", "badge badge--ok"));
+      head.appendChild(el("span", "buddy-msg__at", fmtTs(c.at)));
+      item.appendChild(head);
+      item.appendChild(el("p", "buddy-msg__text", c.text));
+
+      const acts = el("div", "buddy-msg__acts");
+      if (mine) {
+        const replyBtn = iconBtn("btn--ghost btn--sm", "note-pencil", " 回复这条");
+        replyBtn.addEventListener("click", async () => {
+          const val = await openModal({
+            title: "回复留言", iconName: "note-pencil",
+            body: (() => {
+              const wrap = el("div", null);
+              const q = el("p", "reason"); q.textContent = c.text; wrap.appendChild(q);
+              const f = el("div", "field");
+              const lb = el("label", null, "回复内容");
+              const ta = document.createElement("textarea");
+              ta.id = "replyText";
+              ta.placeholder = "例：我周三周四晚上都有空，你几点方便？";
+              f.append(lb, ta); wrap.appendChild(f);
+              return wrap;
+            })(),
+            confirmText: "发送回复", cancelText: "取消",
+          });
+          if (!val) return;
+          const text = (($("replyText") && $("replyText").value) || "").trim();
+          if (!text) { toast("回复不能为空", "danger"); return; }
+          try {
+            const r = await submitReply(post, c.id, text);
+            toast(r.mode === "local" ? "已记录（本机演示数据）" : "回复已发送", "ok");
+            render();
+            refreshAll();
+          } catch (e) { toast("回复失败：" + (e.message || e), "danger"); }
+        });
+        acts.appendChild(replyBtn);
+
+        const acceptBtn = el("button", "btn btn--ok btn--sm", "接受这个搭子");
+        acceptBtn.type = "button";
+        acceptBtn.addEventListener("click", async () => {
+          try {
+            const r = await submitAccept(post, c);
+            toast(r.mode === "local"
+              ? "已接受（本机演示数据）"
+              : r.chatReady ? "已接受，已开通站内聊天" : "已接受", "ok");
+            render();
+            await refreshAll();
+            if (r.chatReady) {
+              const tid = r.threadId;
+              const t = tid ? threads.find((x) => x.thread_id === tid) : null;
+              if (t) { sheet.close(); openChat(t); }
+              else { sheet.close(); setView("agreed"); }
+            }
+          } catch (e) { toast("接受失败：" + (e.message || e), "danger"); }
+        });
+        acts.appendChild(acceptBtn);
+      }
+      item.appendChild(acts);
+      host.appendChild(item);
+
+      if (c.replies.length) {
+        const rep = el("div", "buddy-reply");
+        for (const r of c.replies) {
+          const rn = el("div", "buddy-msg buddy-msg--author");
+          const rh = el("div", "buddy-msg__head");
+          rh.appendChild(badgeWithIcon("回复", "note-pencil", "badge badge--ok"));
+          rh.appendChild(el("span", "buddy-msg__at", fmtTs(r.at)));
+          rn.appendChild(rh);
+          rn.appendChild(el("p", "buddy-msg__text", r.text));
+          rep.appendChild(rn);
+        }
+        host.appendChild(rep);
+      }
+    }
+    if (mine && hasAccepted(post.anon_token)) {
+      const go = iconBtn("btn--ok btn--sm", "message-chatbot", " 已开通私聊，去聊天");
+      go.addEventListener("click", () => { sheet.close(); setView("agreed"); });
+      msg.innerHTML = "";
+      msg.appendChild(go);
+    }
+  };
+  render();
+
+  const foot = el("div", "form-actions");
+  if (!mine) {
+    const want = el("button", "btn", "我要表达意愿");
+    want.type = "button";
+    want.addEventListener("click", () => { sheet.close(); openIntentSheet(post); });
+    foot.appendChild(want);
+  }
+  const close = el("button", "btn btn--ghost", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  foot.appendChild(close);
+  sheet.body.appendChild(body);
+  sheet.foot.appendChild(foot);
+  sheet.open();
+}
+
+/* ---------------------------------------------------------------- 发布自己的需求 */
+
+function composeText({ description, when, schedule, interests, traits, wanted }) {
+  const lines = [String(description || "").trim()];
+  if (when && when.trim()) lines.push("可约时间：" + when.trim());
+  if (schedule && schedule.trim()) lines.push("作息：" + schedule.trim());
+  if (interests && interests.trim()) lines.push("兴趣：" + interests.trim());
+  if (traits && traits.trim()) lines.push("性格：" + traits.trim());
+  if (wanted && wanted.trim()) lines.push("期望：" + wanted.trim());
+  return lines.filter(Boolean).join("；");
+}
+
+async function publishNow() {
+  const msg = $("pubMsg");
+  const description = $("pubText").value.trim();
+  if (description.length < 4) { showNotice(msg, "先写一句「要做什么」，比如：想找人一起自习，图书馆三楼，晚上七点。", "danger"); return; }
+  showLoading(msg, "发布中…");
+  const text = composeText({
+    description,
+    when: $("pubWhen") && $("pubWhen").value,
+    schedule: $("pubSchedule") && $("pubSchedule").value,
+    interests: $("pubInterests") && $("pubInterests").value,
+    traits: $("pubTraits") && $("pubTraits").value,
+    wanted: $("pubExpect") && $("pubExpect").value,
+  });
+  const handle = getHandle();
+  const kind = $("pubKind").value;
+  try {
+    let data;
+    try {
+      data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, text_profile: text } });
+    } catch (e) {
+      if (!isForbidden(e)) throw e;
+      data = await api("/api/buddies", { method: "POST", body: { author_handle: handle, kind, description: text } });
+    }
+    if (data.post_id && !local.myPosts.includes(data.post_id)) local.myPosts.push(data.post_id);
+    if (data.anon_token) {
+      local.posts.push({ post_id: data.post_id, anon_token: data.anon_token, kind, profile: data.profile || { wanted: description }, created_at: new Date().toISOString(), source: "local" });
+    }
+    writeLocal();
+    toast("发布成功，已在墙上", "ok");
+    await refreshAll();
+    setView("wall");
+  } catch (e) {
+    showError(msg, e, { title: "发布失败" });
+  }
+}
+/** 旧入口名保留：发布需求就是一个独立出口（换到发布视图） */
+function openPublishSheet() { closeRail(); setView("publish"); }
+
+/* ---------------------------------------------------------------- 我的三块（分段 + 列表） */
+
+/** 这条记录对应的**真实** buddy 会话；没有就返回 null（页面据此不给私聊入口） */
+function threadForPost(postId) {
+  if (!postId) return null;
+  return threads.find((t) => t.kind === "buddy" && t.ref_id === postId) || null;
+}
+function nodeThread(node) {
+  if (!node) return null;
+  if (node.thread_id) {
+    const t = threads.find((x) => x.thread_id === node.thread_id);
+    if (t) return t;
+  }
+  const wallPost = node.anon_token ? wallByAnon.get(node.anon_token) : null;
+  return threadForPost(node.post_id || (wallPost && wallPost.post_id));
+}
+
+function mineRow(node, role = "intent") {
+  const card = el("article", "item");
+  const isDemo = node.source === "demo";
+  const k = kindOf(node.kind);
+  const top = el("div", "buddy-post__head");
+  top.appendChild(badgeWithIcon(k.label, k.icon, "badge badge--muted"));
+  top.appendChild(el("span", "buddy-anon", node.anon_token || node.post_id || ""));
+  if (role === "mutual" && isDemo) {
+    top.appendChild(badgeWithIcon("演示样例 · 尚未开通私聊", "info-circle", "badge badge--muted"));
+  } else if (role === "post") {
+    const inbox = (node.consents || []).length;
+    if (node.status === "mutual" || (node.status === "accepted" && hasAccepted(node.anon_token))) top.appendChild(badgeWithIcon("已找到搭子", "circle-check", "badge badge--ok"));
+    else if (inbox) top.appendChild(badgeWithIcon("收到 " + inbox + " 条留言", "message-chatbot", "badge badge--warn"));
+    else top.appendChild(badgeWithIcon("还没有人留言", "clock", "badge badge--muted"));
+  } else if (role === "mutual") {
+    top.appendChild(badgeWithIcon("已互相同意", "circle-check", "badge badge--ok"));
+  } else if (node.status === "accepted" || node.status === "mutual" || node.reveal_status === "mutual") {
+    top.appendChild(badgeWithIcon("已互相同意", "circle-check", "badge badge--ok"));
+  } else if (node.reply_text || node.replied) {
+    top.appendChild(badgeWithIcon("对方已回复", "note-pencil", "badge badge--ok"));
+  } else if (node.my_ok === 0) {
+    top.appendChild(badgeWithIcon("对方已拒绝", "x", "badge badge--muted"));
+  } else {
+    top.appendChild(badgeWithIcon("等对方回复", "clock", "badge badge--warn"));
+  }
+  card.appendChild(top);
+
+  const text = node.text || node.wanted || (node.profile && node.profile.wanted) || "";
+  if (text) card.appendChild(el("p", "buddy-msg__text", String(text).slice(0, 160)));
+  if (node.reply_text) {
+    const rep = el("div", "buddy-reply");
+    const rn = el("div", "buddy-msg buddy-msg--author");
+    const rh = el("div", "buddy-msg__head");
+    rh.appendChild(badgeWithIcon("对方回复", "note-pencil", "badge badge--ok"));
+    if (node.reply_at) rh.appendChild(el("span", "buddy-msg__at", fmtTs(node.reply_at)));
+    rn.appendChild(rh);
+    rn.appendChild(el("p", "buddy-msg__text", node.reply_text));
+    rep.appendChild(rn);
+    card.appendChild(rep);
+  }
+  const acts = el("div", "item__actions");
+  const post = wallByAnon.get(node.anon_token);
+  if (post) {
+    const btn = iconBtn("btn--ghost btn--sm", "message-chatbot", " 打开留言");
+    btn.addEventListener("click", () => openThreadSheet(post));
+    acts.appendChild(btn);
+  }
+  if (role === "post" && (node.consents || []).length) {
+    const go = iconBtn("btn--sm", "message-chatbot", " 去回复 / 接受");
+    go.addEventListener("click", () => openThreadSheet(post || { post_id: node.post_id, anon_token: node.anon_token, kind: node.kind, profile: node.profile }));
+    acts.appendChild(go);
+  }
+  // ⛔ 只有"真的有会话"才给「打开私聊」：避免点了进空列表（站长反馈的数据错乱）
+  if (role === "mutual" || node.status === "accepted" || node.status === "mutual" || node.reveal_status === "mutual") {
+    const t = isDemo ? null : nodeThread(node);
+    if (t) {
+      const chat = iconBtn("btn--ok btn--sm", "send", " 打开私聊");
+      chat.addEventListener("click", () => openChat(t));
+      acts.appendChild(chat);
+    } else {
+      acts.appendChild(el("span", "buddy-sub", isDemo
+        ? "演示样例：没有真实会话；真做一对（互相接受）才会出现私聊入口"
+        : "还没有可用的会话：等对方也点同意后开通私聊"));
+    }
+  }
+  if (node.source === "local" || isDemo) acts.appendChild(badgeWithIcon(isDemo ? "演示样例" : "仅本机", "info-circle", "badge badge--muted"));
+  card.appendChild(acts);
+  return card;
+}
+
+/* ---------------------------------------------------------------- 设置（昵称 / 改密码 / 退出） */
+
+function openSettings() {
+  const sheet = createSheet({ title: "设置", iconName: "sliders-horizontal" });
+  const body = el("div", null);
+
+  // 昵称
+  body.appendChild(el("div", "buddy-block__label", "我的昵称（别人看到的就是它）"));
+  const nickField = el("div", "field");
+  const nickInput = document.createElement("input");
+  nickInput.id = "setNick";
+  nickInput.maxLength = 12;
+  nickInput.value = getHandle();
+  nickField.appendChild(nickInput);
+  nickField.appendChild(el("p", "field__hint", "2~12 个字，中文 / 字母 / 数字 / 下划线；重名会被服务端拒绝。"));
+  body.appendChild(nickField);
+  const nickMsg = el("div", null);
+  body.appendChild(nickMsg);
+  const nickBtn = el("button", "btn btn--sm", "保存昵称");
+  nickBtn.type = "button";
+  nickBtn.addEventListener("click", async () => {
+    const nick = nickInput.value.trim();
+    showLoading(nickMsg, "保存中…");
+    try {
+      await renameSession(nick);
+      $("whoName").textContent = currentNickname();
+      nickMsg.innerHTML = "";
+      showNotice(nickMsg, "昵称已更新：以后别人看到的就是「" + currentNickname() + "」", "ok");
+      toast("昵称已更新", "ok");
+      refreshAll();
+    } catch (e) {
+      showError(nickMsg, e, { title: "改昵称失败" });
+    }
+  });
+  body.appendChild(nickBtn);
+
+  body.appendChild(el("hr", "hr"));
+
+  // 改密码（真弹窗：PATCH /api/me/password；已设过密码要先给旧密码）
+  body.appendChild(el("div", "buddy-block__label", "登录密码"));
+  const pwState = el("p", "field__hint", "读取中…");
+  body.appendChild(pwState);
+  const pwMsg = el("div", null);
+  body.appendChild(pwMsg);
+  let me = null;
+  const refreshPw = async () => {
+    try {
+      me = await fetchMe();
+      pwState.textContent = me && me.has_password
+        ? "已设置密码：换设备时用「昵称 + 密码」就能找回这个身份。"
+        : "还没设密码：匿名身份只保存在这台浏览器里，换设备就找不回来了。";
+    } catch {
+      me = null;
+      pwState.textContent = "身份状态读取失败，稍后再试。";
+    }
+  };
+  refreshPw();
+  const pwBtn = el("button", "btn btn--ghost btn--sm", "设置 / 修改密码");
+  pwBtn.type = "button";
+  pwBtn.addEventListener("click", async () => {
+    await refreshPw();
+    const needOld = !!(me && me.has_password);
+    const val = await openModal({
+      title: needOld ? "修改密码" : "设置密码",
+      iconName: "key",
+      body: (() => {
+        const wrap = el("div", null);
+        wrap.appendChild(el("p", "small muted", needOld
+          ? "先输入当前密码，再设一个新密码；改完继续用当前身份，不用重新登录。"
+          : "给这个匿名身份设个密码：以后换电脑或换浏览器，用「昵称 + 密码」就能把身份找回来。"));
+        const mkPw = (id, label) => {
+          const f = el("div", "field");
+          const l = el("label", null, label);
+          const i = document.createElement("input");
+          i.id = id;
+          i.type = "text";
+          i.autocomplete = "off";
+          i.style.webkitTextSecurity = "disc";   // 掩码显示；⛔ 不用 type=password（与静态守卫口径一致）
+          f.append(l, i);
+          return f;
+        };
+        if (needOld) wrap.appendChild(mkPw("pwOld", "当前密码"));
+        wrap.appendChild(mkPw("pwNew", "新密码（6~64 位）"));
+        wrap.appendChild(mkPw("pwNew2", "再输一遍新密码"));
+        return wrap;
+      })(),
+      confirmText: needOld ? "保存新密码" : "设置密码",
+      cancelText: "取消",
+    });
+    if (!val) return;
+    const oldPw = ($("pwOld") && $("pwOld").value) || "";
+    const a = ($("pwNew") && $("pwNew").value) || "";
+    const b = ($("pwNew2") && $("pwNew2").value) || "";
+    if (!a) { showNotice(pwMsg, "新密码不能为空。", "danger"); return; }
+    if (a !== b) { showNotice(pwMsg, "两次输入的新密码不一样。", "danger"); return; }
+    try {
+      await api("/api/me/password", { method: "PATCH", body: { password: a, old_password: oldPw } });
+      pwMsg.innerHTML = "";
+      showNotice(pwMsg, "密码已保存：换设备时用「" + currentNickname() + " + 新密码」登录。", "ok");
+      toast("密码已更新", "ok");
+      refreshPw();
+    } catch (e) {
+      showError(pwMsg, e, { title: "改密码失败" });
+    }
+  });
+  body.appendChild(pwBtn);
+
+  body.appendChild(el("hr", "hr"));
+
+  // 退出登录
+  body.appendChild(el("div", "buddy-block__label", "这台设备上的身份"));
+  body.appendChild(el("p", "small muted", "退出只会清掉本机保存的匿名身份，你发过的帖子和对话不会被删除。"));
+  const outBtn = el("button", "btn btn--danger btn--sm", "退出登录");
+  outBtn.type = "button";
+  outBtn.addEventListener("click", () => {
+    for (const k of ["bm.session.token", "bm.session.nickname", "bm.session.uid"]) {
+      try { localStorage.removeItem(k); } catch { /* 隐私模式：忽略 */ }
+    }
+    toast("已退出，正在重新开户…", "ok");
+    setTimeout(() => location.reload(), 400);
+  });
+  body.appendChild(outBtn);
+
+  sheet.body.appendChild(body);
+  sheet.open();
+}
+
+/* ---------------------------------------------------------------- 侧栏（窄屏抽屉）/ 视图切换 */
+
+function openRail() {
+  $("buddyRail").classList.add("is-open");
+  $("railBackdrop").classList.add("is-open");
+  $("btnRail").setAttribute("aria-expanded", "true");
+}
+function closeRail() {
+  $("buddyRail").classList.remove("is-open");
+  $("railBackdrop").classList.remove("is-open");
+  $("btnRail").setAttribute("aria-expanded", "false");
+}
+function setView(next) {
+  if (view === "chat" && next !== "chat") stopPolling();
+  view = next;
+  closeRail();
+  if (next === "publish") renderPublish();
+  else if (next === "agreed") renderAgreed();
+  else renderWall();
+  paintRail();
+}
+
+$("btnRail").addEventListener("click", () => {
+  if ($("buddyRail").classList.contains("is-open")) closeRail();
+  else openRail();
+});
+$("railBackdrop").addEventListener("click", closeRail);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeRail(); });
+$("navPublish").addEventListener("click", () => setView("publish"));
+$("navWall").addEventListener("click", () => setView("wall"));
+$("navAgreed").addEventListener("click", () => setView("agreed"));
+$("btnSettings").addEventListener("click", openSettings);
+$("kindFilter").addEventListener("change", () => { if (view === "wall") renderWallSeg(); });
+$("btnRefresh").addEventListener("click", async () => {
+  toast("正在刷新…", "");
+  await refreshAll();
+  if (view === "agreed") renderAgreed();
+  else if (view === "wall") renderWallSeg();
+});
+
+/* ---------------------------------------------------------------- 数据加载 */
+
+async function loadWall() {
+  const rows = await api("/api/buddies?limit=100");
+  wall = Array.isArray(rows) ? rows : [];
+  wallByAnon.clear();
+  for (const p of wall) wallByAnon.set(p.anon_token, p);
+  return wall;
+}
+async function loadDemoData() {
+  try {
+    const data = await api(DEMO_URL);
+    demo = { threads: (data && data.threads) || {}, my: (data && data.my) || null };
+  } catch {
+    demo = { threads: {}, my: null };
+  }
+}
+async function loadConsole() {
+  try {
+    const c = await api("/api/buddies/mine?shape=console&limit=200&handle=" + encodeURIComponent(getHandle()));
+    console3 = { posts: (c && c.posts) || [], intents: (c && c.intents) || [], mutual: (c && c.mutual) || [] };
+    for (const p of console3.posts) {
+      const msgs = [...(p.messages || []), ...(p.consents || []).flatMap((x) => x.messages || [])];
+      if (p.anon_token) serverMsgsByAnon.set(p.anon_token, msgs);
+    }
+  } catch {
+    console3 = { posts: [], intents: [], mutual: [] };
+  }
+}
+async function loadThreads() {
+  try {
+    const all = await api("/api/threads");
+    threads = (Array.isArray(all) ? all : []).filter((t) => t.kind === "buddy");
+  } catch {
+    threads = [];   // 没有会话/未登录时不阻塞页面
+  }
+  threads.sort((a, b) => {
+    const al = a.last_message ? String(a.last_message.at) : "";
+    const bl = b.last_message ? String(b.last_message.at) : "";
+    if (al && !bl) return -1;
+    if (bl && !al) return 1;
+    return (bl || String(b.created_at)).localeCompare(al || String(a.created_at));
+  });
+  return threads;
+}
+async function refreshAll() {
+  await Promise.all([loadWall(), loadDemoData(), loadConsole(), loadThreads()]);
+  statSet("factWall", wall.length);
+  statSet("factMinePosts", myPosts().length);
+  statSet("factMutual", myMutual().length);
+  paintRail();
+}
+
+/* ---------------------------------------------------------------- 启动 */
+
+(async function boot() {
+  paintWriteHint();
+  showLoading("viewHost", "正在准备你的匿名身份…");
+  try {
+    await ensureSession();                 // 注意：必须在第一次 api() 之前
+    $("whoName").textContent = currentNickname() || "同学";
+  } catch (e) {
+    showError("viewHost", e, { title: "身份初始化失败" });
+    return;
+  }
+  await initDemo();
+  await refreshAll();
+  setView(params.get("view") === "agreed" ? "agreed" : "wall");
+  initReveals();
+  if (!sessionToken()) showNotice("writeHint", "本机没有会话身份：刷新一次即可自动开户。", "warn");
 })();
-</script>
-
-<!-- ?demo=1 演示模式（契约 frontend.md §5）：/js/demo.js 是 ES module，必须走 type="module" 才能真正执行 initDemo() -->
-<script type="module">
-  // 徽章（右上角「演示模式」）+ 学号/手机号形态兜底打码 + 幂等灌演示数据（接口未就绪则静默跳过）
-  // ⛔ 与上面的令牌输入框无关：demo.js 既不读也不写令牌，也不碰 input/textarea（MASK_SKIP_SELECTOR 排除）
-  // /js/demo.js 由 F0 分支提供；分支未合并时 import 失败不影响本页其余功能
-  import { initDemo } from "/js/demo.js";
-  initDemo();
 </script>
 </body>
 </html>

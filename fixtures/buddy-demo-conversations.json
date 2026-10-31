@@ -1,0 +1,191 @@
+{
+  "_note": "演示对话（留言/回复/接受）数据。与 static/buddy-demo.json 的 threads/my 必须逐字一致（tests/ui-buddy-ui.test.js 有断言）；后端接上 buddy_messages 之类存储后，直接读这里的 threads 与 my 灌库即可。",
+  "threads": {
+    "anon_9f3a2c1b8d47": {
+      "consents": [
+        {
+          "id": "demo-c-study-1",
+          "from_anon": "anon_7c1e5a0d9b42",
+          "text": "我周三周四晚上都在图书馆三楼，可以一起；我也是大二工科，在刷算法题",
+          "at": "2026-10-29T11:20:00Z",
+          "status": "accepted",
+          "replies": [
+            {
+              "id": "demo-r-study-1",
+              "text": "行，那七点图书馆门口见。我一般坐靠窗那排，你到了发我一声",
+              "at": "2026-10-29T11:35:00Z"
+            }
+          ]
+        },
+        {
+          "id": "demo-c-study-2",
+          "from_anon": "anon_3b8f1c7d2a60",
+          "text": "我只有周末有空，能约周末吗？",
+          "at": "2026-10-29T13:02:00Z",
+          "status": "replied",
+          "replies": [
+            {
+              "id": "demo-r-study-2",
+              "text": "周末我要实习，平时七点以后都在，工作日也行的话就约得上",
+              "at": "2026-10-29T13:18:00Z"
+            }
+          ]
+        }
+      ],
+      "accepted": [
+        "anon_7c1e5a0d9b42"
+      ]
+    },
+    "anon_1b8d5e2f9a30": {
+      "consents": [
+        {
+          "id": "demo-c-room-1",
+          "from_anon": "anon_6e2d9b4f8c15",
+          "text": "我作息跟你差不多，晚上戴着耳机打游戏，十一点关灯没问题",
+          "at": "2026-10-29T15:40:00Z",
+          "status": "replied",
+          "replies": [
+            {
+              "id": "demo-r-room-1",
+              "text": "行，那就先按十一点关灯试试，我周四下午在宿舍，可以先把东西搬过去",
+              "at": "2026-10-29T15:55:00Z"
+            }
+          ]
+        },
+        {
+          "id": "demo-c-room-2",
+          "from_anon": "anon_9a0c5e3b7d28",
+          "text": "我也喜欢开黑，不过我周末都回家，只有周中在",
+          "at": "2026-10-30T01:12:00Z",
+          "status": "sent",
+          "replies": []
+        }
+      ],
+      "accepted": []
+    },
+    "anon_8c4a0e6b9d13": {
+      "consents": [
+        {
+          "id": "demo-c-sport-1",
+          "from_anon": "anon_4f7a2e9c5b31",
+          "text": "我下午四点半下课，球馆东门等你？",
+          "at": "2026-10-29T08:05:00Z",
+          "status": "accepted",
+          "replies": [
+            {
+              "id": "demo-r-sport-1",
+              "text": "好，我带球，你早点来先热身",
+              "at": "2026-10-29T08:20:00Z"
+            }
+          ]
+        },
+        {
+          "id": "demo-c-sport-2",
+          "from_anon": "anon_2d5b8f1a6c47",
+          "text": "我投篮一般，能跟着练练吗？",
+          "at": "2026-10-29T12:44:00Z",
+          "status": "replied",
+          "replies": [
+            {
+              "id": "demo-r-sport-2",
+              "text": "能，先练十分钟定点，再打半场",
+              "at": "2026-10-29T12:50:00Z"
+            }
+          ]
+        }
+      ],
+      "accepted": []
+    }
+  },
+  "my": {
+    "posts": [
+      {
+        "anon_token": "anon_5e1f8b2a6c47",
+        "kind": "study",
+        "profile": {
+          "wanted": "想找人一起自习，图书馆三楼，晚上七点"
+        },
+        "created_at": "2026-10-29T10:00:00Z",
+        "consents": [
+          {
+            "id": "demo-my-p1-c1",
+            "from_anon": "anon_8b1d4f7c2e93",
+            "text": "我周三周四晚上都在图书馆三楼，可以一起",
+            "at": "2026-10-29T10:24:00Z",
+            "status": "replied",
+            "replies": [
+              {
+                "id": "demo-my-p1-r1",
+                "text": "行，那七点图书馆门口见",
+                "at": "2026-10-29T10:31:00Z"
+              }
+            ]
+          },
+          {
+            "id": "demo-my-p1-c2",
+            "from_anon": "anon_c3a7e0b5d149",
+            "text": "我只有周末有空，能约周末吗",
+            "at": "2026-10-29T16:08:00Z",
+            "status": "sent",
+            "replies": []
+          }
+        ]
+      },
+      {
+        "anon_token": "anon_4d8c2f6a1b93",
+        "kind": "sport",
+        "profile": {
+          "wanted": "想找人一起打羽毛球，周末下午体育馆"
+        },
+        "created_at": "2026-10-28T09:10:00Z",
+        "consents": [
+          {
+            "id": "demo-my-p2-c1",
+            "from_anon": "anon_7f2c5a9e3b64",
+            "text": "周六下午两点到四点我有空，拍子我有两把，你不用带",
+            "at": "2026-10-28T09:40:00Z",
+            "status": "replied",
+            "replies": [
+              {
+                "id": "demo-my-p2-r1",
+                "text": "那太好了，两点体育馆门口见",
+                "at": "2026-10-28T09:52:00Z"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "intents": [
+      {
+        "anon_token": "anon_1b8d5e2f9a30",
+        "kind": "roommate",
+        "text": "我作息跟你差不多，晚上戴着耳机打游戏，十一点关灯可以吗",
+        "at": "2026-10-29T15:40:00Z",
+        "status": "replied",
+        "reply_text": "可以啊，我周四下午在宿舍，到时候门口见，先把东西搬过去",
+        "reply_at": "2026-10-29T16:05:00Z"
+      },
+      {
+        "anon_token": "anon_0e5a8c1b4f72",
+        "kind": "other",
+        "text": "周末想找人一起玩剧本杀，我这边还能凑两个人",
+        "at": "2026-10-29T18:22:00Z",
+        "status": "replied",
+        "reply_text": "行，我拉个时间表，先说好我不玩恐怖本",
+        "reply_at": "2026-10-29T18:40:00Z"
+      }
+    ],
+    "mutual": [
+      {
+        "anon_token": "anon_2f6c9e3d8b54",
+        "kind": "sport",
+        "text": "我早上七点半就在操场跑步，跑完一起去球馆也行",
+        "reply_text": "太好了，那我按你的时间来，明早七点半操场见",
+        "reveal_status": "mutual",
+        "chat_ready": true,
+        "thread_id": "th_demo_2f6c9e3d8b54"
+      }
+    ]
+  }
+}

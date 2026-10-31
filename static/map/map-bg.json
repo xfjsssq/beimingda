@@ -76,7 +76,42 @@
     "service-clinic": {
       "x_pct": 16.0,
       "y_pct": 39.8
+    },
+    "ming-lake-1": {
+      "x_pct": 22.5,
+      "y_pct": 38.5
+    },
+    "ming-lake-2": {
+      "x_pct": 25.5,
+      "y_pct": 41.0
+    },
+    "ming-lake-3": {
+      "x_pct": 23.5,
+      "y_pct": 44.5
     }
   },
-  "_points_note": "⚠️ 这些百分比是「按楼宇类型对着《校园楼宇编号示意图》标的示意位置」（宿舍点在公寓楼群、食堂在餐厅标记、操场在 1 号田径场、校门在南北边界），**不是测绘坐标**。要精确到楼：浏览器打开 /welcome?calibrate=1 → 选点位 → 在底图上点真实位置 → 把给出的 JSON 粘回本文件。"
+  "_points_note": "⚠️ 这些百分比是「按楼宇类型对着《校园楼宇编号示意图》标的示意位置」（宿舍点在公寓楼群、食堂在餐厅标记、操场在 1 号田径场、校门在南北边界），**不是测绘坐标**。要精确到楼：浏览器打开 /welcome?calibrate=1 → 选点位 → 在底图上点真实位置 → 把给出的 JSON 粘回本文件。  ⭐ 3 个「明湖实景点位」暂时都标在明湖一带（测试用），以后再细分。",
+  "satellite": {
+    "_note": "站内自建的卫星图层：Leaflet（已本地化在 /vendor/leaflet/）+ 影像瓦片。⛔ 地址只写在这里，页面不硬编码；⛔ 不依赖任何 CDN：Leaflet 是本地文件，只有影像瓦片需要联网（与高德嵌入同一性质）。",
+    "enabled": true,
+    "provider": "Esri World Imagery",
+    "tile_url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    "label_tile_url_template": "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}",
+    "attribution": "影像 © Esri · Maxar · Earthstar Geographics",
+    "center": {
+      "lng": 106.107718,
+      "lat": 38.497704
+    },
+    "zoom": 16,
+    "max_zoom": 19,
+    "labels_default_on": true,
+    "min_zoom": 14,
+    "bounds": {
+      "south": 38.4857,
+      "west": 106.0917,
+      "north": 38.5097,
+      "east": 106.1237
+    },
+    "_bounds_note": "限制在校园范围内，防止滑出去找不到学校；要放宽改这四个数字即可"
+  }
 }

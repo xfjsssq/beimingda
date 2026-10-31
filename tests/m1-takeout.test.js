@@ -555,17 +555,19 @@ test("HTTP /api/tasks：4 条路由（读开放、写需令牌、详情、触发
     }
     assert.ok(matched.data.some((m) => m.runner_handle === "接口候选" && m.pushed === true));
 
-    // 页面本体（本分支自带，集成前不依赖任何外链 JS）
+    // 页面本体：集成后复用全站共享层（api / nav / demo / ui），外链脚本仍只允许 /config.js
     const page = await fetch(`${base}/takeout`);
     const html = await page.text();
     assert.equal(page.status, 200);
     assert.ok(html.includes("匹配结果") && html.includes("score"), "页面必须展示 score");
     assert.ok(html.includes("reason:"), "页面必须展示 reason");
     const srcs = [...html.matchAll(/<script[^>]*\bsrc="([^"]+)"/g)].map((m) => m[1]);
-    assert.deepEqual(srcs, ["/config.js"], "页面自带的外链脚本只允许 /config.js（自包含）");
-    // demo 模式接入：F0 的 /js/demo.js（动态 import → 未合并时静默跳过）
-    assert.ok(/import\("\/js\/demo\.js"\)/.test(html), "必须接入 /js/demo.js");
-    assert.ok(!/\/js\/(api|nav)\.js/.test(html), "⛔ 不直接引用 /js/api.js、/js/nav.js");
+    assert.deepEqual(srcs, ["/config.js"], "页面外链脚本只允许 /config.js（共享层以 module 形式内联导入）");
+    // demo 模式接入：F0 的 /js/demo.js
+    assert.ok(/\/js\/demo\.js/.test(html), "必须接入 /js/demo.js");
+    // 集成后必须复用共享层（令牌与信封解包全站唯一来源，⛔ 各页不得再自己写一套）
+    assert.ok(/\/js\/api\.js/.test(html), "必须复用 /js/api.js");
+    assert.ok(/\/js\/nav\.js/.test(html), "必须接入 /js/nav.js（6 页共用导航）");
     // ⛔ 静态文案里不许出现「演示模式」（否则不带 ?demo=1 也会被判定为已启用）
     assert.ok(!html.includes("演示模式"), "静态文案里不许出现「演示模式」字样");
     // 375px 不破版的关键 CSS：datetime-local 所在网格必须允许收缩

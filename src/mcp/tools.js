@@ -1,6 +1,6 @@
 /**
  * MCP 工具注册表（冻版骨架）
- *   ⭐ 各模块往这里注册自己的工具：M1 五个 / M2 三个 / M3 两个 / M4 四个 = 14 个。
+ *   ⭐ 各模块往这里注册自己的工具：M1 五个 / M2 三个 / M3 两个 / M4 四个 / 平台入口一个 = 15 个。
  *   注册必须满足：
  *     1. inputSchema 里 additionalProperties: false
  *     2. handler 返回统一信封（{ok,data,error}），抛 AppError 会被自动转成信封
@@ -107,7 +107,7 @@ export function resetTools() {
   registry.clear();
 }
 
-/** 供文档与自检使用：14 个工具的归属统计 */
+/** 供文档与自检使用：15 个工具的归属统计 */
 export function toolCountByModule() {
   const acc = {};
   for (const t of registry.values()) acc[t.module] = (acc[t.module] || 0) + 1;

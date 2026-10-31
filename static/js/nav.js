@@ -1,5 +1,5 @@
 /* =============================================================================
-   北名大小助手 · 共用导航  static/js/nav.js
+   北民大小助手 · 共用导航  static/js/nav.js
    契约：contracts/frontend.md §1（冻版 6 页）、§7（6 页可访问、无 404）
 
    行为：
@@ -21,14 +21,16 @@
      // 探测结果按 sessionStorage 缓存，同一会话只探一次（5 分钟 TTL，模块合入后自愈）
    ============================================================================= */
 
-/** 冻版 6 页（顺序即导航顺序） */
+/** 冻版 6 页（顺序即导航顺序）
+ *  ⚠️ 顺序与 href 是契约冻版：不要动（f0-frontend.test.js 直接断言这两个字段）。
+ *     「导览」处在 6 项的正中，用 center:true 把它标成导航条里的视觉中心。 */
 export const PAGES = [
-  { id: "index", href: "/", label: "首页", icon: "🏠", desc: "功能聚合门户" },
-  { id: "takeout", href: "/takeout", label: "代取", icon: "📦", desc: "代取撮合看板" },
-  { id: "buddy", href: "/buddy", label: "搭子", icon: "🤝", desc: "搭子墙" },
-  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", desc: "迎新地图与全景" },
-  { id: "schedule", href: "/schedule", label: "日程", icon: "⏰", desc: "课表与提醒" },
-  { id: "agent", href: "/agent", label: "Agent", icon: "🔌", desc: "接入 WorkBuddy（评委页）" },
+  { id: "index", href: "/", label: "首页", icon: "🏠", iconName: "home", desc: "功能聚合门户" },
+  { id: "takeout", href: "/takeout", label: "代取", icon: "📦", iconName: "package", desc: "代取撮合看板" },
+  { id: "buddy", href: "/buddy", label: "搭子", icon: "🤝", iconName: "users", desc: "搭子墙" },
+  { id: "welcome", href: "/welcome", label: "导览", icon: "🗺️", iconName: "map-pin", desc: "迎新地图与全景", center: true },
+  { id: "schedule", href: "/schedule", label: "日程", icon: "⏰", iconName: "calendar-event", desc: "课表与提醒" },
+  { id: "agent", href: "/agent", label: "Agent", icon: "🔌", iconName: "plug-connected", desc: "接入 WorkBuddy（评委页）" },
 ];
 
 /** 导航就绪事件（demo.js 等模块可监听，避免执行顺序耦合） */
@@ -307,13 +309,76 @@ export async function decorateAvailability(opts = {}) {
    三、渲染
    --------------------------------------------------------------------------- */
 
-/** 单个导航项 HTML */
+/* 「导览」在 6 项的正中（第 3、4 项之间），把它做成导航条里的视觉中心。
+   ⚠️ 只落在 .nav-link--center 上，不碰 .site-nav / .nav-link 的既有布局 ——
+      桌面「折叠胶囊 / hover 展开」与手机「底部 tab bar / 把手展开」两套行为都不受影响。
+   ⛔ 不改 app.css（共享样式归那一份），这里注入的是一段页内补丁；⛔ 不用 emoji，图标仍走 phosphor。 */
+const NAV_STYLE_ID = "bm-nav-center-style";
+
+function navCenterCSS() {
+  return `
+/* 导览：导航条里的正中强调块（浅底 + 主色描边 + 大一号） */
+.site-nav .nav-link--center { position: relative; }
+
+@media (min-width: 769px) {
+  /* 收起态也让它在场：默认只露「品牌 + 当前页」，导览作为中心要点一直可见 */
+  .site-nav .nav-link--center {
+    max-width: 200px; padding-inline: 12px; opacity: 1;
+    margin-inline: 8px; font-size: 16px; font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary-line);
+  }
+  .site-nav .nav-link--center:hover {
+    color: var(--color-primary);
+    background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+    border-color: var(--color-primary);
+  }
+  /* 导览恰好是当前页时，让既有的「实心主色」当前页样式优先 */
+  .site-nav .nav-link--center[aria-current="page"] {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+  }
+}
+
+@media (max-width: 768px) {
+  /* 手机：底部 tab bar 里 6 项均分，让导览略宽 + 抬高一档 + 顶部圆角，成为正中那块 */
+  .site-nav .nav-link--center {
+    flex: 1.25 1 0; margin-inline: 0;
+    font-size: 14px; font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-soft);
+    border-radius: 12px 12px 0 0;
+    box-shadow: inset 0 -1px 0 0 var(--color-primary-line);
+    transform: translateY(-2px);
+  }
+  .site-nav .nav-link--center .nav-link__icon { transform: scale(1.12); }
+  .site-nav .nav-link--center[aria-current="page"] {
+    background: var(--color-primary-soft);
+    box-shadow: inset 0 2px 0 0 var(--color-primary);
+  }
+}
+`;
+}
+
+/** 幂等注入导览特殊化样式（没有 document 时静默跳过，便于 Node 单测） */
+function injectNavStyle() {
+  if (typeof document === "undefined" || !document.head) return false;
+  if (document.getElementById(NAV_STYLE_ID)) return true;
+  const st = document.createElement("style");
+  st.id = NAV_STYLE_ID;
+  st.textContent = navCenterCSS();
+  document.head.appendChild(st);
+  return true;
+}
+
+/** 单个导航项 HTML。center 项（导览）多一个 class，样式见 navCenterCSS() */
 function linkHTML(page, activeId) {
   const active = page.id === activeId;
+  const centerCls = page.center ? " nav-link--center" : "";
   return (
-    `<a class="nav-link" href="${page.href}" data-nav="${page.id}"` +
+    `<a class="nav-link${centerCls}" href="${page.href}" data-nav="${page.id}"` +
     ` title="${page.desc}"${active ? ' aria-current="page"' : ""}>` +
-    `<span class="nav-link__icon" aria-hidden="true">${page.icon}</span>` +
+    `<span class="icon icon--18 nav-link__icon" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/${page.iconName || "home"}.svg)"></span>` +
     `<span class="nav-link__label">${page.label}</span>` +
     `</a>`
   );
@@ -321,12 +386,14 @@ function linkHTML(page, activeId) {
 
 /** 页头 HTML（含演示模式徽章占位；徽章显示由 body[data-demo="1"] 控制） */
 export function navHTML(activeId) {
+  injectNavStyle(); // 「导览」特殊化样式（幂等注入，只在 head 里加一段）
   return (
-    `<div class="site-header__inner">` +
+    `<div class="site-header__inner">
+        <button class="nav-handle" id="navHandle" type="button" aria-expanded="false" aria-controls="siteNav" aria-label="展开导航栏"><span class="icon icon--18" aria-hidden="true" style="--icon:url(/vendor/phosphor/icons/caret-up.svg)"></span></button>` +
     `<a class="brand" href="/">` +
-    `<span class="brand__mark" aria-hidden="true">北</span>` +
-    `<span class="brand__text">北名大小助手</span>` +
-    `<span class="brand__tag">赛道 17</span>` +
+    `<img class="brand__logo" src="/img/school-logo.png" alt="北方民族大学校徽" width="28" height="25" />` +
+    `<span class="brand__text">北民大小助手</span>` +
+    `<span class="brand__tag">赛道一</span>` +
     `</a>` +
     `<nav class="site-nav" aria-label="主导航">${PAGES.map((p) => linkHTML(p, activeId)).join("")}</nav>` +
     `<span class="demo-badge" data-demo-badge title="当前为演示模式：数据均为虚构演示数据，姓名显示为「同学A / 同学B」">演示模式</span>` +
@@ -362,6 +429,34 @@ export function mountNav(opts = {}) {
     document.body.insertBefore(host, document.body.firstChild);
   }
 
+  // B7 导航收缩：手机端把手点开/再点收起，按住往上滑也能收起；桌面端靠 CSS :hover / :focus-within 展开
+  const handle = host.querySelector("#navHandle");
+  const rootEl = document.documentElement;
+  const setOpen = (open) => {
+    rootEl.dataset.nav = open ? "open" : "closed";
+    handle?.setAttribute("aria-expanded", open ? "true" : "false");
+    handle?.setAttribute("aria-label", open ? "收起导航栏" : "展开导航栏");
+  };
+  rootEl.dataset.nav = rootEl.dataset.nav || "closed";
+  handle?.addEventListener("click", () => setOpen(rootEl.dataset.nav !== "open"));
+  let touchY = 0;
+  host.addEventListener("touchstart", (e) => { touchY = e.touches[0].clientY; }, { passive: true });
+  host.addEventListener("touchmove", (e) => {
+    if (rootEl.dataset.nav !== "open") return;
+    if (touchY - e.touches[0].clientY > 40) setOpen(false);   // 上滑 40px 收起
+  }, { passive: true });
+
+  // 点「品牌」或「当前页」不再重复加载（用户反馈：点了没反应才对，不该重新弹一下）
+  host.querySelectorAll("a[href]").forEach((a) => {
+    a.addEventListener("click", (e) => {
+      try {
+        const target = new URL(a.getAttribute("href"), location.href).pathname.replace(/\/+$/, "") || "/";
+        const here = location.pathname.replace(/\/+$/, "") || "/";
+        if (target === here) { e.preventDefault(); a.blur(); }
+      } catch { /* 非普通路径：交给浏览器 */ }
+    });
+  });
+
   // 当前页高亮后再兜一层：非 JS 场景（直接在 HTML 里写死链接）也不会错
   host.querySelectorAll(".nav-link").forEach((a) => {
     if (a.dataset.nav === activeId) a.setAttribute("aria-current", "page");
@@ -374,6 +469,34 @@ export function mountNav(opts = {}) {
   }
 
   try {
+    // B7/B11：滚动揭示 + 标语逐词（走共享层，六个页面共用，各页不用改）
+    // 右上角调色盘（色调 / 圆角 / 背景），选择存 localStorage
+    import("/js/theme.js").then((t) => t.initTheme?.()).catch(() => {});
+
+    // ⭐ 首次进入必须注册/登录（用户名全站唯一；之后凭用户名+密码登录）
+    //    引导层是全屏遮罩：不注册/登录就没法用站点；这里不阻塞页面脚本（同步函数里不能 await）
+    import("/js/onboard.js").then((m) => m.ensureIdentity?.()).catch(() => {});
+
+    // 「这一页怎么用」小问号（用户要求：每个功能右上角一个，点开是教学）
+    try {
+      if (!document.querySelector(".help-btn")) {
+        const hb = document.createElement("button");
+        hb.type = "button";
+        hb.className = "help-btn";
+        hb.setAttribute("aria-label", "这一页怎么用");
+        hb.title = "这一页怎么用";
+        hb.innerHTML = '<span class="icon icon--18" aria-hidden="true" ' +
+          'style="--icon:url(/vendor/phosphor/icons/info-circle.svg)"></span>';
+        hb.addEventListener("click", () => {
+          import("/js/ui.js").then((ui) => ui.openHelp?.(activeId)).catch(() => {});
+        });
+        document.body.appendChild(hb);
+      }
+    } catch { /* 教学按钮失败不影响页面 */ }
+    import("/js/ui.js")
+      .then((ui) => { ui.initReveals?.(); ui.initTagline?.(); ui.initCardPicker?.(); })
+      .catch(() => {});   // 环境不支持 IntersectionObserver 时静默降级
+
     document.dispatchEvent(new CustomEvent(NAV_READY_EVENT, { detail: { activeId } }));
   } catch {
     /* 老浏览器不支持 CustomEvent 构造：忽略，不影响导航可用 */

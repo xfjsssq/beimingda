@@ -3,7 +3,7 @@
  *
  *   buddy_publish  —— 发布搭子帖（服务端负责把 text_profile 抽成 §1 的 11 字段画像）
  *   buddy_search   —— 检索候选（kind 一致 + 未一票否决 + score >= 60）
- *   buddy_consent  —— 双选表决（🔒 revealed=0 时返回对象里不含 contact_code 键）
+ *   buddy_consent  —— 双选表决（🔒 revealed=0 时不返回 chat_ready；双方同意后可直接站内私聊）
  *
  *   ⛔ inputSchema 严格照抄 contracts/m2-buddy.md §4，且全部 additionalProperties:false
  *   ⛔ handler 里不写 SQL、不写业务逻辑 —— 一律调 src/services/buddy.js（MCP 与 HTTP 共用）
@@ -56,7 +56,7 @@ export const BUDDY_SEARCH = {
 export const BUDDY_CONSENT = {
   name: "buddy_consent",
   description:
-    "对某条搭子帖表决同意或拒绝（同一帖同一人只能表决一次）。只有双方都同意才会揭示匿名中转码 contact_code；未揭示时该字段不会出现在返回里。",
+    "对某条搭子帖表决同意或拒绝（同一帖同一人只能表决一次）。只有**双方都同意**（revealed=1）才会返回 chat_ready；此后双方可在站内直接私聊（GET /api/threads 拿会话）。⛔ 不再下发任何联系方式；平台不交换、也不下发任何联系方式。未揭示时 chat_ready 不会出现。",
   inputSchema: {
     type: "object",
     properties: {

@@ -33,6 +33,7 @@ import {
 
 /** task_publish / POST /api/tasks 允许的字段（白名单，多一个即 SCHEMA_REJECTED） */
 export const TASK_FIELDS = [
+  "photo",
   "from_building",
   "to_building",
   "station",
@@ -136,6 +137,7 @@ export function toTaskView(row) {
     reward_max: row.reward_max,
     note: row.note ?? null,
     screenshot_path: row.screenshot_path ?? null,
+    photo: row.photo ?? null,
     raw_status: row.raw_status,
     created_at_ts: row.created_at,
     created_at_iso: toIso(row.created_at),
@@ -189,6 +191,17 @@ export function publishTask(input = {}, opts = {}) {
 
   const { text: note, dropped } = scrubNote(input.note);
   const screenshotPath = sanitizeScreenshotPath(input.screenshot_path);
+  // 取件照片（可选）：只收 data:image/* 的 dataURL 缩略图并限大小（不收外链、不收超大数据）
+  const photoRaw = typeof input.photo === "string" ? input.photo.trim() : "";
+  let photoData = null;
+  if (photoRaw) {
+    if (!/^data:image\/(png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+$/.test(photoRaw)) {
+      reject(CODES.SCHEMA_REJECTED, "photo 只接受 dataURL 形式的图片（data:image/...;base64,...）");
+    }
+    if (photoRaw.length > 300 * 1024) reject(CODES.SCHEMA_REJECTED, "photo 过大（≤ 300KB 文本）");
+    photoData = photoRaw;
+  }
+
 
   const ownerId = ensureUser(ownerHandle);
   const taskId = `task_${crypto.randomUUID()}`;
@@ -196,9 +209,9 @@ export function publishTask(input = {}, opts = {}) {
   getDb()
     .prepare(
       `INSERT INTO tasks(id, owner_id, from_building, to_building, station, deadline_ts,
-                         reward_min, reward_max, note, screenshot_path, raw_status, created_at, demo)
+                         reward_min, reward_max, note, screenshot_path, photo, raw_status, created_at, demo)
        VALUES (@id, @owner_id, @from_building, @to_building, @station, @deadline_ts,
-               @reward_min, @reward_max, @note, @screenshot_path, 'open', @created_at, @demo)`,
+               @reward_min, @reward_max, @note, @screenshot_path, @photo, 'open', @created_at, @demo)`,
     )
     .run({
       id: taskId,
@@ -211,6 +224,7 @@ export function publishTask(input = {}, opts = {}) {
       reward_max: rewardMax,
       note,
       screenshot_path: screenshotPath,
+      photo: photoData,
       created_at: now,
       demo: opts.demo === false ? 0 : 1,
     });
@@ -289,6 +303,18 @@ export function matchForTask(taskId, opts = {}) {
   let pushed = 0;
   let skipped = 0;
 
+  // ⭐ 先把"本人主动表达意愿"的行放进候选：否则发布者在 /match 里看不到谁想接这一单
+  //    （source='interest' 由 POST /api/tasks/:id/interest 写入）
+  const interestRows = db.prepare(
+    `SELECT m.id AS match_id, m.state, m.score, m.created_at, r.id AS runner_id, u.handle AS runner_handle
+     FROM matches m
+     JOIN runners r ON r.id = m.runner_id
+     JOIN users u   ON u.id = r.user_id
+     WHERE m.task_id = ? AND m.source = 'interest' AND m.state IN ('pushed','accepted')
+     ORDER BY m.created_at ASC`,
+  ).all(row.id);
+  const inList = new Set();
+
   for (const [i, c] of candidates.entries()) {
     if (i >= topK) break;
     const entry = {
@@ -323,10 +349,31 @@ export function matchForTask(taskId, opts = {}) {
       }
     }
     matches.push(entry);
+    inList.add(c.runner_id);
   }
+
+  // ⭐ 追加意愿行（不在引擎候选里的）：reason 如实写"本人主动表达意愿"
+  let interestAdded = 0;
+  for (const it of interestRows) {
+    if (inList.has(it.runner_id)) continue;                 // 引擎已经推过同一个人 → 不重复
+    matches.push({
+      runner_id: it.runner_id,
+      runner_handle: it.runner_handle,
+      score: it.score,
+      reason: "本人主动表达意愿：主动点了「我想接这一单」（等发布者确认）",
+      pushed: true,
+      match_id: it.match_id,
+      state: it.state,
+      skip_reason: null,
+      source: "interest",
+    });
+    interestAdded += 1;
+  }
+  matches.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
   return {
     task_id: row.id,
+    interest_added: interestAdded,
     task: toTaskView(row),
     threshold: PUSH_THRESHOLD,
     dedupe_window_seconds: DEDUPE_WINDOW_SECONDS,
@@ -343,7 +390,7 @@ export function matchForTask(taskId, opts = {}) {
 export function listMatches(taskId, limit = MAX_LIMIT) {
   return getDb()
     .prepare(
-      `SELECT m.id, m.task_id, m.runner_id, m.score, m.state, m.created_at, u.handle AS runner_handle
+      `SELECT m.id, m.task_id, m.runner_id, m.score, m.state, m.source, m.created_at, u.handle AS runner_handle
          FROM matches m
          JOIN runners r ON r.id = m.runner_id
          JOIN users   u ON u.id = r.user_id
@@ -358,6 +405,7 @@ export function listMatches(taskId, limit = MAX_LIMIT) {
       runner_handle: m.runner_handle,
       score: m.score,
       state: m.state,
+      source: m.source ?? "engine",
       created_at_iso: toIso(m.created_at),
     }));
 }
@@ -366,26 +414,105 @@ export function listMatches(taskId, limit = MAX_LIMIT) {
  * 最近的撮合记录（跨任务，按时间倒序）—— 门户「平均匹配得分」用
  * ⛔ 只读，不写库；只出昵称，不出 user_id / 联系方式
  */
-export function listRecentMatches(limit = DEFAULT_LIMIT) {
+export function listRecentMatches(limit = DEFAULT_LIMIT, opts = {}) {
+  const where = [];
+  const args = [];
+  if (opts.state) { where.push("m.state = ?"); args.push(String(opts.state)); }
+  if (opts.runner_handle) { where.push("u.handle = ?"); args.push(String(opts.runner_handle)); }
+  const clause = where.length ? "WHERE " + where.join(" AND ") : "";
   return getDb()
     .prepare(
-      `SELECT m.id, m.task_id, m.score, m.state, m.created_at, u.handle AS runner_handle
+      `SELECT m.id, m.task_id, m.score, m.state, m.source, m.created_at, u.handle AS runner_handle
          FROM matches m
          JOIN runners r ON r.id = m.runner_id
          JOIN users   u ON u.id = r.user_id
+         ${clause}
         ORDER BY m.created_at DESC, m.score DESC
         LIMIT ?`,
     )
-    .all(clampLimit(limit, DEFAULT_LIMIT, MAX_LIMIT))
+    .all(...args, clampLimit(limit, DEFAULT_LIMIT, MAX_LIMIT))
     .map((m) => ({
       match_id: m.id,
       task_id: m.task_id,
       runner_handle: m.runner_handle,
       score: m.score,
       state: m.state,
+      source: m.source ?? "engine",
       created_at: m.created_at,
       created_at_iso: toIso(m.created_at),
     }));
+}
+
+// ---------------------------------------------------------------- 接单 / 拒单
+
+/**
+ * `matches.state` 的合法取值（契约 contracts/m1-takeout.md §1）
+ * `pushed`：撮合引擎刚推出去；`accepted`：有人接了；`declined`：明确不接；`expired`：过了截止时间
+ */
+export const MATCH_STATES = Object.freeze(["pushed", "accepted", "declined", "expired"]);
+
+/**
+ * 改一条撮合记录的状态（接单 / 拒单）—— 前端卡片上的「接这一单」「选 TA 接单」走这里。
+ *
+ * 规则（M1 契约 §1 的 matches.state）：
+ *   - 只接受 `accepted` / `declined` 两个目标态（状态机由撮合引擎与这个函数共同推进）
+ *   - **只有 `state='pushed'` 的记录能被改**：已经被接走 / 已拒单的记录再改 → SCHEMA_REJECTED，
+ *     message 里带上「当前状态」——前端据此提示「这一单已经被别人接走了」，而不是静默失败
+ *   - 记录不存在 → NOT_FOUND
+ *
+ * ⛔ 不在这里改任务状态、⛔ 不写其它候选的行：把「同任务其它候选置灰」留给展示层，
+ *    后端只保证「一条撮合记录的状态迁移是原子的」（UPDATE ... WHERE state='pushed'）。
+ *
+ * @param {string} matchId
+ * @param {"accepted"|"declined"} state
+ * @returns {{match_id:string, task_id:string, state:string}}
+ */
+export function setMatchState(matchId, state, opts = {}) {
+  const id = typeof matchId === "string" ? matchId.trim() : "";
+  if (!id) reject(CODES.NOT_FOUND, "match not found: 空 id");
+
+  const next = typeof state === "string" ? state.trim() : "";
+  if (next !== "accepted" && next !== "declined" && next !== "pushed") {
+    reject(CODES.SCHEMA_REJECTED, `state 只允许 accepted / declined / pushed（收到「${next || "空"}」）`);
+  }
+
+  const db = getDb();
+  const row = db.prepare("SELECT id, task_id, state FROM matches WHERE id = ?").get(id);
+  if (!row) reject(CODES.NOT_FOUND, `match not found: ${id}`);
+
+  // 派单权限（用户要求）：把某个候选定为接单人（accepted）只能由**任务的发布者本人**做，
+  // 否则谁都能替别人决定"让谁来接" —— 那不是他的单子，他没这个权力。
+  if (next === "accepted" && opts.as) {
+    const taskRow = db.prepare(`${TASK_SELECT} WHERE t.id = ?`).get(row.task_id);
+    if (taskRow && taskRow.owner_handle && String(opts.as).trim() !== taskRow.owner_handle) {
+      reject(CODES.SCHEMA_REJECTED, `只有发布者（${taskRow.owner_handle}）能选人接单，别人不能替他决定`);
+    }
+  }
+
+  // 状态机：pushed → accepted/declined（接单/拒单）；accepted → pushed（取消接单）
+  const allowedFrom = next === "pushed" ? "accepted" : "pushed";
+  if (row.state !== allowedFrom) {
+    reject(
+      CODES.SCHEMA_REJECTED,
+      next === "pushed"
+        ? `match ${id} 当前状态是 ${row.state}，只有 accepted 的记录可以取消接单`
+        : `match ${id} 当前状态是 ${row.state}，只有 pushed 的记录可以被接单 / 拒单`,
+    );
+  }
+
+  // 带上 state='pushed' 条件：即使并发调用，也只有一个能把行改走
+  const changed = db
+    .prepare("UPDATE matches SET state = ? WHERE id = ? AND state = ?")
+    .run(next, id, allowedFrom).changes;   // 带上原状态：并发下只有一个能改走
+  if (changed !== 1) {
+    const now = db.prepare("SELECT state FROM matches WHERE id = ?").get(id);
+    reject(
+      CODES.SCHEMA_REJECTED,
+      `match ${id} 当前状态是 ${now?.state ?? "未知"}，只有 pushed 的记录可以被接单 / 拒单`,
+    );
+  }
+
+  return { match_id: row.id, task_id: row.task_id, state: next };
 }
 
 // ---------------------------------------------------------------- 截图理解（task_parse_screenshot）
@@ -590,8 +717,79 @@ export default {
   matchForTask,
   listMatches,
   listRecentMatches,
+  setMatchState,
+  MATCH_STATES,
   parseTaskFromImage,
   isVisionConfigured,
   toTaskView,
   TASK_FIELDS,
 };
+
+
+/* =============================================================================
+   站内交互的两条权限规则（2026-10-30 · 用户指出"不该由我替别人选接单人"）
+     · 表达意愿 expressInterest(taskId, handle)：路人（跑腿方）对**别人的单**表达想接，
+       不改变任务归属；服务端确保这个 handle 有 runner 档案，并落一条 state='pushed' 的撮合记录。
+     · 派单 setMatchState(id, "accepted", { as })：**只有任务发布者本人**能把某个候选定为接单人。
+   ============================================================================= */
+
+/** 表达意愿：把"我想接这一单"落成一条候选（pushed），发布者随后才决定选谁 */
+export function expressInterest(taskId, runnerHandle, opts = {}) {
+  const id = typeof taskId === "string" ? taskId.trim() : "";
+  if (!id) reject(CODES.NOT_FOUND, "task not found: 空 id");
+  const handle = requiredText(runnerHandle, "runner_handle");
+  const now = Number.isFinite(opts.now) ? opts.now : nowSec();
+  const db = getDb();
+
+  const row = db.prepare(`${TASK_SELECT} WHERE t.id = ?`).get(id);
+  if (!row) reject(CODES.NOT_FOUND, `task not found: ${id}`);
+  if (row.raw_status !== "open" || row.deadline_ts <= now) {
+    reject(CODES.SCHEMA_REJECTED, "这一单已经关闭或过期了，接不了");
+  }
+  if (row.owner_handle === handle) {
+    reject(CODES.SCHEMA_REJECTED, "这是你自己发布的单 —— 发布者不能接自己的单");
+  }
+
+  // 确保这个 handle 有 runner 档案（默认能力就按这一单来，保证"我愿意接"一定成立）
+  const runner = ensureRunnerForHandle(handle, row);
+
+  // 同一对（任务 × 跑腿者）已有 pushed 记录就直接复用，不重复落
+  const exist = db
+    .prepare("SELECT id, score, state FROM matches WHERE task_id = ? AND runner_id = ? ORDER BY created_at DESC LIMIT 1")
+    .get(id, runner.id);
+  if (exist && exist.state === "pushed") {
+    return { match_id: exist.id, task_id: id, runner_handle: handle, score: exist.score, state: "pushed", reused: true };
+  }
+
+  const cand = findMatches(row, [runner], now)[0];
+  const score = cand ? cand.score : 60;
+  const reason = cand ? cand.reason : "本人表达意愿（按可达/时段/报酬自动核过）";
+  const matchId = `match_${crypto.randomUUID()}`;
+  db.prepare(
+    `INSERT INTO matches(id, task_id, runner_id, score, state, source, created_at)
+     VALUES (@id, @task_id, @runner_id, @score, 'pushed', 'interest', @created_at)`,
+  ).run({ id: matchId, task_id: id, runner_id: runner.id, score, created_at: now });
+  return { match_id: matchId, task_id: id, runner_handle: handle, score, reason, state: "pushed" };
+}
+
+/** 给某个 handle 确保存在 runner 档案（没有就按这一单建一个最小可用的） */
+function ensureRunnerForHandle(handle, taskRow) {
+  const db = getDb();
+  const userId = ensureUser(handle);
+  const found = db.prepare("SELECT * FROM runners WHERE user_id = ?").get(userId);
+  if (found) return found;
+  const runnerId = `runner_${crypto.randomUUID()}`;
+  db.prepare(
+    `INSERT INTO runners(id, user_id, reachable_buildings, reward_floor, time_windows, active, demo, created_at)
+     VALUES (@id, @user_id, @reachable, @floor, @windows, 1, 1, @created_at)`,
+  ).run({
+    id: runnerId,
+    user_id: userId,
+    reachable: JSON.stringify([taskRow.from_building, taskRow.to_building]),
+    floor: taskRow.reward_min ?? 0,
+    // ⚠️ 键名必须是 start/end：引擎按 w.start / w.end 判时间重叠（写成 from/to 会被判完全不重叠）
+    windows: JSON.stringify([{ start: taskRow.created_at, end: taskRow.deadline_ts }]),
+    created_at: nowSec(),
+  });
+  return db.prepare("SELECT * FROM runners WHERE id = ?").get(runnerId);
+}

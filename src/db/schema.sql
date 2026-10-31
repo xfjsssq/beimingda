@@ -1,4 +1,4 @@
--- 北名大小助手 · 数据库表结构（冻版）
+-- 北民大小助手 · 数据库表结构（冻版）
 -- 来源：contracts/core.md §2 —— ⛔ 字段名不得改，改这里必须先提 PR 到 main 并在群里说一声。
 -- ⛔ 全站不允许出现可存储真实身份信息的字段（无姓名 / 学号 / 手机号 / 身份证 / 校园网账号）。
 
@@ -8,7 +8,9 @@ PRAGMA foreign_keys = ON;
 CREATE TABLE IF NOT EXISTS users (
   id            TEXT PRIMARY KEY,
   handle        TEXT NOT NULL UNIQUE,
-  contact_code  TEXT,
+  contact_code  TEXT,                            -- 历史遗留字段（"中转码"已废弃，不再对外输出）
+  pass_hash     TEXT,                            -- scrypt 哈希（⛔ 绝不存明文；匿名用户为空）
+  pass_salt     TEXT,
   created_at    INTEGER NOT NULL,
   demo          INTEGER NOT NULL DEFAULT 0
 );
@@ -115,3 +117,52 @@ CREATE TABLE IF NOT EXISTS scrub_audit (
   dropped_fields TEXT NOT NULL,
   created_at     INTEGER NOT NULL
 );
+
+-- ★ 搭子留言 / 回复（站内直接沟通；也可由 MCP 写入）
+CREATE TABLE IF NOT EXISTS buddy_messages (
+  id         TEXT PRIMARY KEY,
+  post_id    TEXT NOT NULL REFERENCES buddy_posts(id),
+  consent_id TEXT REFERENCES buddy_consents(id),
+  from_id    TEXT NOT NULL REFERENCES users(id),
+  to_id      TEXT REFERENCES users(id),
+  kind       TEXT NOT NULL DEFAULT 'message',   -- message=留言 / reply=回复
+  body       TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_buddy_msg_post ON buddy_messages(post_id, created_at);
+
+-- 匿名会话（2026-10-31）：让站点"活起来"——每个浏览器一份身份，发的内容彼此可见
+--   ⛔ 只存 token 的 sha256；不存姓名/学号/手机号/IP，表里没有任何身份信息字段
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash   TEXT PRIMARY KEY,
+  user_id      TEXT NOT NULL REFERENCES users(id),
+  created_at   INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
+
+-- 私聊（2026-10-31）：**双方都同意之后**才有会话；有服务器直连，不再用"中转码"那套
+--   kind='task'  → ref_id 是 tasks.id（发布者 ↔ 接单者，matches.state='accepted' 才建）
+--   kind='buddy' → ref_id 是 buddy_posts.id（发布者 ↔ 搭子，buddy_consents.revealed=1 才建）
+--   ⛔ 表里没有任何联系方式字段：聊天就在站内，不需要交换手机号/微信号
+CREATE TABLE IF NOT EXISTS threads (
+  id         TEXT PRIMARY KEY,
+  kind       TEXT NOT NULL,
+  ref_id     TEXT NOT NULL,
+  a_uid      TEXT NOT NULL REFERENCES users(id),
+  b_uid      TEXT NOT NULL REFERENCES users(id),
+  created_at INTEGER NOT NULL,
+  UNIQUE(kind, ref_id, a_uid, b_uid)
+);
+CREATE INDEX IF NOT EXISTS idx_threads_a ON threads(a_uid);
+CREATE INDEX IF NOT EXISTS idx_threads_b ON threads(b_uid);
+
+CREATE TABLE IF NOT EXISTS thread_messages (
+  id         TEXT PRIMARY KEY,
+  thread_id  TEXT NOT NULL REFERENCES threads(id),
+  from_uid   TEXT NOT NULL REFERENCES users(id),
+  body       TEXT NOT NULL,
+  kind       TEXT NOT NULL DEFAULT 'text',      -- text / emoji
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_thread_msg ON thread_messages(thread_id, created_at);

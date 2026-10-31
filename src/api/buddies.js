@@ -14,8 +14,18 @@
  */
 import express from "express";
 import { requireWriteToken } from "../middleware/auth.js";
+import { ensureThreadForBuddy, threadIdForBuddy } from "../services/chat.js";   // 双方同意 → 站内私聊（替代旧"站内私聊"）
 import { ok } from "../util/envelope.js";
-import { listPosts, myApplications, publishPost, searchBuddies } from "../services/buddy.js";
+import {
+  castConsent,
+  listMessages,
+  listPosts,
+  myApplications,
+  myConsole,
+  postMessage,
+  publishPost,
+  searchBuddies,
+} from "../services/buddy.js";
 
 /** Express 4 不会自动接住 async handler 的异常，这里统一转交 routes.js 的错误中间件 */
 const wrap = (fn) => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
@@ -43,15 +53,54 @@ export function createBuddiesRouter() {
   );
 
   // 辅助（只读）：我发出的意愿（⛔ 只给 pending / mutual，不暴露对方个人表决位）
+  // 我的申请：默认仍是「我发出的意愿」数组（契约口径不变）；
+  // ?shape=console 时给站内用的三块结构 { posts, intents, mutual }
   router.get("/mine", (req, res) => {
-    res.json(
-      ok(
-        myApplications({
-          seeker_handle: req.query.handle ?? req.query.seeker_handle,
-          limit: req.query.limit,
-        }),
-      ),
-    );
+    const handle = req.query.handle ?? req.query.seeker_handle ?? req.session?.handle;
+    if (req.query.shape === "console") {
+      return res.json(ok(myConsole({ handle, limit: req.query.limit })));
+    }
+    res.json(ok(myApplications({ seeker_handle: handle, limit: req.query.limit })));
+  });
+
+  // 表达意愿（站内直接点，不再必须走 MCP）/ 回复（留言）
+  router.post(
+    "/:id/consent",
+    requireWriteToken,
+    wrap(async (req, res) => {
+      const body = req.body ?? {};
+      const me = req.session?.handle;   // ⭐ 有会话就用会话身份
+      const r = castConsent({ post_id: req.params.id, seeker_handle: me ?? body.handle ?? body.seeker_handle ?? body.from_handle, agree: body.agree !== false });
+      if (body.message) postMessage({ post_id: req.params.id, from_handle: me ?? body.handle ?? body.seeker_handle, body: body.message, kind: "message" });
+      // 双方都同意 → 直接把站内私聊会话给它（⛔ 不再给"站内私聊"）
+      if (r && r.revealed === 1) {
+        ensureThreadForBuddy(req.params.id);
+        r.chat_ready = true;
+        r.thread_id = threadIdForBuddy(req.params.id, req.session?.uid) || null;
+      }
+      res.json(ok(r));
+    }),
+  );
+
+  router.post(
+    "/:id/reply",
+    requireWriteToken,
+    wrap(async (req, res) => {
+      const body = req.body ?? {};
+      res.json(ok(postMessage({
+        post_id: req.params.id,
+        consent_id: body.to_consent_id ?? null,
+        from_handle: req.session?.handle ?? body.handle ?? body.from_handle,
+        to_handle: body.to_handle ?? null,
+        body: body.message,
+        kind: body.to_consent_id ? "reply" : "message",
+      })));
+    }),
+  );
+
+  // 留言与回复（只读）
+  router.get("/:id/messages", (req, res) => {
+    res.json(ok(listMessages(req.params.id)));
   });
 
   // 契约 §5：发布（写接口 → X-Demo-Token）
@@ -59,7 +108,9 @@ export function createBuddiesRouter() {
     "/",
     requireWriteToken,
     wrap(async (req, res) => {
-      res.json(ok(await publishPost(req.body ?? {})));
+      const b = req.body ?? {};
+      // ⭐ 有会话就用会话身份发帖（谁发的 = 谁）；无会话保留 body（MCP/老调用）
+      res.json(ok(await publishPost({ ...b, author_handle: req.session?.handle ?? b.author_handle })));
     }),
   );
 

@@ -97,13 +97,17 @@ try {
   const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS (\w+)/g)].map((m) => m[1]).sort();
   const expected = [
     "buddy_consents",
+    "buddy_messages",
     "buddy_posts",
     "map_nodes",
     "matches",
     "runners",
     "schedule_items",
     "scrub_audit",
+    "sessions",
     "tasks",
+    "thread_messages",
+    "threads",
     "users",
   ].sort();
   check(

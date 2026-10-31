@@ -1,7 +1,7 @@
-# 参赛材料索引 · 北名大小助手
+# 参赛材料索引 · 北民大小助手
 
-> **队名**：啊对对 ｜ **队伍编号**：`TM202610160004` ｜ **赛道 17**：智慧校园 Agent 创意赛道（第一届"银移杯"校园 AI Agent 创新大赛）
-> **项目**：北名大小助手 ｜ **演示站点**：`https://demo.knowingly.dpdns.org` ｜ **提交截止**：`2026-10-31 23:59:59`
+> **队名**：啊对对 ｜ **队伍编号**：`TM202610160004` ｜ **赛道一**：智慧校园 Agent 创意赛道（第一届"银移杯"校园 AI Agent 创新大赛）
+> **项目**：北民大小助手 ｜ **演示站点**：`https://demo.knowingly.dpdns.org` ｜ **提交截止**：`2026-10-31 23:59:59`
 > **仓库**：`https://github.com/xfjsssq/beimingda`（Public） ｜ **本目录分支**：`docs/materials`
 
 ---
@@ -16,11 +16,11 @@
 |---|---|---|---|
 | — | `README.md` | 本文件：索引 + 完成状态 + 导出记录 | ✅ 完成 |
 | 01 | `01-作品说明书.md` | 一句话定位 / 问题 / 四模块 / **MCP 可复用性** / 截图占位与图注 / 合规声明 / 团队与编号 / 实测自检 / 已知边界 | ✅ 完成 |
-| 02 | `02-技术方案.md` | 技术栈表 / 文字版分层架构 / 9 张表 + 索引 / **14 个 MCP 工具清单** / 三条技术约束 / 关键实现 / 已知边界 / 可复用性小结 | ✅ 完成 |
+| 02 | `02-技术方案.md` | 技术栈表 / 文字版分层架构 / 13 张表 + 索引 / **15 个 MCP 工具清单** / 三条技术约束 / 关键实现 / 已知边界 / 可复用性小结 | ✅ 完成 |
 | 03 | `03-演示脚本.md` | 路演 5 分钟逐分钟 5 段（说什么 / 点什么 / 屏幕上是啥）/ 直播硬规定 / 5 条示例对话 + 模块与工具映射 / 5 条问答预案 / Plan B | ✅ 完成 |
 | 04 | `04-合规与隐私说明.md` | 逐条回应「敏感信息脱敏」，每条都给**可核验位置**（表 / 接口 / 命令 / 代码路径 / 页面区块） | ✅ 完成 |
 | — | `截图清单.md` | 8 个画面 × 2 档视口（1440 / 375）+ 3 组备选，含页面 / 视口 / `?demo=1` / 图注 / 可核验点 / 已知缺口 | ✅ 完成 |
-| — | **截图原图（22 个 PNG）** | `C:\Users\17768\Desktop\北名大小助手-交付素材\`（**不在仓库**） | ✅ 已产出，随材料单独上传 |
+| — | **截图原图（22 个 PNG）** | `C:\Users\17768\Desktop\北民大小助手-交付素材\`（**不在仓库**） | ✅ 已产出，随材料单独上传 |
 | — | **源码 ZIP** | `git archive` 导出，含 `materials/`，不含 `.env` / `*.db` / `node_modules` / `.git/` | ⏳ 待所有功能分支合并 `main` 后导出（见 §4） |
 
 ---
@@ -29,9 +29,9 @@
 
 | 项 | 值 | 复核依据 |
 |---|---|---|
-| MCP 工具 | **14 个**（M1 5 / M2 3 / M3 2 / M4 4） | `src/mcp/handlers/{takeout,buddy,map,schedule}.js` 注册的 `name`；`POST /mcp tools/list`；`/agent` 页区块⑤ 实时核对 |
+| MCP 工具 | **15 个**（M1 5 / M2 3 / M3 2 / M4 4 / 跨模块 `app_open_view` 1） | `src/mcp/handlers/{takeout,buddy,map,schedule,app}.js` 注册的 `name`；`POST /mcp tools/list`；`/agent` 页区块⑤ 实时核对 |
 | 页面 | **6 个**：`/` `/takeout` `/buddy` `/welcome` `/schedule` `/agent` | `src/server.js` 的 `PAGES` 常量 + `static/*.html` |
-| 数据库表 | **9 张**：`users` `tasks` `runners` `matches` `buddy_posts` `buddy_consents` `schedule_items` `map_nodes` `scrub_audit` | `src/db/schema.sql`；`npm run smoke` 的表清单核对项 |
+| 数据库表 | **13 张**：`users` `tasks` `runners` `matches` `buddy_posts` `buddy_consents` `buddy_messages` `schedule_items` `map_nodes` `scrub_audit` `sessions` `threads` `thread_messages` | `src/db/schema.sql`；`npm run smoke` 的表清单核对项 |
 
 ---
 
@@ -39,15 +39,15 @@
 
 | 命令 / 检查 | 结果 |
 |---|---|
-| `npm test` | **75 / 75 通过** |
-| `npm run smoke` | **8 / 8 通过**（含 `tools/list` = 14 个工具、表清单 9 张、全仓无硬编码密钥） |
-| `npm run verify`（跨模块集成自检） | **107 / 107 通过**（14 个工具逐个真调 + 6 页 + HTTP 路由 + CDN 红线） |
+| `npm test` | **170 / 170 通过** |
+| `npm run smoke` | **8 / 8 通过**（含 `tools/list` = 15 个工具、表清单 13 张、全仓无硬编码密钥） |
+| `npm run verify`（跨模块集成自检） | **114 / 114 通过**（15 个工具逐个真调 + 6 页 + HTTP 路由 + CDN 红线） |
 | 6 个页面可访问 | 全部 HTTP 200 |
 | 375px 手机视口 | 6 页均 `documentElement.scrollWidth === 375`（不破版） |
 | `?demo=1` 演示徽章 | 6 页**均可见**（375×812 实测） |
 | `/welcome` 点位 | **12 个点位全部渲染** |
 | 页面 4xx 噪音 | **无**（`/favicon.svg` 返回 200） |
-| 全站文件上传控件 | 仅 `/takeout` **一处**（代取截图；课表页 0 处） |
+| 全站文件上传控件 | **0 处**（代取截图入口已于 2026-10-31 下线；需要识别请在 WorkBuddy 里发图给对话方） |
 | 脱敏审计 | `GET /api/scrub/audit` 实测返回 `dropped_fields: ["studentNo","phone"]`（**只有字段名，无值**） |
 
 ---
@@ -103,8 +103,8 @@ tar -tf .\源码.zip | Select-String -Pattern '\.env$|\.db$|node_modules|\.git/'
 
 - **不收集身份信息**：全站不收集真实姓名 / 学号 / 手机号 / 证件号 / 学生证照片 / 校内系统口令；数据库**没有任何字段能存这些**。
 - **不接入学校任何内部系统**：不接入、不登录、不抓取；无"输入学号 / 校内口令"的字段或方案。
-- **没有「上传课表文件」入口**（刻意设计）：课表只能走对话（MCP），服务端无课表上传接口；
-  全站 `input[type=file]` 仅 `/takeout` 一处（代取截图，图不落盘）。
+- **站内没有任何文件上传入口**（刻意设计）：课表只能走对话（MCP），服务端无课表上传接口；
+  代取截图入口也于 2026-10-31 下线 —— 需要识别时请在 WorkBuddy 里把截图发给对话方（图不落盘）。
 - **演示数据全匿名**：`?demo=1`，姓名一律「同学A / 同学B」，页面右上角有「演示模式」徽章。
 - **令牌**：材料、页面、截图、录屏里**一律写作占位符 `<DEMO_TOKEN>`**；真实值只存在于服务端环境变量，由站长单独发给评委。
 - **平台不参与交易**：报酬线下协商，不代收款、不承诺履约。

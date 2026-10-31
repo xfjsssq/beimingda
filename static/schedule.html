@@ -1,323 +1,920 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-page="schedule">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>日程与提醒 · 北名大小助手</title>
+  <title>日程与提醒：点课表格子就能改</title>
+  <link rel="stylesheet" href="/css/app.css" />
   <style>
-    :root { --pri:#1F4E8C; --ok:#2E8B76; --warn:#B45309; --bg:#F5F7FA; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:#1c1c1e;
-      font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
-    main { max-width:1080px; margin:0 auto; padding:28px 20px 64px; }
-    h1 { color:var(--pri); font-size:23px; margin:0 0 6px; }
-    .sub { color:#5b6470; margin:0 0 20px; }
-    .card { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px;
-      box-shadow:0 1px 3px rgba(16,24,40,.08); }
-    .card h2 { font-size:16px; margin:0 0 10px; color:var(--pri); }
-    .card h2 small { font-weight:400; color:#6b7280; font-size:12px; margin-left:6px; }
-    code { font-family:Consolas,"Courier New",monospace; font-size:13px; }
-    table { border-collapse:collapse; width:100%; font-size:13px; }
-    th, td { border:1px solid #e5e7eb; padding:6px 8px; text-align:left; vertical-align:top; }
-    th { background:#f3f4f6; font-weight:600; }
-    .grid td { height:38px; }
-    .slot { background:rgba(31,78,140,.08); border-left:3px solid var(--pri); padding:2px 6px; border-radius:4px; font-size:12px; }
-    .slot.cont { opacity:.55; border-left-color:#9ca3af; }
-    .notice { background:#FFFBEB; border:1px solid #FCD34D; border-radius:10px; padding:12px 14px; }
-    .notice strong { color:var(--warn); }
-    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
-    label { font-size:12px; color:#4b5563; display:block; margin-bottom:4px; }
-    input, select { padding:7px 9px; border:1px solid #d1d5db; border-radius:8px; font-size:13px; background:#fff; }
-    input[type="text"] { min-width:130px; }
-    button { background:var(--pri); color:#fff; border:0; border-radius:8px; padding:8px 14px;
-      font-size:13px; cursor:pointer; }
-    button.ghost { background:#fff; color:var(--pri); border:1px solid var(--pri); }
-    button:disabled { opacity:.55; cursor:default; }
-    .muted { color:#6b7280; font-size:12px; }
-    .ok { color:var(--ok); } .bad { color:#B91C1C; }
-    .pill { display:inline-block; font-size:11px; padding:1px 7px; border-radius:999px;
-      background:rgba(31,78,140,.1); color:var(--pri); margin-left:6px; }
-    /* ⚠️ 7 列 × 节次的周课表在窄屏必然放进 375px：
+    /* 本页只保留「周课表网格」特有样式；其余全走 /css/app.css
+       注意：7 列 × 第 1–14 节在窄屏必然放不进 375px：
        ① 表格包在可横向滚动的容器里（表格自身宽度由内容决定，不能指望它收缩）
-       ② 窄屏再降一档字号/内边距，绝大多数情况无需滚动 */
-    #gridWrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
-    #gridWrap table { min-width:0; }
-    @media (max-width:640px) {
-      main { padding:16px 12px 56px; }
-      .card { padding:12px 12px; }
-      table { font-size:12px; }
-      th, td { padding:5px 4px; }
-      .grid td { height:34px; }
-      .slot { font-size:11px; padding:2px 4px; }
-      /* 7 列课表在窄屏不再硬压（会把课程名压成逐字竖排）：
-         给表格一个合理最小宽，让 #gridWrap 真横向滚动，字还是正常横排可读 */
-      #gridWrap table.grid { min-width:520px; }
-      input[type="text"] { min-width:0; width:100%; }
-      input[type="number"] { width:88px; }
+       ② 首列「节次」冻结，横滑时不会丢失时间基准
+       ③ 页面本体不横滚 —— 只有这块容器横滑（否则 375px 会整页横着跑） */
+    #gridWrap {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      border: 1px solid var(--color-line);
+      border-radius: var(--radius-md);
+      background: #fff;
+      box-shadow: var(--shadow-card);
+      /* 「今天」那一列的颜色从这两个变量派生，不在页面里写死一堆 hex */
+      --today-hue: 215;
+      --today-bg: hsl(var(--today-hue) 62% 97%);
+      --today-bg-strong: hsl(var(--today-hue) 58% 93%);
+      --today-fg: hsl(var(--today-hue) 55% 38%);
+    }
+    #gridWrap table.course-grid {
+      border-collapse: collapse;
+      width: 100%;
+      min-width: 640px;
+      font-size: 13px;
+    }
+    #gridWrap th,
+    #gridWrap td {
+      padding: 4px 6px;
+      text-align: left;
+      vertical-align: top;
+      border-bottom: 1px solid var(--color-line);
+    }
+    #gridWrap thead th {
+      background: var(--color-sunken);
+      color: var(--color-muted);
+      font-size: 12.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+    #gridWrap tbody th {
+      background: var(--color-sunken);
+      color: var(--color-muted);
+      font-size: var(--size-xs);
+      font-weight: 600;
+      white-space: nowrap;
+      text-align: center;
+    }
+    /* 今天那一列：表头带「今天」标，整列浅底（颜色都来自上面的 CSS 变量） */
+    #gridWrap th.is-today {
+      background: var(--today-bg-strong);
+      color: var(--today-fg);
+    }
+    #gridWrap th.is-today::after {
+      content: "今天";
+      display: block;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.4;
+      color: var(--today-fg);
+    }
+    #gridWrap td.is-today { background: var(--today-bg); }
+    #gridWrap td.is-today.is-clickable:hover { background: var(--today-bg-strong); }
+    /* 首列冻结：横滑时「第几节」始终可见 */
+    #gridWrap tr > *:first-child {
+      position: sticky;
+      left: 0;
+      background: var(--color-sunken);
+      z-index: 1;
+      box-shadow: 1px 0 0 var(--color-line);
+    }
+    #gridWrap thead th:first-child {
+      background: var(--color-sunken);
+      z-index: 4;
+    }
+    #gridWrap td { height: 44px; }
+    /* 每门课一个色相（JS 按课程名哈希取 0~5）：底色 / 左边线 / 字色全由 --h 派生 */
+    .slot {
+      --h: 215;
+      --slot-bg: hsl(var(--h) 62% 95%);
+      --slot-line: hsl(var(--h) 52% 42%);
+      --slot-fg: hsl(var(--h) 45% 26%);
+      background: var(--slot-bg);
+      border-left: 3px solid var(--slot-line);
+      color: var(--slot-fg);
+      padding: var(--sp-25) var(--sp-50);
+      border-radius: var(--r-sm);
+      font-size: var(--size-xs);
+      line-height: 1.45;
+    }
+    .slot--h0 { --h: 215; } /* 品牌蓝 */
+    .slot--h1 { --h: 168; } /* 青绿 */
+    .slot--h2 { --h: 32; }  /* 琥珀 */
+    .slot--h3 { --h: 268; } /* 紫 */
+    .slot--h4 { --h: 348; } /* 玫红 */
+    .slot--h5 { --h: 196; } /* 天蓝 */
+    .slot .room { font-size: 11px; color: var(--color-muted); }
+    .slot.cont { opacity: .5; }
+    .slot + .slot { margin-top: var(--sp-25); }
+    /* 概览里的文字型统计（最早 / 最晚那一节）不要 30px 的大字 */
+    .stat--text .stat__value { font-size: var(--size-lg); letter-spacing: 0; }
+    /* 对话示例：窄屏自动折行，不靠横向滚动 */
+    #dlgBlock { white-space: pre-wrap; word-break: break-word; }
+    @media (max-width: 640px) {
+      #gridWrap table.course-grid { min-width: 540px; }
+      #gridWrap td { height: 40px; }
+      .slot { font-size: 11px; }
+      /* 窄屏：区块标题里的补充说明换行，别把「一周课表」挤成断字两行 */
+      .section__title { flex-wrap: wrap; }
+      .section__title small { flex: 1 1 100%; }
     }
   </style>
+  <meta name="description" content="只收星期、节次、课程名、教室、周次五个匿名字段，脱敏审计只记字段名不记值。" />
+  <meta property="og:title" content="日程与提醒：点课表格子就能改" />
+  <meta property="og:description" content="只收星期、节次、课程名、教室、周次五个匿名字段，脱敏审计只记字段名不记值。" />
+  <meta property="og:type" content="website" />
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 </head>
 <body>
-<main>
-  <h1>日程与主动提醒</h1>
-  <p class="sub">只保存「周几 / 起止节次 / 课程名 / 教室 / 周次」。提醒由平台定时任务触发，不占用任何长连接。</p>
+<a class="skip-link" href="#main">跳到主要内容</a>
+<main class="page" id="main">
 
-  <!-- 身份：仅昵称，无任何身份字段 -->
-  <div class="card">
+  <!-- 顶栏只有一行：左侧内置演示身份，右侧两个入口（导入指引 / 提醒设置） -->
+  <div class="toolbar">
+    <span class="chip" id="whoChip" title="身份内置，不需要输入任何名字">
+      <span class="icon icon--14" style="--icon:url(/vendor/phosphor/icons/user.svg)" aria-hidden="true"></span>
+      <span class="small" id="whoText">演示身份：同学A</span>
+    </span>
+    <span class="toolbar__spacer"></span>
+    <button class="btn btn--ghost btn--sm" id="overviewBtn" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/chart-bar.svg)" aria-hidden="true"></span>本周概览
+    </button>
+    <button class="btn btn--ghost btn--sm" id="importBtn" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/calendar-event.svg)" aria-hidden="true"></span>导入课表
+    </button>
+    <button class="btn btn--ghost btn--sm" id="remindBtn" type="button">
+      <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/clock.svg)" aria-hidden="true"></span>提醒设置
+    </button>
+  </div>
+
+  <h1 class="sr-only">日程与主动提醒 · 一周课表</h1>
+
+  <!-- 首屏就是课表：7 列 × 第 1–14 节，点任意格子直接编辑这一节课 -->
+  <section class="section" aria-labelledby="gridTitle">
+    <h2 class="section__title" id="gridTitle">
+      <span class="section__index">1</span>一周课表
+      <small>7 列 × 第 1–14 节 · 点格子就能改这节课</small>
+    </h2>
+    <div id="gridWrap" aria-busy="true"></div>
+    <p class="section__note" id="gridNote">正在载入课表…</p>
+  </section>
+
+  <!-- 合规说明（一句话）+ 脱敏审计：原来那一大块收成一行按钮 -->
+  <section class="section reveal" aria-labelledby="auditTitle">
+    <h2 class="section__title" id="auditTitle">
+      <span class="section__index">2</span>合规与脱敏审计
+      <small>只记字段名，不记任何字段值</small>
+    </h2>
     <div class="row">
-      <div>
-        <label for="handle">你的昵称（仅用于区分日程，不涉及身份信息）</label>
-        <input id="handle" type="text" value="同学A" />
-      </div>
-      <button id="loadBtn" class="ghost">载入我的日程</button>
-      <span class="muted" id="whoami"></span>
+      <button class="btn btn--quiet btn--sm" id="auditBtn" type="button">
+        <span class="icon icon--16" style="--icon:url(/vendor/phosphor/icons/shield-check.svg)" aria-hidden="true"></span>查看脱敏审计记录
+      </button>
+      <span class="hint">打开后只列出被丢弃的<b>字段名</b>，任何字段值都不记录、不展示。</span>
     </div>
-  </div>
-
-  <!-- 区块一 · 周视图 -->
-  <div class="card">
-    <h2>① 一周课表 <small>7 列 × 节次网格</small></h2>
-    <div id="gridWrap" class="muted">还没有日程。可以先在下方手动添加，或在对话里让 Agent 导入。</div>
-  </div>
-
-  <!-- 区块二 · 导入指引（合规说明区，必须显眼） -->
-  <div class="card">
-    <h2>② 怎么导入课表 <small>⚠️ 请先读这一段</small></h2>
-    <div class="notice">
-      <p style="margin:0 0 8px"><strong>课表文件不要上传到这里。</strong>本页面没有、也不会有任何上传入口。</p>
-      <p style="margin:0">
-        请在学校官方渠道导出课表后，在<strong>你自己的本机</strong> WorkBuddy 对话里交给 Agent 处理 ——
-        Agent 只会把「周几 / 起止节次 / 课程名 / 教室 / 周次」写入平台，
-        <strong>姓名与学号不会离开你的设备</strong>。每次导入后 Agent 会告诉你写入了多少条、
-        丢弃了哪些类别的字段（这些类别会记进下方第 ⑤ 区块的脱敏审计）。
-      </p>
-    </div>
-    <p class="muted" style="margin:10px 0 0">
-      对话里可以这么说：<code>把我的课表导入：周一 1-2 节 课程A，周三 3-4 节 课程B……</code>
+    <p class="notice notice--warn" style="margin-top:12px">
+      课表文件不要上传到这里 —— <b>本页没有、也不会有任何上传入口</b>，课表只走 WorkBuddy 对话（MCP）。
+      点右上角「导入课表」可以看到该怎么对 Agent 说。
     </p>
-  </div>
+  </section>
 
-  <!-- 区块三 · 手动添加（只有 6 个字段） -->
-  <div class="card">
-    <h2>③ 手动添加一门课 <small>不想用对话时的兜底</small></h2>
-    <form id="addForm">
-      <div class="row">
-        <div><label for="weekday">周几</label>
-          <select id="weekday">
-            <option value="1">周一</option><option value="2">周二</option><option value="3">周三</option>
-            <option value="4">周四</option><option value="5">周五</option><option value="6">周六</option>
-            <option value="7">周日</option>
-          </select></div>
-        <div><label for="ps">起节</label><input id="ps" type="number" min="1" max="14" value="1" style="width:80px" /></div>
-        <div><label for="pe">止节</label><input id="pe" type="number" min="1" max="14" value="2" style="width:80px" /></div>
-        <div><label for="title">课程名</label><input id="title" type="text" placeholder="课程A" /></div>
-        <div><label for="room">教室（可选）</label><input id="room" type="text" placeholder="教学楼A-101" /></div>
-        <div><label for="weeks">周次（可选）</label><input id="weeks" type="text" placeholder="1-16" style="width:110px" /></div>
-        <div><label for="rb">提前提醒（分钟）</label><input id="rb" type="number" min="0" max="1440" placeholder="不提醒" style="width:120px" /></div>
-        <button type="submit">添加 / 更新</button>
-      </div>
-    </form>
-    <p class="muted" style="margin:8px 0 0">同一门课（周几+起止节次+课程名）再次提交是<strong>更新</strong>，不会产生重复条目。</p>
-  </div>
-
-  <!-- 区块四 · 提醒设置 -->
-  <div class="card">
-    <h2>④ 提醒设置 <small>每门课单独设置，单位分钟；留空 = 不提醒</small></h2>
-    <div id="remindWrap" class="muted">载入日程后可在这里逐门课设置。</div>
-    <p class="muted" style="margin:8px 0 0">
-      提醒由服务端定时任务每 5 分钟检查一次（按 Asia/Shanghai 计算），不使用 SSE 长连接。
-    </p>
-  </div>
-
-  <!-- 区块五 · 脱敏审计 -->
-  <div class="card">
-    <h2>⑤ 脱敏审计 <small>最近一次导入丢弃了哪些类别的字段</small></h2>
-    <div id="auditWrap" class="muted">正在读取…</div>
-    <p class="muted" style="margin:8px 0 0">审计只记录<strong>字段名</strong>，绝不记录任何字段值。</p>
-  </div>
 </main>
 
+<footer class="site-footer">
+  <p>北民大小助手 · 第一届「银移杯」赛道一 智慧校园 Agent｜演示数据全部虚构（demo=1）。</p>
+  <p>本页不接收课表文件，也不收集姓名 / 学号 / 手机号。</p>
+<nav class="site-footer__legal" aria-label="法律与来源">
+    <a href="/agent#p-compliance">隐私与合规说明</a>
+    <a href="/legal.html">许可与素材来源</a>
+    <a href="/agent">接入说明</a>
+  </nav>
+</footer>
+
 <script src="/config.js"></script>
-<script>
-  /* ?demo=1 演示模式（contracts/frontend.md §5）：/js/demo.js 是 ES module，
-     由 F0 分支提供；未就绪时 import 失败不影响本页其余功能。⛔ 本页不读也不显示令牌。 */
-  import("/js/demo.js").then(function (m) { if (m && m.initDemo) m.initDemo(); }).catch(function () {});
-</script>
-<script>
-(function () {
-  var WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
-  var MAX_PERIOD = 10;
-  var state = { items: [] };
+<script type="module">
+import { api, mcpRpc } from "/js/api.js";
+import { mountNav } from "/js/nav.js";
+import { initDemo } from "/js/demo.js";
+import { el, icon, showLoading, createSheet, openModal, toast, copyText, initReveals } from "/js/ui.js";
 
-  function el(id) { return document.getElementById(id); }
-  function esc(s) {
-    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
-      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
-    });
-  }
-  function handle() { return (el("handle").value || "").trim(); }
+/* =============================================================================
+   页面重做要点（2026-10-28）
+     1. 没有昵称输入框：身份内置为演示身份「同学A」（?handle=xxx 仅供自测覆盖）
+     2. 首屏就是课表；顶部只留一行 .toolbar（导入课表 / 提醒设置 两个入口）
+     3. 底部那一整块加课表单删掉 -> 改成点课表格子直接编辑（新增 / 修改 / 删除）
+     4. 脱敏审计收成一行按钮，明细进侧栏（createSheet）
+     5. 图标一律 .icon + /vendor/phosphor/icons/*.svg（无 emoji、无外链）
+   ============================================================================= */
 
-  // 写接口按 contracts/core.md §4 需要 X-Demo-Token；令牌由 /config.js 注入（⛔ 不硬编码）
-  function writeToken() {
-    return (window.__DEMO_TOKEN__ || "").trim();
-  }
-  function api(url, opts) {
-    opts = opts || {};
-    var method = (opts.method || "GET").toUpperCase();
-    if (method !== "GET") {
-      opts.headers = Object.assign({}, opts.headers || {}, { "X-Demo-Token": writeToken() });
-      if (!opts.headers["Content-Type"]) opts.headers["Content-Type"] = "application/json";
-    }
-    return fetch(url, opts).then(function (r) { return r.json(); });
-  }
+const WEEK_LABELS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
-  function renderGrid() {
-    if (!state.items.length) {
-      el("gridWrap").className = "muted";
-      el("gridWrap").textContent = "还没有日程。可以先在下方手动添加，或在对话里让 Agent 导入。";
-      return;
-    }
-    var cells = {};
-    state.items.forEach(function (it) {
-      for (var p = it.period_start; p <= it.period_end; p++) {
-        cells[it.weekday + "-" + p] = cells[it.weekday + "-" + p] || [];
-        cells[it.weekday + "-" + p].push(it);
+/* 课程色板：按课程名哈希取 0~5，具体颜色由页面 CSS 变量派生（.slot--h0 … .slot--h5），
+   一门课的色相永远稳定 —— 刷新、改教室、换周次都不会变色 */
+const SLOT_HUES = 6;
+function hueIndex(name) {
+  const s = String(name || "").trim();
+  if (!s) return 0;
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 100003;
+  return h % SLOT_HUES;
+}
+
+/** 今天是周几（1=周一 … 7=周日），与 WEEK_LABELS / weekday 字段同一套编号 */
+function todayWeekday() {
+  const d = new Date().getDay();
+  return d === 0 ? 7 : d;
+}
+const TODAY = todayWeekday();
+/* 与契约的 1~14 对齐：早期 MAX_PERIOD=10 会让 11-14 节的课「写进去了但课表不显示」 */
+const MAX_PERIOD = 14;
+/* 身份内置：页面不再要求任何人输名字；?handle=xxx 只用于自测/演示切换 */
+const DEFAULT_HANDLE = "同学A";
+/* 契约里写明的删除路由（本分支尚未合并 -> 走下面的 MCP 退路，见 removeItem） */
+const REMOVE_PATH = "/api/schedule/remove";
+/* 课表入口只走对话：给一段可直接复制的示例对话（刻意不做任何上传 / 粘贴入口） */
+const SAMPLE_DIALOGUE = "帮我导入一下这学期课表：周一 1-2 节 课程A（教学楼A-101），周三 3-4 节 课程B（实验楼C-201），周次 1-16。";
+
+function paramHandle() {
+  try {
+    return (new URLSearchParams(location.search).get("handle") || "").trim();
+  } catch {
+    return "";
+  }
+}
+const HANDLE = paramHandle() || DEFAULT_HANDLE;
+
+const state = { items: [] };
+const byId = (id) => document.getElementById(id);
+const num = (v) => Number(v);
+
+/** 条目身份键：与 POST /api/schedule 的 upsert 键 (weekday, ps, pe, title) 完全一致 */
+const keyOf = (it) => [num(it.weekday), num(it.period_start), num(it.period_end), String(it.title || "").trim()].join("|");
+
+function itemsAt(weekday, period) {
+  return state.items.filter(
+    (it) => num(it.weekday) === weekday && period >= num(it.period_start) && period <= num(it.period_end),
+  );
+}
+
+/** 一条记录 -> MCP/接口都认的白名单 6 字段（不带任何身份字段） */
+function itemOf(v) {
+  return {
+    weekday: num(v.weekday),
+    period_start: num(v.period_start),
+    period_end: num(v.period_end),
+    title: String(v.title || "").trim(),
+    room: v.room ? String(v.room).trim() : null,
+    weeks: v.weeks ? String(v.weeks).trim() : null,
+  };
+}
+
+/** 写接口请求体：6 字段 + remind_before（留空 = null = 不提醒） */
+function bodyOf(v) {
+  const body = Object.assign({ user_handle: HANDLE }, itemOf(v));
+  const raw = v.remind_before;
+  body.remind_before = raw === "" || raw === null || raw === undefined ? null : Number(raw);
+  return body;
+}
+
+/* ------------------------------------------------------------------ 三态（自带 phosphor 图标，不用 emoji） */
+function stateBox(target, kind, iconName, title, hint, actionText, onAction) {
+  const wrap = el("div", "state" + (kind ? " state--" + kind : ""));
+  if (iconName) {
+    const box = el("div", "state__icon");
+    box.appendChild(icon(iconName, { size: 24 }));
+    wrap.appendChild(box);
+  }
+  if (title) wrap.appendChild(el("p", "state__title", title));
+  if (hint) wrap.appendChild(el("p", "state__hint", hint));
+  if (actionText && typeof onAction === "function") {
+    const bar = el("div", "state__action");
+    const btn = el("button", "btn btn--ghost btn--sm", actionText);
+    btn.type = "button";
+    btn.addEventListener("click", onAction);
+    bar.appendChild(btn);
+    wrap.appendChild(bar);
+  }
+  if (!target) return wrap;
+  target.innerHTML = "";
+  target.appendChild(wrap);
+  target.setAttribute("role", kind === "error" ? "alert" : "status");
+  return wrap;
+}
+
+/* ------------------------------------------------------------------ 周课表：点格子 = 编辑这节课 */
+function cellNode(weekday, period, list) {
+  const td = el("td", "is-clickable");
+  td.dataset.d = String(weekday);
+  td.dataset.p = String(period);
+  td.tabIndex = 0;
+  td.setAttribute("role", "button");
+  if (weekday === TODAY) td.classList.add("is-today");
+
+  const where = WEEK_LABELS[weekday - 1] + " 第" + period + "节";
+  const main = list.filter((it) => num(it.period_start) === period)[0] || list[0] || null;
+
+  if (main) {
+    list.forEach((it) => {
+      const started = num(it.period_start) === period;
+      const slot = el("div", "slot slot--h" + hueIndex(it.title) + (started ? "" : " cont"));
+      if (started) {
+        slot.appendChild(document.createTextNode(String(it.title || "")));
+        if (it.room) {
+          slot.appendChild(document.createElement("br"));
+          slot.appendChild(el("span", "room", String(it.room)));
+        }
+      } else {
+        slot.appendChild(document.createTextNode("…"));
       }
+      if (it.weeks) slot.title = "周次 " + it.weeks;
+      td.appendChild(slot);
     });
-    var html = '<table class="grid"><thead><tr><th style="width:64px">节次</th>';
-    WEEK_LABELS.forEach(function (w) { html += "<th>" + w + "</th>"; });
-    html += "</tr></thead><tbody>";
-    for (var p = 1; p <= MAX_PERIOD; p++) {
-      html += '<tr><th>' + p + "</th>";
-      for (var d = 1; d <= 7; d++) {
-        var list = cells[d + "-" + p] || [];
-        html += "<td>";
-        list.forEach(function (it) {
-          var isStart = it.period_start === p;
-          html += '<div class="slot' + (isStart ? "" : " cont") + '" title="' +
-            esc(it.weeks ? "周次 " + it.weeks : "") + '">' +
-            (isStart ? esc(it.title) + (it.room ? '<br><span style="font-size:11px">' + esc(it.room) + "</span>" : "")
-                     : "…") +
-            "</div>";
-        });
-        html += "</td>";
-      }
-      html += "</tr>";
+    td.setAttribute("aria-label", where + "「" + String(main.title || "") + "」，点一下改写或删除");
+  } else {
+    td.setAttribute("aria-label", where + " 空，点一下加一节课");
+  }
+
+  const hint = el("span", "slot-add");
+  hint.appendChild(icon(main ? "pencil" : "plus", { size: 14 }));
+  td.appendChild(hint);
+  return td;
+}
+
+/** 空课表：用本站空态插画 + 一个入口（走对话导入），而不是一行灰字 */
+function renderEmptyGrid(wrap) {
+  const box = el("div", "empty-art");
+  const img = document.createElement("img");
+  img.src = "/img/empty-state.png";
+  img.alt = "空课表示意插画";
+  img.width = 333;
+  img.height = 400;
+  img.loading = "lazy";
+  box.appendChild(img);
+  box.appendChild(el("p", "state__title", "这一周还没有课"));
+  box.appendChild(el("p", "", "点任意格子就能加第一节课；整张课表建议让 Agent 在对话里导入。"));
+  const btn = el("button", "btn btn--ghost btn--sm");
+  btn.type = "button";
+  btn.appendChild(icon("message-chatbot", { size: 16 }));
+  btn.appendChild(document.createTextNode("怎么让 Agent 导入"));
+  btn.addEventListener("click", () => openSheetOnly(openImportSheet));
+  box.appendChild(btn);
+  wrap.appendChild(box);
+}
+
+function renderGrid() {
+  const wrap = byId("gridWrap");
+  wrap.removeAttribute("aria-busy");
+  wrap.innerHTML = "";
+
+  if (!state.items.length) {
+    renderEmptyGrid(wrap);
+    byId("gridNote").textContent =
+      "这张课表还是空的 · 点任意格子就能加第一节课，也可以点右上角「导入课表」，让 Agent 在对话里导入整张课表。";
+    return;
+  }
+
+  const cells = {};
+  state.items.forEach((it) => {
+    for (let p = num(it.period_start); p <= num(it.period_end); p++) {
+      const k = num(it.weekday) + "-" + p;
+      if (!cells[k]) cells[k] = [];
+      cells[k].push(it);
     }
-    html += "</tbody></table>";
-    el("gridWrap").className = "";
-    el("gridWrap").innerHTML = html;
-  }
-
-  function renderRemind() {
-    if (!state.items.length) {
-      el("remindWrap").className = "muted";
-      el("remindWrap").textContent = "载入日程后可在这里逐门课设置。";
-      return;
-    }
-    var html = '<table><thead><tr><th>课程</th><th>时间</th><th>提前提醒（分钟）</th><th></th></tr></thead><tbody>';
-    state.items.forEach(function (it, i) {
-      html += "<tr><td>" + esc(it.title) + (it.room ? '<span class="pill">' + esc(it.room) + "</span>" : "") + "</td>" +
-        "<td>" + WEEK_LABELS[it.weekday - 1] + " 第" + it.period_start + (it.period_end > it.period_start ? "-" + it.period_end : "") + "节</td>" +
-        '<td><input type="number" min="0" max="1440" style="width:110px" id="rb' + i + '" value="' +
-        (it.remind_before == null ? "" : it.remind_before) + '" placeholder="不提醒" /></td>' +
-        '<td><button class="ghost" data-i="' + i + '">保存</button></td></tr>';
-    });
-    html += "</tbody></table>";
-    el("remindWrap").className = "";
-    el("remindWrap").innerHTML = html;
-    Array.prototype.forEach.call(el("remindWrap").querySelectorAll("button[data-i]"), function (btn) {
-      btn.addEventListener("click", function () {
-        var i = Number(btn.getAttribute("data-i"));
-        var it = state.items[i];
-        var raw = el("rb" + i).value;
-        var rb = raw === "" ? null : Number(raw);
-        btn.disabled = true;
-        api("/api/schedule", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            user_handle: handle(), weekday: it.weekday, period_start: it.period_start,
-            period_end: it.period_end, title: it.title, room: it.room, weeks: it.weeks,
-            remind_before: rb,
-          }),
-        }).then(function (j) {
-          btn.disabled = false;
-          if (j.ok) { load(); } else { alert("保存失败：" + (j.error && j.error.message)); }
-        }).catch(function (e) { btn.disabled = false; alert("保存失败：" + e.message); });
-      });
-    });
-  }
-
-  function renderAudit() {
-    api("/api/scrub/audit?limit=20").then(function (j) {
-      if (!j.ok || !j.data || !j.data.length) {
-        el("auditWrap").className = "muted";
-        el("auditWrap").textContent = "暂时没有审计记录（说明还没有字段被丢弃）。";
-        return;
-      }
-      var html = '<table><thead><tr><th>时间</th><th>类型</th><th>被丢弃的字段名</th></tr></thead><tbody>';
-      j.data.forEach(function (row) {
-        html += "<tr><td>" + esc(row.created_at) + "</td><td>" + esc(row.item_type) + "</td><td><code>" +
-          esc((row.dropped_fields || []).join(", ")) + "</code></td></tr>";
-      });
-      html += "</tbody></table>";
-      el("auditWrap").className = "";
-      el("auditWrap").innerHTML = html;
-    }).catch(function (e) {
-      el("auditWrap").className = "bad";
-      el("auditWrap").textContent = "读取失败：" + e.message;
-    });
-  }
-
-  function load() {
-    var h = handle();
-    if (!h) { alert("请先填昵称"); return; }
-    try { localStorage.setItem("bm_handle", h); } catch (e) {}
-    el("whoami").textContent = "当前：" + h;
-    api("/api/schedule?handle=" + encodeURIComponent(h)).then(function (j) {
-      state.items = j.ok && Array.isArray(j.data) ? j.data : [];
-      renderGrid();
-      renderRemind();
-    }).catch(function (e) {
-      el("gridWrap").className = "bad";
-      el("gridWrap").textContent = "载入失败：" + e.message;
-    });
-    renderAudit();
-  }
-
-  el("loadBtn").addEventListener("click", load);
-
-  el("addForm").addEventListener("submit", function (ev) {
-    ev.preventDefault();
-    var rbRaw = el("rb").value;
-    var body = {
-      user_handle: handle(),
-      weekday: Number(el("weekday").value),
-      period_start: Number(el("ps").value),
-      period_end: Number(el("pe").value),
-      title: (el("title").value || "").trim(),
-    };
-    if (el("room").value.trim()) body.room = el("room").value.trim();
-    if (el("weeks").value.trim()) body.weeks = el("weeks").value.trim();
-    if (rbRaw !== "") body.remind_before = Number(rbRaw);
-
-    api("/api/schedule", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(body),
-    }).then(function (j) {
-      if (j.ok) { el("title").value = ""; load(); }
-      else { alert("添加失败：" + (j.error && j.error.message)); }
-    }).catch(function (e) { alert("添加失败：" + e.message); });
   });
 
-  try {
-    var saved = localStorage.getItem("bm_handle");
-    if (saved) el("handle").value = saved;
-  } catch (e) {}
+  const table = document.createElement("table");
+  table.className = "course-grid";
 
-  load();
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  const corner = el("th", "", "节次");
+  corner.setAttribute("scope", "col");
+  headRow.appendChild(corner);
+  WEEK_LABELS.forEach((w, idx) => {
+    const th = el("th", "", w);
+    th.setAttribute("scope", "col");
+    if (idx + 1 === TODAY) {
+      th.classList.add("is-today");
+      th.setAttribute("aria-label", w + "（今天）");
+    }
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (let p = 1; p <= MAX_PERIOD; p++) {
+    const tr = document.createElement("tr");
+    const th = el("th", "", "第 " + p + " 节");
+    th.setAttribute("scope", "row");
+    tr.appendChild(th);
+    for (let d = 1; d <= 7; d++) tr.appendChild(cellNode(d, p, cells[d + "-" + p] || []));
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  const count = state.items.length;
+  byId("gridNote").textContent =
+    "共 " + count + " 节课 · 点课程格子改这节课，点空格子加一节课（只存 周几 / 起止节次 / 课程名 / 教室 / 周次 / 提前提醒）。";
+}
+
+async function load() {
+  const wrap = byId("gridWrap");
+  wrap.setAttribute("aria-busy", "true");
+  showLoading(wrap, "正在载入你的课表…");
+  try {
+    const data = await api("/api/schedule?handle=" + encodeURIComponent(HANDLE));
+    state.items = Array.isArray(data) ? data : [];
+    renderGrid();
+  } catch (e) {
+    state.items = [];
+    stateBox(wrap, "error", "alert-triangle", "课表读取失败", (e && e.message) || String(e), "重试", load);
+    byId("gridNote").textContent = "读取失败：确认服务在跑（端口按启动参数），然后点上面的「重试」。";
+  }
+}
+
+function openCell(td) {
+  const weekday = num(td.dataset.d);
+  const period = num(td.dataset.p);
+  const list = itemsAt(weekday, period);
+  const editing = list.filter((it) => num(it.period_start) === period)[0] || list[0] || null;
+  openEditor(weekday, period, editing);
+}
+
+/* ------------------------------------------------------------------ 编辑弹层：课程名 / 教室 / 起止节次 / 周次 / 提前提醒 */
+function fieldNode(id, label, input, hint) {
+  const f = el("div", "field");
+  const lb = el("label", "", label);
+  lb.setAttribute("for", id);
+  input.id = id;
+  f.appendChild(lb);
+  f.appendChild(input);
+  if (hint) f.appendChild(el("p", "hint", hint));
+  return f;
+}
+
+function textInput(value, placeholder, maxlength) {
+  const i = document.createElement("input");
+  i.type = "text";
+  i.value = value === null || value === undefined ? "" : String(value);
+  if (placeholder) i.placeholder = placeholder;
+  if (maxlength) i.maxLength = Number(maxlength);
+  return i;
+}
+
+function numberInput(value, min, max, placeholder) {
+  const i = document.createElement("input");
+  i.type = "number";
+  i.min = String(min);
+  i.max = String(max);
+  i.value = value === null || value === undefined || value === "" ? "" : String(value);
+  if (placeholder) i.placeholder = placeholder;
+  return i;
+}
+
+function openEditor(weekday, period, editing) {
+  const dayLabel = WEEK_LABELS[weekday - 1];
+  const isNew = !editing;
+  const src = editing || { weekday, period_start: period, period_end: period, title: "", room: "", weeks: "", remind_before: null };
+
+  const body = el("div", "stack--sm");
+  body.appendChild(el("p", "hint", dayLabel + " · 第 " + period + " 节" + (isNew ? "（这一格现在是空的）" : "（已排课，可以改也可以删）")));
+
+  const tTitle = textInput(src.title, "课程A", 100);
+  const tRoom = textInput(src.room, "教学楼A-101", 50);
+  const tWeeks = textInput(src.weeks, "1-16", 50);
+  const nPs = numberInput(src.period_start, 1, MAX_PERIOD);
+  const nPe = numberInput(src.period_end, 1, MAX_PERIOD);
+  const nRb = numberInput(src.remind_before, 0, 1440, "留空 = 不提醒");
+
+  const grid = el("div", "form-grid form-grid--tight");
+  grid.appendChild(fieldNode("ed-title", "课程名", tTitle));
+  grid.appendChild(fieldNode("ed-room", "教室（可选）", tRoom));
+  grid.appendChild(fieldNode("ed-ps", "起始节次", nPs));
+  grid.appendChild(fieldNode("ed-pe", "结束节次", nPe));
+  grid.appendChild(fieldNode("ed-weeks", "周次（可选）", tWeeks));
+  grid.appendChild(fieldNode("ed-rb", "提前提醒（分钟）", nRb));
+  body.appendChild(grid);
+
+  const msg = el("p", "notice notice--danger");
+  msg.style.marginTop = "10px";
+  msg.hidden = true;
+  body.appendChild(msg);
+
+  body.appendChild(el("p", "hint", "只保存 周几 / 起止节次 / 课程名 / 教室 / 周次 / 提前提醒这 6 个字段；姓名、学号、教师不会离开你的设备。改了课程名或节次时会先删掉原来那一条再写新的 —— 否则同一时段会留下两条。"));
+
+  const modalPromise = openModal({
+    title: (isNew ? "新增一节课 · " : "改写这一节课 · ") + dayLabel + " 第" + period + "节",
+    iconName: isNew ? "plus" : "pencil",
+    body,
+    confirmText: "保存",
+    cancelText: "取消",
+  });
+
+  /* openModal 的骨架是同步挂上的：立刻拿到它的取消 / 保存按钮（取消按钮同时用于「删除后关闭」） */
+  const backdrops = document.querySelectorAll(".modal-backdrop");
+  const mine = backdrops[backdrops.length - 1];
+  const footBtns = mine.querySelectorAll(".modal__foot .btn");
+  const cancelBtn = footBtns[0];
+  const okBtn = footBtns[1];
+
+  let delAsked = false;
+  let pending = null;
+
+  function readDraft() {
+    const rbRaw = String(nRb.value === undefined ? "" : nRb.value).trim();
+    return {
+      weekday,
+      period,
+      period_start: nPs.value,
+      period_end: nPe.value,
+      title: tTitle.value,
+      room: tRoom.value,
+      weeks: tWeeks.value,
+      remind_before: rbRaw === "" ? null : rbRaw,
+    };
+  }
+
+  function validate(v) {
+    const ps = Number(v.period_start);
+    const pe = Number(v.period_end);
+    if (!String(v.title || "").trim()) return "请先填课程名（不能只有空格）";
+    if (!Number.isInteger(ps) || ps < 1 || ps > MAX_PERIOD) return "起始节次要填 1~14 的整数";
+    if (!Number.isInteger(pe) || pe < 1 || pe > MAX_PERIOD) return "结束节次要填 1~14 的整数";
+    if (pe < ps) return "结束节次不能小于起始节次";
+    const rb = v.remind_before;
+    if (rb !== null && (!Number.isInteger(Number(rb)) || Number(rb) < 0 || Number(rb) > 1440)) {
+      return "提前提醒要填 0~1440 的分钟数，或者留空表示不提醒";
+    }
+    return "";
+  }
+
+  function sync() {
+    pending = readDraft();
+    const bad = validate(pending);
+    msg.hidden = !bad;
+    msg.textContent = bad || "";
+    okBtn.disabled = Boolean(bad); // 不合法就点不动「保存」，弹层不会关掉丢数据
+    return bad;
+  }
+
+  [tTitle, tRoom, tWeeks, nPs, nPe, nRb].forEach((n) => n.addEventListener("input", sync));
+  sync();
+  tTitle.focus();
+
+  if (!isNew) {
+    const del = el("button", "btn btn--quiet btn--sm");
+    del.type = "button";
+    del.appendChild(icon("trash", { size: 16 }));
+    del.appendChild(document.createTextNode("删除这节课"));
+    del.addEventListener("click", () => {
+      delAsked = true;
+      cancelBtn.click(); // 关掉弹层，真正的删除在下面的 then 里执行
+    });
+    const bar = el("div", "row");
+    bar.style.marginTop = "14px";
+    bar.appendChild(del);
+    body.appendChild(bar);
+  }
+
+  return modalPromise.then((confirmed) => {
+    if (delAsked) return deleteItem(editing);
+    if (!confirmed || !pending) return null;
+    return saveItem(editing, pending);
+  });
+}
+
+/* ------------------------------------------------------------------ 写库：POST /api/schedule（身份键变了 -> 先删旧的再新增） */
+async function saveItem(editing, v) {
+  try {
+    if (editing && keyOf(editing) !== keyOf(v)) {
+      /* upsert 键是 (user_id, weekday, period_start, period_end, title)：改了课程名/节次
+         就等于换了一条记录。先删旧条目，页面上的语义才是「改名 = 更新」而不是「多一条」。 */
+      await removeItem(editing);
+    }
+    await api("/api/schedule", { method: "POST", body: bodyOf(v) });
+    toast(editing ? "已更新这一节课" : "已添加这一节课", "ok");
+    await load();
+    return true;
+  } catch (e) {
+    toast("保存失败：" + ((e && e.message) || e), "danger");
+    return false;
+  }
+}
+
+/** 只信「路由不存在」这一种 404，别把鉴权/参数错误也吞成退路 */
+function isMissingRoute(e) {
+  return Boolean(e && e.code === "NOT_FOUND" && /no route for/i.test(String(e.message || "")));
+}
+
+/**
+ * 删除一条（按条目身份）。
+ *   1) 契约里写明的 POST /api/schedule/remove —— 本分支还没合并，命中就优先用它
+ *   2) 退路：既有的 MCP 工具 schedule_import（按设计就是「先清空该用户旧课表再写入」，
+ *      所以能真正删掉一条）；它会把 remind_before 置空，随后按新条目把提醒补回来
+ */
+async function removeItem(it) {
+  const target = itemOf(it);
+  try {
+    await api(REMOVE_PATH, {
+      method: "POST",
+      body: {
+        user_handle: HANDLE,
+        weekday: target.weekday,
+        period_start: target.period_start,
+        period_end: target.period_end,
+        title: target.title,
+      },
+    });
+    return "endpoint";
+  } catch (e) {
+    if (!isMissingRoute(e)) throw e;
+  }
+
+  const keep = state.items.filter((x) => keyOf(x) !== keyOf(it));
+  const res = await mcpRpc("tools/call", {
+    name: "schedule_import",
+    arguments: { user_handle: HANDLE, items: keep.map(itemOf) },
+  });
+  const env = res && res.structuredContent;
+  if (!env || env.ok !== true) {
+    throw new Error((env && env.error && env.error.message) || "整表替换失败（MCP schedule_import）");
+  }
+  for (const x of keep) {
+    if (x.remind_before === null || x.remind_before === undefined) continue;
+    await api("/api/schedule", { method: "POST", body: bodyOf(x) });
+  }
+  return "import";
+}
+
+async function deleteItem(it) {
+  try {
+    await removeItem(it);
+    toast("已删除「" + String((it && it.title) || "") + "」", "ok");
+    await load();
+    return true;
+  } catch (e) {
+    toast("删除失败：" + ((e && e.message) || e), "danger");
+    return false;
+  }
+}
+
+/* ------------------------------------------------------------------ 侧栏 1：导入课表（只走对话 / MCP） */
+function openImportSheet() {
+  const sheet = createSheet({ title: "导入课表（只走对话 / MCP）", iconName: "calendar-event" });
+  const body = sheet.body;
+
+  const box = el("div", "notice notice--warn");
+  const head = el("p", "", "课表入口只走对话（MCP）：本平台没有课表上传按钮，也不做「粘贴整张课表」的输入框 —— 这是刻意的合规设计。");
+  head.style.margin = "0 0 10px";
+  box.appendChild(head);
+  box.appendChild(el("p", "hint", "把下面这句话复制到 WorkBuddy 对话里发给 Agent，它会用 MCP 工具 schedule_import 写入你的课表："));
+  const pre = document.createElement("pre");
+  pre.className = "code";
+  pre.id = "dlgBlock";
+  pre.appendChild(el("code", "", SAMPLE_DIALOGUE));
+  box.appendChild(pre);
+  body.appendChild(box);
+
+  const copy = el("button", "btn btn--ghost btn--sm");
+  copy.type = "button";
+  copy.appendChild(icon("copy", { size: 16 }));
+  copy.appendChild(document.createTextNode("复制这段对话"));
+  copy.addEventListener("click", () => {
+    copyText(SAMPLE_DIALOGUE).then((done) => {
+      toast(done ? "已复制示例对话" : "复制失败：请手动选中上面的文字", done ? "ok" : "danger");
+    });
+  });
+  const row = el("div", "row");
+  row.style.marginTop = "12px";
+  row.appendChild(copy);
+  body.appendChild(row);
+
+  const list = el("ul", "hint-list");
+  [
+    "Agent 只会写入白名单字段：周几 / 起止节次 / 课程名 / 教室 / 周次（另可在课表格子上设提前提醒）。",
+    "同一门课重复导入不叠加：写入前会先清空你自己的旧课表。",
+    "姓名、学号、教师等字段会被当场丢弃，并把丢弃的字段名记进脱敏审计（只记字段名，不记值）。",
+  ].forEach((s) => list.appendChild(el("li", "", s)));
+  body.appendChild(list);
+
+  const foot = el("button", "btn btn--quiet", "关闭");
+  foot.type = "button";
+  foot.addEventListener("click", () => sheet.close());
+  sheet.foot.appendChild(foot);
+  sheet.open();
+  return sheet;
+}
+
+/* ------------------------------------------------------------------ 侧栏 2：提醒设置（保存走 POST /api/schedule） */
+function openRemindSheet() {
+  const sheet = createSheet({ title: "提醒设置", iconName: "clock" });
+  const body = sheet.body;
+
+  if (!state.items.length) {
+    stateBox(body, "", "clock", "还没有课可以设提醒", "先在课表格子上点一下加一节课，或者让 Agent 在对话里导入整张课表。");
+  } else {
+    const wrap = el("div", "table-wrap");
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["课程", "时间", "提前提醒（分钟）"].forEach((t) => headRow.appendChild(el("th", "", t)));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    state.items.forEach((it, i) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(el("td", "", String(it.title || "")));
+      tr.appendChild(el("td", "nowrap", WEEK_LABELS[num(it.weekday) - 1] + " 第" + num(it.period_start) +
+        (num(it.period_end) > num(it.period_start) ? "-" + num(it.period_end) : "") + " 节"));
+      const td = document.createElement("td");
+      const input = numberInput(it.remind_before, 0, 1440, "不提醒");
+      input.id = "remind-" + i;
+      input.style.maxWidth = "120px";
+      input.setAttribute("aria-label", String(it.title || "") + " 提前提醒分钟数");
+      td.appendChild(input);
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    body.appendChild(wrap);
+    body.appendChild(el("p", "section__note", "留空 = 不提醒；提醒由服务端定时任务按 Asia/Shanghai 每 5 分钟检查一次，不占用长连接。"));
+  }
+
+  const save = el("button", "btn", "保存提醒设置");
+  save.type = "button";
+  const close = el("button", "btn btn--quiet", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  save.addEventListener("click", async () => {
+    save.disabled = true;
+    save.textContent = "保存中…";
+    try {
+      let changed = 0;
+      for (let i = 0; i < state.items.length; i++) {
+        const input = byId("remind-" + i);
+        if (!input) continue;
+        const it = state.items[i];
+        const raw = String(input.value === undefined ? "" : input.value).trim();
+        const next = raw === "" ? null : Number(raw);
+        const old = it.remind_before === null || it.remind_before === undefined ? null : Number(it.remind_before);
+        if (next === old) continue;
+        if (next !== null && (!Number.isInteger(next) || next < 0 || next > 1440)) {
+          throw new Error("提前提醒要填 0~1440 的整数，或者留空表示不提醒");
+        }
+        await api("/api/schedule", { method: "POST", body: bodyOf(Object.assign({}, it, { remind_before: next })) });
+        changed += 1;
+      }
+      toast(changed ? "已保存 " + changed + " 门课的提醒" : "提醒设置没有变化", "ok");
+      await load();
+      sheet.close();
+    } catch (e) {
+      toast("保存失败：" + ((e && e.message) || e), "danger");
+      save.disabled = false;
+      save.textContent = "保存提醒设置";
+    }
+  });
+  sheet.foot.append(close, save);
+  sheet.open();
+  return sheet;
+}
+
+/* ------------------------------------------------------------------ 侧栏 3：脱敏审计（只列字段名） */
+function loadAudit(body) {
+  showLoading(body, "正在读取审计记录…");
+  api("/api/scrub/audit?limit=20").then((rows) => {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      stateBox(body, "", "clipboard-text", "暂时没有审计记录",
+        "说明还没有字段被丢弃：导入课表时若夹带了姓名 / 学号 / 教师这类字段，这里会列出被丢弃的字段名。");
+      return;
+    }
+    const wrap = el("div", "table-wrap");
+    const table = document.createElement("table");
+    const thead = document.createElement("thead");
+    const headRow = document.createElement("tr");
+    ["时间", "类型", "被丢弃的字段名"].forEach((t) => headRow.appendChild(el("th", "", t)));
+    thead.appendChild(headRow);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    list.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.appendChild(el("td", "nowrap", String((row && row.created_at) || "")));
+      tr.appendChild(el("td", "nowrap", String((row && row.item_type) || "")));
+      const td = document.createElement("td");
+      const names = row && Array.isArray(row.dropped_fields) ? row.dropped_fields : [];
+      td.appendChild(el("code", "", names.map((x) => String(x)).join(" · "))); // 只显示字段名，绝不显示字段值
+      tr.appendChild(td);
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
+    wrap.appendChild(table);
+    body.innerHTML = "";
+    body.appendChild(wrap);
+    body.appendChild(el("p", "section__note", "审计只记字段名，绝不记录任何字段值。数据来自 GET /api/scrub/audit?limit=20。"));
+  }).catch((e) => {
+    stateBox(body, "error", "alert-triangle", "审计读取失败", (e && e.message) || String(e), "重试",
+      () => loadAudit(body));
+  });
+}
+
+function openAuditSheet() {
+  const sheet = createSheet({ title: "脱敏审计记录", iconName: "shield-check" });
+  const close = el("button", "btn btn--quiet", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  sheet.foot.appendChild(close);
+  sheet.open();
+  loadAudit(sheet.body);
+  return sheet;
+}
+
+/* ------------------------------------------------------------------ 侧栏 4：本周概览（几节课 / 最早一节 / 最晚一节） */
+function openOverviewSheet() {
+  const sheet = createSheet({ title: "本周概览", iconName: "chart-bar" });
+  const body = sheet.body;
+
+  if (!state.items.length) {
+    stateBox(body, "", "calendar-event", "这周还没有课",
+      "点课表格子加一节，或者点右上角「导入课表」，让 Agent 在对话里导入整张课表。");
+  } else {
+    const items = state.items.slice();
+    const dayOf = (it) => num(it.weekday);
+    const earliest = items.slice().sort((a, b) => dayOf(a) - dayOf(b) || num(a.period_start) - num(b.period_start))[0];
+    const latest = items.slice().sort((a, b) => dayOf(b) - dayOf(a) || num(b.period_end) - num(a.period_end))[0];
+    const periods = items.reduce((n, it) => n + Math.max(1, num(it.period_end) - num(it.period_start) + 1), 0);
+    const days = new Set(items.map(dayOf)).size;
+    const reminded = items.filter((it) => it.remind_before !== null && it.remind_before !== undefined).length;
+
+    const grid = el("div", "grid grid--stats");
+    const stat = (label, value, unit, text) => {
+      const box = el("div", "stat" + (text ? " stat--text" : ""));
+      box.appendChild(el("p", "stat__label", label));
+      const v = el("div", "stat__value", value);
+      if (unit) v.appendChild(el("span", "stat__unit", unit));
+      box.appendChild(v);
+      return box;
+    };
+    const where = (it, periodKey) => WEEK_LABELS[dayOf(it) - 1] + " 第 " + num(it[periodKey]) + " 节";
+
+    grid.appendChild(stat("本周课程", String(items.length), "门"));
+    grid.appendChild(stat("最早一节", where(earliest, "period_start"), null, true));
+    grid.appendChild(stat("最晚一节", where(latest, "period_end"), null, true));
+    grid.appendChild(stat("有课天数", String(days), "天"));
+    grid.appendChild(stat("覆盖节次", String(periods), "节"));
+    grid.appendChild(stat("已设提醒", String(reminded), "门"));
+    body.appendChild(grid);
+    body.appendChild(el("p", "section__note", "统计只按你当前的课表数据算，不联网、不上传。"));
+  }
+
+  const close = el("button", "btn btn--quiet", "关闭");
+  close.type = "button";
+  close.addEventListener("click", () => sheet.close());
+  sheet.foot.appendChild(close);
+  sheet.open();
+  return sheet;
+}
+
+/* ------------------------------------------------------------------ 启动 */
+mountNav();
+byId("whoText").textContent = "演示身份：" + HANDLE;
+
+let activeSheet = null;
+function openSheetOnly(open) {
+  if (activeSheet) activeSheet.close();
+  activeSheet = open();
+  return activeSheet;
+}
+
+byId("overviewBtn").addEventListener("click", () => openSheetOnly(openOverviewSheet));
+byId("importBtn").addEventListener("click", () => openSheetOnly(openImportSheet));
+byId("remindBtn").addEventListener("click", () => openSheetOnly(openRemindSheet));
+byId("auditBtn").addEventListener("click", () => openSheetOnly(openAuditSheet));
+
+const gridWrap = byId("gridWrap");
+gridWrap.addEventListener("click", (e) => {
+  const td = e.target && e.target.closest ? e.target.closest("td.is-clickable") : null;
+  if (td) openCell(td);
+});
+gridWrap.addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " " && e.key !== "Spacebar") return;
+  const td = e.target && e.target.closest ? e.target.closest("td.is-clickable") : null;
+  if (!td) return;
+  e.preventDefault();
+  openCell(td);
+});
+
+(async function start() {
+  initReveals(); // 滚动揭示：只动 transform/opacity；prefers-reduced-motion 下直接显示
+  try {
+    await initDemo(); // ?demo=1：演示模式徽章 + 幂等灌一次演示数据
+  } catch {
+    /* 演示模式不可用不影响正常加载 */
+  }
+  await load();
 })();
 </script>
 </body>

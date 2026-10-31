@@ -36,13 +36,30 @@
         "schedule": {
           "early_bird": 0.3,
           "weekend_free": 0.8,
-          "busy_slots": [{ "weekday": 3, "period_start": 1, "period_end": 2 }]
+          "busy_slots": [
+            {
+              "weekday": 3,
+              "period_start": 1,
+              "period_end": 2
+            }
+          ]
         },
-        "interests": ["算法", "摄影"],
-        "traits": { "chatty": 0.4, "planner": 0.7, "tidy": 0.6 },
+        "interests": [
+          "算法",
+          "摄影"
+        ],
+        "traits": {
+          "chatty": 0.4,
+          "planner": 0.7,
+          "tidy": 0.6
+        },
         "wanted": "想找一起刷算法题、周末一起扫街拍照的同学，晚上七点后都有空",
-        "must_have": ["能一起去图书馆自习"],
-        "deal_breaker": ["约了不来也不说一声"]
+        "must_have": [
+          "能一起去图书馆自习"
+        ],
+        "deal_breaker": [
+          "约了不来也不说一声"
+        ]
       },
       "raw_status": "open"
     },
@@ -59,15 +76,34 @@
           "early_bird": 0.15,
           "weekend_free": 0.6,
           "busy_slots": [
-            { "weekday": 1, "period_start": 1, "period_end": 4 },
-            { "weekday": 4, "period_start": 5, "period_end": 6 }
+            {
+              "weekday": 1,
+              "period_start": 1,
+              "period_end": 4
+            },
+            {
+              "weekday": 4,
+              "period_start": 5,
+              "period_end": 6
+            }
           ]
         },
-        "interests": ["算法", "考研"],
-        "traits": { "chatty": 0.3, "planner": 0.8, "tidy": 0.5 },
+        "interests": [
+          "算法",
+          "考研"
+        ],
+        "traits": {
+          "chatty": 0.3,
+          "planner": 0.8,
+          "tidy": 0.5
+        },
         "wanted": "找一起刷算法题、一起备考考研的搭子，能长期坚持，凌晨还在线",
-        "must_have": ["能接受晚上十点以后自习"],
-        "deal_breaker": ["三天打鱼两天晒网"]
+        "must_have": [
+          "能接受晚上十点以后自习"
+        ],
+        "deal_breaker": [
+          "三天打鱼两天晒网"
+        ]
       },
       "raw_status": "open"
     },
@@ -83,13 +119,30 @@
         "schedule": {
           "early_bird": 0.2,
           "weekend_free": 0.5,
-          "busy_slots": [{ "weekday": 2, "period_start": 1, "period_end": 3 }]
+          "busy_slots": [
+            {
+              "weekday": 2,
+              "period_start": 1,
+              "period_end": 3
+            }
+          ]
         },
-        "interests": ["游戏", "动漫"],
-        "traits": { "chatty": 0.7, "planner": 0.3, "tidy": 0.4 },
+        "interests": [
+          "游戏",
+          "动漫"
+        ],
+        "traits": {
+          "chatty": 0.7,
+          "planner": 0.3,
+          "tidy": 0.4
+        },
         "wanted": "找作息接近的室友，晚上能一起开黑聊两句，白天各忙各的",
-        "must_have": ["能接受晚上打游戏"],
-        "deal_breaker": ["受不了室友凌晨打游戏外放（半夜戴耳机也行，外放绝对不行）"]
+        "must_have": [
+          "能接受晚上打游戏"
+        ],
+        "deal_breaker": [
+          "受不了室友凌晨打游戏外放（半夜戴耳机也行，外放绝对不行）"
+        ]
       },
       "raw_status": "open"
     },
@@ -106,15 +159,34 @@
           "early_bird": 0.75,
           "weekend_free": 0.3,
           "busy_slots": [
-            { "weekday": 5, "period_start": 1, "period_end": 4 },
-            { "weekday": 6, "period_start": 1, "period_end": 4 }
+            {
+              "weekday": 5,
+              "period_start": 1,
+              "period_end": 4
+            },
+            {
+              "weekday": 6,
+              "period_start": 1,
+              "period_end": 4
+            }
           ]
         },
-        "interests": ["实习", "读书"],
-        "traits": { "chatty": 0.35, "planner": 0.85, "tidy": 0.8 },
+        "interests": [
+          "实习",
+          "读书"
+        ],
+        "traits": {
+          "chatty": 0.35,
+          "planner": 0.85,
+          "tidy": 0.8
+        },
         "wanted": "找爱干净、作息规律的室友，实习期早出晚归，希望互相尊重安静时间",
-        "must_have": ["能保持公共区域整洁"],
-        "deal_breaker": ["室友抽烟（阳台抽也不行）"]
+        "must_have": [
+          "能保持公共区域整洁"
+        ],
+        "deal_breaker": [
+          "室友抽烟（阳台抽也不行）"
+        ]
       },
       "raw_status": "open"
     },
@@ -130,13 +202,30 @@
         "schedule": {
           "early_bird": 0.4,
           "weekend_free": 0.9,
-          "busy_slots": [{ "weekday": 3, "period_start": 5, "period_end": 8 }]
+          "busy_slots": [
+            {
+              "weekday": 3,
+              "period_start": 5,
+              "period_end": 8
+            }
+          ]
         },
-        "interests": ["编程", "剪辑"],
-        "traits": { "chatty": 0.6, "planner": 0.75, "tidy": 0.7 },
+        "interests": [
+          "编程",
+          "剪辑"
+        ],
+        "traits": {
+          "chatty": 0.6,
+          "planner": 0.75,
+          "tidy": 0.7
+        },
         "wanted": "想组队做校园小程序，前端后端都行，周末集中开发，能一起写代码到深夜",
-        "must_have": ["会写代码或愿意学"],
-        "deal_breaker": ["只挂名不出力"]
+        "must_have": [
+          "会写代码或愿意学"
+        ],
+        "deal_breaker": [
+          "只挂名不出力"
+        ]
       },
       "raw_status": "open"
     },
@@ -152,13 +241,30 @@
         "schedule": {
           "early_bird": 0.55,
           "weekend_free": 0.55,
-          "busy_slots": [{ "weekday": 2, "period_start": 5, "period_end": 6 }]
+          "busy_slots": [
+            {
+              "weekday": 2,
+              "period_start": 5,
+              "period_end": 6
+            }
+          ]
         },
-        "interests": ["数学建模", "编程"],
-        "traits": { "chatty": 0.45, "planner": 0.9, "tidy": 0.6 },
+        "interests": [
+          "数学建模",
+          "编程"
+        ],
+        "traits": {
+          "chatty": 0.45,
+          "planner": 0.9,
+          "tidy": 0.6
+        },
         "wanted": "备战数学建模竞赛找队友，需要会编程和论文写作，能一起熬夜赶稿",
-        "must_have": ["有建模或编程基础"],
-        "deal_breaker": ["比赛前一晚失联"]
+        "must_have": [
+          "有建模或编程基础"
+        ],
+        "deal_breaker": [
+          "比赛前一晚失联"
+        ]
       },
       "raw_status": "open"
     },
@@ -174,13 +280,30 @@
         "schedule": {
           "early_bird": 0.6,
           "weekend_free": 0.7,
-          "busy_slots": [{ "weekday": 4, "period_start": 7, "period_end": 8 }]
+          "busy_slots": [
+            {
+              "weekday": 4,
+              "period_start": 7,
+              "period_end": 8
+            }
+          ]
         },
-        "interests": ["篮球", "健身"],
-        "traits": { "chatty": 0.8, "planner": 0.4, "tidy": 0.5 },
+        "interests": [
+          "篮球",
+          "健身"
+        ],
+        "traits": {
+          "chatty": 0.8,
+          "planner": 0.4,
+          "tidy": 0.5
+        },
         "wanted": "找固定球搭子，每周两三次，下午没课就约球，一起撸铁也行",
-        "must_have": ["能固定时间"],
-        "deal_breaker": ["老是放鸽子"]
+        "must_have": [
+          "能固定时间"
+        ],
+        "deal_breaker": [
+          "老是放鸽子"
+        ]
       },
       "raw_status": "open"
     },
@@ -196,13 +319,31 @@
         "schedule": {
           "early_bird": 0.85,
           "weekend_free": 0.9,
-          "busy_slots": [{ "weekday": 1, "period_start": 1, "period_end": 2 }]
+          "busy_slots": [
+            {
+              "weekday": 1,
+              "period_start": 1,
+              "period_end": 2
+            }
+          ]
         },
-        "interests": ["羽毛球", "跑步", "早起"],
-        "traits": { "chatty": 0.5, "planner": 0.6, "tidy": 0.7 },
+        "interests": [
+          "羽毛球",
+          "跑步",
+          "早起"
+        ],
+        "traits": {
+          "chatty": 0.5,
+          "planner": 0.6,
+          "tidy": 0.7
+        },
         "wanted": "想找晨跑和打羽毛球的搭子，周末一起去体育馆，早睡早起型",
-        "must_have": ["周末能早起"],
-        "deal_breaker": ["约了早上又赖床"]
+        "must_have": [
+          "周末能早起"
+        ],
+        "deal_breaker": [
+          "约了早上又赖床"
+        ]
       },
       "raw_status": "open"
     },
@@ -221,7 +362,11 @@
           "busy_slots": []
         },
         "interests": [],
-        "traits": { "chatty": 0.5, "planner": 0.5, "tidy": 0.5 },
+        "traits": {
+          "chatty": 0.5,
+          "planner": 0.5,
+          "tidy": 0.5
+        },
         "wanted": "想找一起自习的搭子",
         "must_have": [],
         "deal_breaker": []
@@ -240,13 +385,31 @@
         "schedule": {
           "early_bird": 0.25,
           "weekend_free": 0.85,
-          "busy_slots": [{ "weekday": 5, "period_start": 5, "period_end": 8 }]
+          "busy_slots": [
+            {
+              "weekday": 5,
+              "period_start": 5,
+              "period_end": 8
+            }
+          ]
         },
-        "interests": ["桌游", "电影", "音乐"],
-        "traits": { "chatty": 0.9, "planner": 0.35, "tidy": 0.45 },
+        "interests": [
+          "桌游",
+          "电影",
+          "音乐"
+        ],
+        "traits": {
+          "chatty": 0.9,
+          "planner": 0.35,
+          "tidy": 0.45
+        },
         "wanted": "周末想找人一起玩桌游看片，剧本杀也可，人多热闹点更好",
-        "must_have": ["愿意一起约周末"],
-        "deal_breaker": ["临时放鸽子"]
+        "must_have": [
+          "愿意一起约周末"
+        ],
+        "deal_breaker": [
+          "临时放鸽子"
+        ]
       },
       "raw_status": "open"
     },
@@ -262,13 +425,31 @@
         "schedule": {
           "early_bird": 0.45,
           "weekend_free": 0.4,
-          "busy_slots": [{ "weekday": 2, "period_start": 9, "period_end": 10 }]
+          "busy_slots": [
+            {
+              "weekday": 2,
+              "period_start": 9,
+              "period_end": 10
+            }
+          ]
         },
-        "interests": ["咖啡", "读书", "摄影"],
-        "traits": { "chatty": 0.3, "planner": 0.7, "tidy": 0.9 },
+        "interests": [
+          "咖啡",
+          "读书",
+          "摄影"
+        ],
+        "traits": {
+          "chatty": 0.3,
+          "planner": 0.7,
+          "tidy": 0.9
+        },
         "wanted": "想找安静一点的咖啡探店/看展搭子，一周一次，慢慢聊",
-        "must_have": ["能安静聊天"],
-        "deal_breaker": ["房间乱一点就焦虑，会一直念叨别人不收拾"]
+        "must_have": [
+          "能安静聊天"
+        ],
+        "deal_breaker": [
+          "房间乱一点就焦虑，会一直念叨别人不收拾"
+        ]
       },
       "raw_status": "open"
     },
@@ -284,15 +465,114 @@
         "schedule": {
           "early_bird": 0.7,
           "weekend_free": 0.2,
-          "busy_slots": [{ "weekday": 3, "period_start": 9, "period_end": 12 }]
+          "busy_slots": [
+            {
+              "weekday": 3,
+              "period_start": 9,
+              "period_end": 12
+            }
+          ]
         },
-        "interests": ["考研", "英语"],
-        "traits": { "chatty": 0.4, "planner": 0.85, "tidy": 0.65 },
+        "interests": [
+          "考研",
+          "英语"
+        ],
+        "traits": {
+          "chatty": 0.4,
+          "planner": 0.85,
+          "tidy": 0.65
+        },
         "wanted": "考研冲刺找背书搭子，图书馆四楼常年驻扎",
-        "must_have": ["每天能固定时间"],
-        "deal_breaker": ["半夜还在宿舍大声背书"]
+        "must_have": [
+          "每天能固定时间"
+        ],
+        "deal_breaker": [
+          "半夜还在宿舍大声背书"
+        ]
       },
       "raw_status": "closed"
+    },
+    {
+      "id": "demo-buddy-short-1",
+      "author_handle": "同学L",
+      "kind": "study",
+      "anon_token": "anon_5e1f8b2a6c47",
+      "short": true,
+      "profile": {
+        "kind": "study",
+        "grade": "不限",
+        "major_group": "不限",
+        "schedule": {
+          "early_bird": 0.5,
+          "weekend_free": 0.5,
+          "busy_slots": []
+        },
+        "interests": [],
+        "traits": {
+          "chatty": 0.5,
+          "planner": 0.5,
+          "tidy": 0.5
+        },
+        "wanted": "想找人一起自习，图书馆三楼，晚上七点",
+        "must_have": [],
+        "deal_breaker": []
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-short-2",
+      "author_handle": "同学M",
+      "kind": "sport",
+      "anon_token": "anon_4d8c2f6a1b93",
+      "short": true,
+      "profile": {
+        "kind": "sport",
+        "grade": "不限",
+        "major_group": "不限",
+        "schedule": {
+          "early_bird": 0.5,
+          "weekend_free": 0.5,
+          "busy_slots": []
+        },
+        "interests": [],
+        "traits": {
+          "chatty": 0.5,
+          "planner": 0.5,
+          "tidy": 0.5
+        },
+        "wanted": "想找人一起打羽毛球，周末下午体育馆",
+        "must_have": [],
+        "deal_breaker": []
+      },
+      "raw_status": "open"
+    },
+    {
+      "id": "demo-buddy-short-3",
+      "author_handle": "同学N",
+      "kind": "other",
+      "anon_token": "anon_8a3d9c1f5e27",
+      "short": true,
+      "profile": {
+        "kind": "other",
+        "grade": "不限",
+        "major_group": "不限",
+        "schedule": {
+          "early_bird": 0.5,
+          "weekend_free": 0.5,
+          "busy_slots": []
+        },
+        "interests": [],
+        "traits": {
+          "chatty": 0.5,
+          "planner": 0.5,
+          "tidy": 0.5
+        },
+        "wanted": "想找人一起拼车回家，周五下午校门口集合",
+        "must_have": [],
+        "deal_breaker": []
+      },
+      "raw_status": "open"
     }
-  ]
+  ],
+  "_short_posts_note": "demo-buddy-short-* 是「只写一句需求」的短帖（详细度由用户自己选），与上面的详细帖并存做对比；profile 里未提及的字段一律中性值。"
 }

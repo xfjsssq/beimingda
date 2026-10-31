@@ -1,7 +1,12 @@
 # 契约 · M2 搭子匹配模块
 
+> **2026-10-31 修订：中转码（`contact_code`）机制已废弃，改为站内私聊。**
+> 双方都同意后不再下发任何联系方式，而是返回 `chat_ready: true` + `thread_id`，双方在站内直接聊
+> （`GET /api/threads`、`GET/POST /api/threads/:id/messages`；服务端只允许会话双方访问）。
+> `users.contact_code` 列保留在库里仅为兼容老数据，**接口不再输出**、新流程不再使用。
+
 **依赖：** `contracts/core.md`
-**对应表：** `buddy_posts` `buddy_consents`
+**对应表：** `buddy_posts` `buddy_consents`（会话落在 `threads` / `thread_messages`）
 
 ---
 
@@ -78,13 +83,14 @@ buddyScore(post.profile, seeker.profile) -> 0..100
 初始：       author_ok=0, seeker_ok=0, revealed=0
 寻找方同意： 设置 seeker_ok=1     -> author_ok 保持 0，revealed 保持 0
 发布方同意： 设置 author_ok=1
-双方都为 1： revealed=1，此时才返回 contact_code
+双方都为 1： revealed=1，此时给出聊天入口 chat_ready=true（+ 站内会话 thread_id）
 ```
 
 **硬性要求**
-- ⛔ 任何一方未同意时，**绝不返回 `contact_code`**
+- ⛔ 任何一方未同意时，**绝不返回 `chat_ready` / `thread_id`**（这两个键根本不出现在返回对象里）
 - ⛔ 绝不向一方暗示"对方已经同意了"
 - ⛔ 不得把 `anon_token` 与真实身份关联后展示给另一方
+- ⛔ 双方同意后**不下发任何联系方式**：改为站内私聊（旧的"中转码"机制已废弃）
 - ✅ 同一 `(post_id, seeker_id)` 只能表决一次（靠数据库 UNIQUE 约束）
 
 ---
@@ -129,10 +135,10 @@ buddyScore(post.profile, seeker.profile) -> 0..100
   }
 }
 ```
-返回 `{candidates:[{anon_token, score, reason, reveal_status}]}`。
+返回 `{candidates:[{anon_token, score, reason, reveal_status, chat_ready?, thread_id?}]}`。
 - 只返回 `raw_status='open'` 的帖
 - 只返回 score >= 60
-- `reveal_status`：`"pending"` / `"mutual"`（`"mutual"` 时才附 `contact_code`）
+- `reveal_status`：`"pending"` / `"mutual"`；`"mutual"`（双方都已同意）时该候选**额外**带 `chat_ready: true` 与 `thread_id`
 - ⛔ 结果里**不得出现**院系全名、班级、学号、宿舍号、真实姓名、联系方式
 
 ### 4.3 `buddy_consent`
@@ -151,8 +157,10 @@ buddyScore(post.profile, seeker.profile) -> 0..100
   }
 }
 ```
-返回 `{author_ok, seeker_ok, revealed, contact_code?}`。
-`revealed=0` 时 **`contact_code` 字段必须完全不出现在返回里**（不是返回 null，是不返回）。
+返回 `{author_ok, seeker_ok, revealed, chat_ready?, thread_id?}`。
+`revealed=0` 时 **`chat_ready` / `thread_id` 必须完全不出现在返回里**（不是返回 null，是不返回）。
+`revealed=1` 时返回 `chat_ready: true`，并带 `thread_id`（据此可读 `GET /api/threads/:id/messages`）——
+双方直接站内私聊，**不再下发任何联系方式**（旧的"中转码"已废弃）。
 
 ---
 
@@ -197,8 +205,8 @@ POST /api/buddies         → {post_id, anon_token}
 - [ ] 未提及的字段被填成中性值，**没有编造兴趣**
 - [ ] `must_have` 与 `deal_breaker` 语义冲突的候选被排除（测一个真实冲突用例）
 - [ ] `kind` 不同的候选被排除
-- [ ] 只有一方同意时，返回里**不含** `contact_code` 这个键
-- [ ] 双方同意后 `revealed=1` 且 `contact_code` 出现
+- [ ] 只有一方同意时，返回里**不含** `chat_ready` / `thread_id` 这两个键
+- [ ] 双方同意后 `revealed=1`、`chat_ready:true` 且带 `thread_id`（站内私聊可开；⛔ 不再下发联系方式）
 - [ ] 同一 `(post_id, seeker_id)` 重复表决被数据库 UNIQUE 拦住
 - [ ] `anon_token` 与 user_id 无任何可推导关系
 - [ ] 候选 `reason` 里的分值相加等于 score

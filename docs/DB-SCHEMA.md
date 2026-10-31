@@ -7,7 +7,7 @@
 
 ---
 
-## 九张表
+## 十三张表
 
 | 表 | 归属模块 | 用途 |
 |---|---|---|
@@ -20,6 +20,10 @@
 | `schedule_items` | M4 | 日程（只收 6 类匿名字段） |
 | `map_nodes` | M3 | 地图节点（含全景图路径） |
 | `scrub_audit` | M4 | ★ 脱敏审计：**只记字段名，绝不记值** |
+| `buddy_messages` | M2 | 搭子帖上的留言 / 回复（`consent_id` 关联双选） |
+| `sessions` | core | 匿名会话（只存 token 的 sha256 + 用户外键，`X-Session-Token` 的身份来源） |
+| `threads` | core | 站内私聊会话（`kind` + `ref_id` 指向代取单/搭子帖；`a_uid`/`b_uid` 是双方，`UNIQUE(kind,ref_id,a_uid,b_uid)`） |
+| `thread_messages` | core | 私聊消息（`body` ≤500 字，纯表情记 `kind='emoji'`；排序 `created_at, rowid`） |
 
 ---
 
@@ -29,7 +33,7 @@
 |---|---|---|---|
 | id | TEXT | PK | uuid |
 | handle | TEXT | NOT NULL UNIQUE | 昵称，如"同学A" |
-| contact_code | TEXT |  | 双选揭示后才返回的联系代号 |
+| contact_code | TEXT | （历史遗留） | **已废弃的旧"中转码"列**：保留仅为兼容老库/老会话；⛔ 接口不再输出、新流程不再使用（双方同意后改走站内私聊 `threads` / `thread_messages`） |
 | created_at | INTEGER | NOT NULL | Unix 秒 |
 | demo | INTEGER | NOT NULL DEFAULT 0 | 演示数据标记 |
 

@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>手动标注工具 · 北民大小助手（开发用）</title>
+  <!-- 与全站共用设计系统与组件层（本页是开发工具，不进 6 页导航，也不引导航模块） -->
+  <link rel="stylesheet" href="/css/app.css" />
+  <style>
+    /* 本页只保留「标注画布」特有样式；颜色/圆角/阴影/字体一律取 app.css 的令牌，
+       字号与间距只用设计刻度（11 12 12.5 13 13.5 14 16 17 18 19 20 24 / 0 2 4 6 8 10 12 14 16 20 24 32 40）。 */
+    :root {
+      --pri: var(--color-primary);
+      --ok: var(--color-accent);
+      --warn: var(--color-danger);
+      --card: var(--color-card);
+      --line: var(--color-line);
+      --muted: var(--color-muted);
+      --text: var(--color-text);
+      /* ⭐ 8 个预设标注色（色块与圆点都从这里取；导出的是等价十六进制值） */
+      --pin-1: #1F4E8C; /* 主色 · 宿舍楼常用 */
+      --pin-2: #2E8B76; /* 辅助色 · 教学楼/自习 */
+      --pin-3: #C0392B; /* 警示色 · 服务设施 */
+      --pin-4: #E08C1B; /* 食堂 */
+      --pin-5: #7A5AF8; /* 校门 */
+      --pin-6: #0F766E; /* 备用深青 */
+      --pin-7: #B45309; /* 备用赭石 */
+      --pin-8: #334155; /* 其它 / 未分类 */
+    }
+
+    .anno-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+    @media (max-width: 900px) { .anno-layout { grid-template-columns: minmax(0, 1fr); } }
+
+    .map-card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+      padding: 10px; box-shadow: var(--shadow-card); }
+
+    /* 画布：平移用 transform，缩放用 scale，标注点按百分比定位（与 welcome.html 的底图方案一致） */
+    .viewport { position: relative; width: 100%; height: min(62vh, 620px); min-height: 320px;
+      overflow: hidden; border-radius: 8px; background: #10161f; touch-action: none; cursor: crosshair; }
+    /* 窄屏：画布矮一点，避免底图上下留大片空白（底图是横向长图） */
+    @media (max-width: 640px) { .viewport { height: min(46vh, 380px); min-height: 240px; } }
+    .viewport.is-panning { cursor: grabbing; }
+    .stage { position: absolute; left: 0; top: 0; width: 100%; transform-origin: 0 0; }
+    .stage img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+
+    .pin { position: absolute; transform: translate(-50%, -50%); width: 24px; height: 24px; padding: 0;
+      border-radius: 999px; border: 2px solid #fff; background: var(--pin-color, var(--pin-1));
+      box-shadow: 0 1px 4px rgba(16, 24, 40, .35); cursor: grab; }
+    .pin[aria-current="true"] { outline: 3px solid rgba(31, 78, 140, .38); outline-offset: 2px; }
+    .pin__idx { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      font-size: 12px; color: #fff; font-weight: 500; }
+    .pin__note { position: absolute; left: 50%; top: 26px; transform: translateX(-50%); max-width: 180px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; color: var(--text);
+      background: rgba(255, 255, 255, .94); border: 1px solid var(--line); border-radius: 6px; padding: 2px 6px; }
+    .pin__note[hidden] { display: none; }
+
+    .zoombar { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .zoombar input[type="range"] { flex: 1 1 auto; min-width: 0; accent-color: var(--pri); }
+    .zoombar .btn--sm { min-width: 40px; }
+
+    .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+    .swatch { width: 32px; height: 32px; padding: 0; border-radius: 999px; border: 2px solid #fff;
+      box-shadow: 0 1px 4px rgba(16, 24, 40, .28); cursor: pointer; }
+    .swatch[aria-pressed="true"] { outline: 3px solid var(--pri); outline-offset: 2px; }
+
+    #jsonOut { max-height: 220px; overflow: auto; }
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; }
+    .legend .chip { cursor: default; }
+    .pt-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--line); background: var(--color-sunken); cursor: pointer; }
+    .pt-row:hover { border-color: var(--color-primary-line); }
+    .pt-row__dot { width: 12px; height: 12px; border-radius: 999px; flex: 0 0 auto; background: var(--pin-color, var(--pri)); }
+    .pt-row__name { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow: hidden;
+      white-space: nowrap; text-overflow: ellipsis; }
+    .pt-row__del { flex: 0 0 auto; }
+  </style>
+</head>
+<body>
+<main class="page">
+  <div class="page-head">
+    <h1>手动标注工具</h1>
+    <p class="lead">
+      在学校《校园楼宇编号示意图》上点出标注点 → 填颜色 / 备注 / 类别 → 「复制 JSON」或「下载 JSON」。
+      数据只在本机（内存 + localStorage，键名 <code>beimingda.annotations</code>），
+      <b>不发任何请求、不写服务器</b>，刷新不丢。
+    </p>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn--sm" id="btnCopy" type="button"></button>
+    <button class="btn btn--ghost btn--sm" id="btnDownload" type="button"></button>
+    <button class="btn btn--ghost btn--sm" id="btnImport" type="button"></button>
+    <span class="chk" title="开启后落点不再逐点弹面板，适合一次标一串点位；随时可再点某个点单独编辑">
+      <label><input type="checkbox" id="batchMode" />连续落点（不逐点弹面板）</label>
+    </span>
+    <span class="toolbar__spacer"></span>
+    <span class="hint" id="savedAt"></span>
+  </div>
+
+  <div class="anno-layout">
+    <section class="map-card">
+      <div class="viewport" id="viewport" role="application" aria-label="标注画布：点击底图落点，拖动平移">
+        <div class="stage" id="stage">
+          <img id="baseImg" src="/map/campus-map.jpg" alt="学校《校园楼宇编号示意图》底图" draggable="false" />
+        </div>
+      </div>
+
+      <div class="zoombar">
+        <button class="btn btn--ghost btn--sm" id="zoomOut" type="button" aria-label="缩小">－</button>
+        <input id="zoomRange" type="range" min="60" max="400" step="10" value="100"
+               aria-label="缩放比例（60% ~ 400%）" />
+        <button class="btn btn--ghost btn--sm" id="zoomIn" type="button" aria-label="放大">＋</button>
+        <button class="btn btn--ghost btn--sm" id="zoomReset" type="button">适配</button>
+        <span class="hint" id="zoomText">100%</span>
+      </div>
+
+      <p class="hint">
+        滚轮（或滑动条 / ＋－）缩放、按住拖动平移；<b>在底图上点一下</b>就在该处落一个标注点。
+        已有标注点可<b>拖动改位置</b>，点一下可改颜色 / 备注 / 类别，或删除。
+      </p>
+      <div id="notice"></div>
+    </section>
+
+    <aside class="stack">
+      <section class="section">
+        <div class="section-head">
+          <h2>标注点 <span class="pill" id="count">0</span></h2>
+          <button class="btn btn--ghost btn--sm" id="btnClear" type="button">清空</button>
+        </div>
+        <p class="hint" id="listEmpty">还没有标注点 —— 在左边底图上点一下即可。</p>
+        <div class="stack stack--sm" id="list"></div>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>导出 JSON</h2></div>
+        <pre id="jsonOut" class="mono">{ "points": [] }</pre>
+        <p class="hint">格式：<code>{ "points": [ { x_pct, y_pct, color, note, category } ] }</code>；
+          <code>x_pct / y_pct</code> 是相对底图的百分比（左上角 0,0）。</p>
+      </section>
+
+      <section class="section">
+        <div class="section-head"><h2>类别</h2></div>
+        <div class="legend" id="legend"></div>
+        <p class="hint">类别只写进 JSON 供人看，不参与任何计算。</p>
+      </section>
+    </aside>
+  </div>
+</main>
+
+<script src="/config.js"></script>
+<script type="module">
+import { icon, toast, createSheet, openModal, copyText, el, esc, showNotice } from "/js/ui.js";
+
+/* =============================================================================
+   手动标注工具（开发用，非 6 个交付页面之一）
+   契约/口径：
+     - 底图：/map/campus-map.jpg（学校《校园楼宇编号示意图》）
+     - 坐标：x_pct / y_pct ∈ 0~100，相对底图左上角（与 static/map/map-bg.json 同口径）
+     - 存储：内存 + localStorage["beimingda.annotations"]（存的就是导出格式）
+     - ⛔ 不发任何请求、不写服务器；导出走剪贴板 / Blob 下载
+   ============================================================================= */
+
+const STORE_KEY = "beimingda.annotations";
+const IMG_SRC = "/map/campus-map.jpg";
+const ZOOM_MIN = 60;
+const ZOOM_MAX = 400;
+
+/** 8 个预设色：css 变量给色块用，hex 给导出与圆点用（两者等价） */
+const COLORS = [
+  { cssVar: "--pin-1", hex: "#1F4E8C" },
+  { cssVar: "--pin-2", hex: "#2E8B76" },
+  { cssVar: "--pin-3", hex: "#C0392B" },
+  { cssVar: "--pin-4", hex: "#E08C1B" },
+  { cssVar: "--pin-5", hex: "#7A5AF8" },
+  { cssVar: "--pin-6", hex: "#0F766E" },
+  { cssVar: "--pin-7", hex: "#B45309" },
+  { cssVar: "--pin-8", hex: "#334155" },
+];
+const DEFAULT_COLOR = COLORS[0].hex;
+
+/** 类别下拉（宿舍楼 / 食堂 / 教学 / 校门 / 服务 / 其它） */
+const CATEGORIES = [
+  { id: "dorm", label: "宿舍楼", iconName: "building-community" },
+  { id: "canteen", label: "食堂", iconName: "map-pin" },
+  { id: "teaching", label: "教学", iconName: "school" },
+  { id: "gate", label: "校门", iconName: "map" },
+  { id: "service", label: "服务", iconName: "package" },
+  { id: "other", label: "其它", iconName: "sparkles" },
+];
+const CAT_IDS = CATEGORIES.map((c) => c.id);
+const HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+const $ = (s) => document.querySelector(s);
+const viewport = $("#viewport");
+const stage = $("#stage");
+const baseImg = $("#baseImg");
+
+/** 内存里的标注点：{ id, x_pct, y_pct, color, note, category }（id 仅内部用，不导出） */
+let points = [];
+let selectedId = null;
+let seq = 0;
+const nextId = () => `pt-${++seq}-${Date.now().toString(36)}`;
+
+/* ---------------------------------------------------------------- 视图（缩放 / 平移） */
+
+const view = { scale: 1, x: 0, y: 0, base: 1 };
+
+function sizes() {
+  const vw = viewport.clientWidth;
+  const vh = viewport.clientHeight;
+  const sw = stage.offsetWidth || vw;
+  const sh = stage.offsetHeight || 0;
+  return { vw, vh, sw, sh };
+}
+
+/** 平移软夹取：允许往视口外滑出 25% 视口（拖动有手感），但图不会丢出去 */
+function clampView() {
+  const { vw, vh, sw, sh } = sizes();
+  const w = sw * view.scale;
+  const h = sh * view.scale;
+  const mx = vw * 0.25;
+  const my = vh * 0.25;
+  view.x = Math.min(mx, Math.max(vw - w - mx, view.x));
+  view.y = Math.min(my, Math.max(vh - h - my, view.y));
+}
+
+/** 把图摆在视口正中（适配 / 首次进入用） */
+function centerView() {
+  const { vw, vh, sw, sh } = sizes();
+  view.x = (vw - sw * view.scale) / 2;
+  view.y = (vh - sh * view.scale) / 2;
+  renderView();
+}
+
+function renderView() {
+  clampView();
+  stage.style.transform = `translate(${view.x}px, ${view.y}px) scale(${view.scale})`;
+  const pct = Math.round(view.scale * 100);
+  $("#zoomText").textContent = pct + "%";
+  $("#zoomRange").value = String(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, pct)));
+}
+
+function setZoom(pct, origin) {
+  const { vw, vh } = sizes();
+  const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(pct) || 100)) / 100;
+  const ox = origin && Number.isFinite(origin.x) ? origin.x : vw / 2;
+  const oy = origin && Number.isFinite(origin.y) ? origin.y : vh / 2;
+  // 让光标（或视口中心）下的那一点保持不动
+  const k = next / view.scale;
+  view.x = ox - (ox - view.x) * k;
+  view.y = oy - (oy - view.y) * k;
+  view.scale = next;
+  renderView();
+}
+
+/** 适配：整图放进视口（不改 base，只改当前 scale） */
+function fitView() {
+  const { vw, vh, sw, sh } = sizes();
+  const byW = vw / (sw || vw);
+  const byH = sh ? vh / sh : 1;
+  const scale = Math.min(byW, byH);
+  view.scale = Math.min(ZOOM_MAX / 100, Math.max(ZOOM_MIN / 100, Math.min(1, scale)));
+  centerView();
+}
+
+/** 视口坐标 → 底图百分比 */
+function toPercent(clientX, clientY) {
+  const r = baseImg.getBoundingClientRect();
+  if (!r.width || !r.height) return null;
+  const x = ((clientX - r.left) / r.width) * 100;
+  const y = ((clientY - r.top) / r.height) * 100;
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { x_pct: +Math.min(100, Math.max(0, x)).toFixed(1), y_pct: +Math.min(100, Math.max(0, y)).toFixed(1) };
+}
+
+/* ---------------------------------------------------------------- 存储（localStorage） */
+
+/** 归一一个标注点（导入 / 读盘都要过这里，脏数据一律挡掉） */
+function normalizePoint(raw, { keepId = false } = {}) {
+  if (!raw || typeof raw !== "object") return null;
+  const x = Number(raw.x_pct);
+  const y = Number(raw.y_pct);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const color = HEX_RE.test(String(raw.color)) ? String(raw.color) : DEFAULT_COLOR;
+  const note = typeof raw.note === "string" ? raw.note.trim().slice(0, 60) : "";
+  const category = CAT_IDS.includes(raw.category) ? raw.category : "other";
+  return {
+    id: keepId && raw.id ? String(raw.id) : nextId(),
+    x_pct: +Math.min(100, Math.max(0, x)).toFixed(1),
+    y_pct: +Math.min(100, Math.max(0, y)).toFixed(1),
+    color,
+    note,
+    category,
+  };
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return [];
+    const obj = JSON.parse(raw);
+    const list = Array.isArray(obj && obj.points) ? obj.points : [];
+    return list.map((p) => normalizePoint(p)).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, exportJson());
+    const t = new Date();
+    $("#savedAt").textContent = "已存本机 " + String(t.getHours()).padStart(2, "0") + ":" +
+      String(t.getMinutes()).padStart(2, "0") + ":" + String(t.getSeconds()).padStart(2, "0");
+  } catch {
+    toast("本机存储不可用（隐私模式？），当前改动只在内存里", "danger");
+  }
+}
+
+/* ---------------------------------------------------------------- 导出 / 导入 */
+
+/** 序列化：⛔ 只有 x_pct / y_pct / color / note / category 五个字段（id 不导出） */
+export function exportJson(pretty = true) {
+  const payload = {
+    points: points.map((p) => ({
+      x_pct: p.x_pct,
+      y_pct: p.y_pct,
+      color: p.color,
+      note: p.note,
+      category: p.category,
+    })),
+  };
+  return JSON.stringify(payload, null, pretty ? 2 : 0);
+}
+
+/** 解析 + 校验 + 整体替换，返回 { loaded, skipped } */
+export function importJson(text) {
+  const obj = JSON.parse(String(text || "").trim());
+  const list = Array.isArray(obj) ? obj : obj && obj.points;
+  if (!Array.isArray(list)) throw new Error('JSON 里找不到 points 数组（应为 { "points": [ … ] }）');
+  const next = [];
+  let skipped = 0;
+  for (const item of list) {
+    const p = normalizePoint(item);
+    if (p) next.push(p);
+    else skipped += 1;
+  }
+  points = next;
+  selectedId = null;
+  renderAll();
+  save();
+  return { loaded: points.length, skipped };
+}
+
+export async function copyJson() {
+  const text = exportJson();
+  const ok = await copyText(text);
+  $("#jsonOut").textContent = text;
+  toast(ok ? `已复制 ${points.length} 个标注点的 JSON` : "复制被浏览器拦下，请手动从右侧文本框复制", ok ? "ok" : "danger");
+  return ok;
+}
+
+/** 下载为 annotations.json（纯前端 Blob，⛔ 不上传） */
+export function downloadJson() {
+  const blob = new Blob([exportJson()], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "annotations.json";
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 0);
+  toast(`已下载 annotations.json（${points.length} 个点）`, "ok");
+  return true;
+}
+
+/* ---------------------------------------------------------------- 标注点增删改 */
+
+export function addPoint(x_pct, y_pct, opts = {}) {
+  const p = normalizePoint({ x_pct, y_pct, color: opts.color, note: opts.note, category: opts.category });
+  points.push(p);
+  selectedId = p.id;
+  renderAll();
+  save();
+  return p;
+}
+
+export function updatePoint(id, patch = {}) {
+  const p = points.find((x) => x.id === id);
+  if (!p) return null;
+  if (patch.x_pct !== undefined || patch.y_pct !== undefined) {
+    const merged = normalizePoint({ ...p, ...patch }, { keepId: true });
+    if (!merged) return null;
+    Object.assign(p, merged);
+  }
+  if (patch.color !== undefined && HEX_RE.test(String(patch.color))) p.color = String(patch.color);
+  if (patch.note !== undefined) p.note = String(patch.note).trim().slice(0, 60);
+  if (patch.category !== undefined && CAT_IDS.includes(patch.category)) p.category = patch.category;
+  renderAll();
+  save();
+  return p;
+}
+
+export function removePoint(id) {
+  const before = points.length;
+  points = points.filter((p) => p.id !== id);
+  if (points.length === before) return false;
+  if (selectedId === id) selectedId = null;
+  renderAll();
+  save();
+  return true;
+}
+
+export function clearAll() {
+  points = [];
+  selectedId = null;
+  renderAll();
+  save();
+  closeEditors();
+}
+
+/* ---------------------------------------------------------------- 渲染 */
+
+function pinNode(p, idx) {
+  const btn = el("button", "pin");
+  btn.type = "button";
+  btn.dataset.id = p.id;
+  btn.style.left = p.x_pct + "%";
+  btn.style.top = p.y_pct + "%";
+  btn.style.setProperty("--pin-color", p.color);
+  btn.setAttribute("aria-current", p.id === selectedId ? "true" : "false");
+  btn.setAttribute("aria-label", `标注点 ${idx + 1}${p.note ? "：" + p.note : ""}（可拖动改位置）`);
+  btn.appendChild(el("span", "pin__idx", String(idx + 1)));
+  const note = el("span", "pin__note", p.note || "");
+  note.hidden = !p.note;
+  btn.appendChild(note);
+  return btn;
+}
+
+function renderPins() {
+  for (const old of stage.querySelectorAll(".pin")) old.remove();
+  points.forEach((p, i) => stage.appendChild(pinNode(p, i)));
+}
+
+function renderList() {
+  const list = $("#list");
+  list.innerHTML = "";
+  $("#count").textContent = String(points.length);
+  $("#listEmpty").hidden = points.length > 0;
+  points.forEach((p, i) => {
+    const row = el("div", "pt-row");
+    row.dataset.id = p.id;
+    row.tabIndex = 0;
+    row.setAttribute("role", "button");
+    const dot = el("span", "pt-row__dot");
+    dot.style.setProperty("--pin-color", p.color);
+    const name = el("span", "pt-row__name",
+      `${i + 1}. ${p.note || "（无备注）"} · ${catLabel(p.category)} · ${p.x_pct}%, ${p.y_pct}%`);
+    const del = el("button", "btn btn--ghost btn--sm pt-row__del", "删除");
+    del.type = "button";
+    del.dataset.del = p.id;
+    row.append(dot, name, del);
+    list.appendChild(row);
+  });
+}
+
+function catLabel(id) {
+  return (CATEGORIES.find((c) => c.id === id) || { label: "其它" }).label;
+}
+
+function renderLegend() {
+  const box = $("#legend");
+  box.innerHTML = "";
+  for (const c of CATEGORIES) {
+    const chip = el("span", "chip");
+    chip.appendChild(icon(c.iconName, { size: 16 }));
+    chip.appendChild(el("span", "", c.label));
+    box.appendChild(chip);
+  }
+}
+
+function renderJson() {
+  $("#jsonOut").textContent = exportJson();
+}
+
+function renderAll() {
+  renderPins();
+  renderList();
+  renderJson();
+}
+
+/* ---------------------------------------------------------------- 编辑面板（createSheet） */
+
+let colorSheet = null;
+
+/** 打开某个标注点的编辑面板：颜色 / 备注 / 类别 / 删除（改动即时生效） */
+export function openEditor(id) {
+  const p = points.find((x) => x.id === id);
+  if (!p) return null;
+  selectedId = id;
+  renderPins();
+  if (colorSheet) {
+    colorSheet.close();
+    colorSheet = null;
+  }
+
+  const body = el("div", "stack");
+
+  const idx = points.findIndex((x) => x.id === id) + 1;
+  const coord = el("p", "hint", `位置：x ${p.x_pct}% / y ${p.y_pct}%（拖动圆点可改；左上角为 0,0）`);
+  body.appendChild(coord);
+
+  // ① 颜色
+  const colorField = el("div", "field");
+  colorField.appendChild(el("label", "field__label", "颜色（8 个预设）"));
+  const swatches = el("div", "swatches");
+  for (const c of COLORS) {
+    const b = el("button", "swatch");
+    b.type = "button";
+    b.dataset.color = c.hex;
+    b.style.background = `var(${c.cssVar})`;
+    b.setAttribute("aria-pressed", p.color.toLowerCase() === c.hex.toLowerCase() ? "true" : "false");
+    b.setAttribute("aria-label", "选择颜色 " + c.hex);
+    b.addEventListener("click", () => {
+      updatePoint(id, { color: c.hex });
+      for (const x of swatches.querySelectorAll(".swatch")) {
+        x.setAttribute("aria-pressed", x.dataset.color.toLowerCase() === c.hex.toLowerCase() ? "true" : "false");
+      }
+    });
+    swatches.appendChild(b);
+  }
+  colorField.appendChild(swatches);
+  colorField.appendChild(el("p", "field__hint", `当前：${p.color}`));
+  body.appendChild(colorField);
+
+  // ② 备注
+  const noteField = el("div", "field");
+  const noteId = "annoNote";
+  noteField.appendChild(el("label", "field__label", "备注（可空，≤ 60 字）"));
+  const noteInput = el("input");
+  noteInput.id = noteId;
+  noteInput.type = "text";
+  noteInput.maxLength = 60;
+  noteInput.value = p.note;
+  noteInput.placeholder = "例如：12号宿舍楼 / 快递驿站（东）";
+  noteInput.addEventListener("input", () => updatePoint(id, { note: noteInput.value }));
+  noteField.appendChild(noteInput);
+  body.appendChild(noteField);
+
+  // ③ 类别
+  const catField = el("div", "field");
+  catField.appendChild(el("label", "field__label", "类别（可选）"));
+  const sel = el("select");
+  sel.id = "annoCat";
+  for (const c of CATEGORIES) {
+    const o = el("option", "", c.label);
+    o.value = c.id;
+    sel.appendChild(o);
+  }
+  sel.value = p.category;
+  sel.addEventListener("change", () => updatePoint(id, { category: sel.value }));
+  catField.appendChild(sel);
+  body.appendChild(catField);
+
+  const foot = el("div", "row--between");
+  const del = el("button", "btn btn--ghost btn--sm", "删除这个点");
+  del.type = "button";
+  del.addEventListener("click", () => {
+    removePoint(id);
+    toast("已删除该标注点", "ok");
+    if (colorSheet) colorSheet.close();
+  });
+  const done = el("button", "btn btn--sm", "完成");
+  done.type = "button";
+  done.addEventListener("click", () => colorSheet && colorSheet.close());
+  foot.append(del, done);
+
+  colorSheet = createSheet({
+    title: `标注点 ${idx}`,
+    iconName: "map-pin",
+    body,
+    footer: foot,
+    onClose: () => {
+      colorSheet = null;
+    },
+  });
+  colorSheet.open();
+  return colorSheet;
+}
+
+function closeEditors() {
+  if (colorSheet) {
+    colorSheet.close();
+    colorSheet = null;
+  }
+}
+
+/** 导入面板（createSheet + textarea）：解析后整体替换画布上的标注点 */
+export function openImportSheet() {
+  const body = el("div", "stack");
+  body.appendChild(el("p", "hint", '粘贴导出的 JSON（格式 { "points": [ { x_pct, y_pct, color, note, category } ] }）'));
+  const ta = el("textarea");
+  ta.id = "importText";
+  ta.rows = 12;
+  ta.spellcheck = false;
+  ta.placeholder = '{ "points": [ { "x_pct": 62.1, "y_pct": 55.3, "color": "#1F4E8C", "note": "12号宿舍楼", "category": "dorm" } ] }';
+  body.appendChild(ta);
+  const out = el("div");
+  out.id = "importOut";
+  body.appendChild(out);
+
+  const foot = el("div", "row--between");
+  const pasteBtn = el("button", "btn btn--ghost btn--sm", "从剪贴板粘贴");
+  pasteBtn.type = "button";
+  pasteBtn.addEventListener("click", async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      ta.value = text;
+      showNotice(out, "已读入剪贴板内容，点「解析并导入」生效");
+    } catch {
+      showNotice(out, "浏览器不允许读剪贴板，请手动粘贴（Ctrl/⌘+V）", "warn");
+    }
+  });
+  const doBtn = el("button", "btn btn--sm", "解析并导入");
+  doBtn.type = "button";
+  doBtn.addEventListener("click", () => {
+    try {
+      const res = importJson(ta.value);
+      showNotice(out, `已导入 ${res.loaded} 个标注点` + (res.skipped ? `，跳过 ${res.skipped} 条无效数据` : ""), "ok");
+      toast(`已导入 ${res.loaded} 个标注点`, "ok");
+    } catch (e) {
+      showNotice(out, "解析失败：" + (e && e.message ? e.message : e), "danger");
+    }
+  });
+  foot.append(pasteBtn, doBtn);
+
+  const sheet = createSheet({ title: "粘贴导入 JSON", iconName: "clipboard-text", body, footer: foot });
+  sheet.open();
+  ta.focus();
+  return sheet;
+}
+
+/* ---------------------------------------------------------------- 画布交互（点 / 拖 / 缩放） */
+
+const drag = { mode: null, id: null, sx: 0, sy: 0, ox: 0, oy: 0, moved: false };
+
+viewport.addEventListener("pointerdown", (e) => {
+  if (e.button !== undefined && e.button !== 0) return;
+  const pinEl = e.target.closest ? e.target.closest(".pin") : null;
+  drag.moved = false;
+  drag.sx = e.clientX;
+  drag.sy = e.clientY;
+  if (pinEl) {
+    drag.mode = "pin";
+    drag.id = pinEl.dataset.id;
+    selectedId = drag.id;
+    renderPins();
+  } else {
+    drag.mode = "pan";
+    drag.ox = view.x;
+    drag.oy = view.y;
+    viewport.classList.add("is-panning");
+  }
+  try { viewport.setPointerCapture(e.pointerId); } catch { /* 老浏览器忽略 */ }
+});
+
+viewport.addEventListener("pointermove", (e) => {
+  if (!drag.mode) return;
+  const dx = e.clientX - drag.sx;
+  const dy = e.clientY - drag.sy;
+  if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
+  if (drag.mode === "pan") {
+    view.x = drag.ox + dx;
+    view.y = drag.oy + dy;
+    renderView();
+    return;
+  }
+  if (drag.mode === "pin") {
+    const pct = toPercent(e.clientX, e.clientY);
+    if (!pct) return;
+    const p = points.find((x) => x.id === drag.id);
+    if (!p) return;
+    p.x_pct = pct.x_pct;
+    p.y_pct = pct.y_pct;
+    const node = stage.querySelector(`.pin[data-id="${drag.id}"]`);
+    if (node) {
+      node.style.left = p.x_pct + "%";
+      node.style.top = p.y_pct + "%";
+    }
+  }
+});
+
+viewport.addEventListener("pointerup", (e) => {
+  const mode = drag.mode;
+  const id = drag.id;
+  const moved = drag.moved;
+  drag.mode = null;
+  drag.id = null;
+  viewport.classList.remove("is-panning");
+  try { viewport.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+
+  if (mode === "pin") {
+    if (moved) {
+      const p = points.find((x) => x.id === id);
+      if (p) {
+        renderList();
+        save();
+        toast(`已移动到 x ${p.x_pct}% / y ${p.y_pct}%`, "ok");
+      }
+    } else {
+      openEditor(id); // 点一下（没拖动）= 打开编辑面板
+    }
+    return;
+  }
+  if (mode === "pan" && !moved) {
+    // 空处单击 = 落一个新标注点
+    const pct = toPercent(e.clientX, e.clientY);
+    if (!pct) return;
+    const p = addPoint(pct.x_pct, pct.y_pct, { color: DEFAULT_COLOR, category: "other" });
+    toast(`已在 x ${p.x_pct}% / y ${p.y_pct}% 落点`, "ok");
+    // 默认逐点弹面板填颜色/备注/类别；勾了「连续落点」就只落点，稍后逐个编辑
+    if (!$("#batchMode").checked) openEditor(p.id);
+  }
+});
+
+viewport.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const r = viewport.getBoundingClientRect();
+  const step = e.deltaY > 0 ? -10 : 10;
+  setZoom(Math.round(view.scale * 100) + step, { x: e.clientX - r.left, y: e.clientY - r.top });
+}, { passive: false });
+
+$("#zoomIn").addEventListener("click", () => setZoom(Math.round(view.scale * 100) + 20));
+$("#zoomOut").addEventListener("click", () => setZoom(Math.round(view.scale * 100) - 20));
+$("#zoomRange").addEventListener("input", (e) => setZoom(e.target.value));
+$("#zoomReset").addEventListener("click", fitView);
+
+/** 键盘：选中点上按 Delete/Backspace 删除；+/- 缩放（画布聚焦时） */
+viewport.addEventListener("keydown", (e) => {
+  if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+    e.preventDefault();
+    removePoint(selectedId);
+    toast("已删除该标注点", "ok");
+  }
+  if (e.key === "+" || e.key === "=") setZoom(Math.round(view.scale * 100) + 20);
+  if (e.key === "-") setZoom(Math.round(view.scale * 100) - 20);
+});
+
+stage.addEventListener("click", (e) => {
+  // 鼠标点击已在 pointerup 里处理；这里只接键盘激活（Enter / Space 的 click 事件 detail 为 0）
+  const pinEl = e.target.closest ? e.target.closest(".pin") : null;
+  if (pinEl && e.detail === 0) openEditor(pinEl.dataset.id);
+});
+
+/* ---------------------------------------------------------------- 列表 / 工具条 */
+
+$("#list").addEventListener("click", (e) => {
+  const del = e.target.closest ? e.target.closest("[data-del]") : null;
+  if (del) {
+    e.stopPropagation();
+    removePoint(del.dataset.del);
+    toast("已删除该标注点", "ok");
+    return;
+  }
+  const row = e.target.closest ? e.target.closest(".pt-row") : null;
+  if (row) openEditor(row.dataset.id);
+});
+$("#list").addEventListener("keydown", (e) => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const row = e.target.closest ? e.target.closest(".pt-row") : null;
+  if (row) {
+    e.preventDefault();
+    openEditor(row.dataset.id);
+  }
+});
+
+$("#btnCopy").addEventListener("click", () => { copyJson(); });
+$("#btnDownload").addEventListener("click", () => { downloadJson(); });
+$("#btnImport").addEventListener("click", () => { openImportSheet(); });
+$("#btnClear").addEventListener("click", async () => {
+  if (!points.length) {
+    toast("还没有标注点");
+    return;
+  }
+  const yes = await openModal({
+    title: `清空全部 ${points.length} 个标注点？`,
+    iconName: "alert-triangle",
+    body: el("p", "hint", "清空后可用「下载 JSON」的备份重新粘贴导入；本机存储同步清空。"),
+    confirmText: "清空",
+    cancelText: "取消",
+    danger: true,
+  });
+  if (yes) {
+    clearAll();
+    toast("已清空标注点", "ok");
+  }
+});
+
+/* ---------------------------------------------------------------- 启动 */
+
+function boot() {
+  // 工具条按钮统一带图标
+  const withIcon = (btn, name, text, cls) => {
+    btn.innerHTML = "";
+    btn.appendChild(icon(name, { size: 16, cls }));
+    btn.appendChild(el("span", "", text));
+    if (cls) btn.classList.add(cls);
+  };
+  withIcon($("#btnCopy"), "copy", "复制 JSON");
+  withIcon($("#btnDownload"), "clipboard-text", "下载 JSON");
+  withIcon($("#btnImport"), "package", "粘贴导入 JSON");
+
+  renderLegend();
+  points = load();
+  renderAll();
+
+  const onReady = () => {
+    fitView();
+    renderAll();
+  };
+  if (baseImg.complete && baseImg.naturalWidth) onReady();
+  else {
+    baseImg.addEventListener("load", onReady, { once: true });
+    baseImg.addEventListener("error", () => {
+      showNotice("#notice", `底图加载失败（${IMG_SRC}）——请确认文件存在。`, "danger");
+    }, { once: true });
+  }
+  window.addEventListener("resize", () => { renderView(); });
+  $("#savedAt").textContent = points.length ? `已从本机载入 ${points.length} 个标注点` : "";
+}
+
+/* 供浏览器控制台 / 自动化实测使用（⛔ 页面自身不依赖它） */
+window.__annotate = {
+  STORE_KEY,
+  COLORS,
+  CATEGORIES,
+  exportJson,
+  importJson,
+  copyJson,
+  downloadJson,
+  addPoint,
+  updatePoint,
+  removePoint,
+  clearAll,
+  get points() { return points; },
+};
+
+boot();
+</script>
+</body>
+</html>

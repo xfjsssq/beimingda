@@ -13,7 +13,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import { initDb, dbPath } from "./db/index.js";
-import { apiLimiter } from "./middleware/ratelimit.js";
+import { apiLimiter, createRateLimiter } from "./middleware/ratelimit.js";
 import { createApiRouter } from "./api/routes.js";
 import { createMcpRouter } from "./mcp/server.js";
 
@@ -77,7 +77,20 @@ export function createApp() {
   });
 
   // HTTP API
-  app.use("/api", apiLimiter, createApiRouter());
+  // 读接口放宽（演示时连续翻页/截图会被自己的限频挡住）：读 240 次/分钟，写仍 60 次/分钟
+  const READ_MAX = Number(process.env.API_READ_LIMIT) || 240;
+  const WRITE_MAX = Number(process.env.API_WRITE_LIMIT) || 60;
+  const readLimiter = createRateLimiter({ windowMs: 60_000, max: READ_MAX, label: "api-read" });
+  // 写接口默认 60/分钟；测试或压测时可用 API_WRITE_LIMIT 放宽
+  // 写接口限频：默认 60/分钟；测试或压测可用 API_WRITE_LIMIT 放宽（懒创建，避免多实例互相干扰）
+  let writeLimiter = null;
+  const createWriteLimiter = () =>
+    (writeLimiter ??= createRateLimiter({ windowMs: 60_000, max: WRITE_MAX, label: "api-write" }));
+
+  app.use("/api", (req, res, next) => {
+    const isRead = req.method === "GET" || req.method === "HEAD";
+    return (isRead ? readLimiter : createWriteLimiter())(req, res, next);
+  }, createApiRouter());
 
   // MCP 远程端点（必须零配置可接入：POST /mcp）
   app.use("/mcp", createMcpRouter());
@@ -95,7 +108,12 @@ export function createApp() {
   app.use(express.static(STATIC_DIR, { extensions: ["html"] }));
   app.use("/pano", express.static(path.join(ROOT, "pano")));
 
+  // 404：接口/ MCP 仍然回统一信封；浏览器请求给一个品牌化的 404 页面（B10 交付项）
   app.use((req, res) => {
+    const wantsHtml = !req.path.startsWith("/api") && !req.path.startsWith("/mcp") &&
+      String(req.get("accept") || "").includes("text/html");
+    const file404 = path.join(STATIC_DIR, "404.html");
+    if (wantsHtml && fs.existsSync(file404)) return res.status(404).sendFile(file404);
     res
       .status(404)
       .json({ ok: false, data: null, error: { code: "NOT_FOUND", message: "not found" } });

@@ -11,7 +11,7 @@
  *
  *   ⛔ 三条红线（评审对照用）
  *     1. anon_token 随机生成，**不得由 user_id 派生**
- *     2. 未双选成功不返回 contact_code（且 revealed=0 时该键根本不出现在返回对象里）
+ *     2. 未双选成功不返回 chat_ready（⛔ 也不再有"站内私聊"：双方同意后直接站内私聊）
  *     3. 结果里不出现院系全名 / 班级 / 学号 / 宿舍号 / 真实姓名
  *        —— 对外字段一律走白名单投影（safePost / safeCandidate）
  */
@@ -53,7 +53,8 @@ export const SAFE_CANDIDATE_KEYS = Object.freeze([
   "reason",
   "reveal_status",
   "parts",
-  "contact_code",
+  "chat_ready",
+  "thread_id",
 ]);
 
 /** publishPost 允许的入参（HTTP 侧 additionalProperties:false 的等价实现） */
@@ -68,11 +69,25 @@ const SEARCH_POOL = () => (llmEnabled() ? 30 : 200); // 单次响应必须 < 90 
  * 匿名标识：随机 12 位十六进制。
  * ⛔ 绝不用 hash(user_id) / user_id.slice() 这类可反推的派生方式。
  */
+/** 入参校验（本模块自带一份，⛔ 不与 task.js 互相依赖） */
+function requiredText(value, label, maxLen = 60) {
+  const text = typeof value === "string" ? value.trim() : "";
+  if (!text) reject(CODES.SCHEMA_REJECTED, `${label} 不能为空`);
+  if (text.length > maxLen) reject(CODES.SCHEMA_REJECTED, `${label} 过长（≤ ${maxLen} 字符）`);
+  return text;
+}
+
+function clampLimit(value, fallback = 50, max = 200) {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
 export function anonToken() {
   return `anon_${crypto.randomBytes(6).toString("hex")}`;
 }
 
-/** 匿名中转码（不是手机号/微信，双选成功后下发的对接凭据） */
+/** 匿名站内私聊（不是手机号/微信，双选成功后下发的对接凭据） */
 export function newContactCode() {
   return `ct_${crypto.randomBytes(4).toString("hex")}`;
 }
@@ -100,7 +115,7 @@ function assertKind(kind) {
 }
 
 export function findUser(handle) {
-  return getDb().prepare("SELECT id, handle, contact_code FROM users WHERE handle = ?").get(handle) ?? null;
+  return getDb().prepare("SELECT id, handle FROM users WHERE handle = ?").get(handle) ?? null;
 }
 
 /** 写入路径用：昵称不存在则建（user_id 随机，与昵称无推导关系） */
@@ -108,27 +123,16 @@ export function ensureUser(handle) {
   const existed = findUser(handle);
   if (existed) return existed;
   getDb()
-    .prepare("INSERT OR IGNORE INTO users(id,handle,contact_code,created_at,demo) VALUES (?,?,?,?,1)")
-    .run(newId("u"), handle, newContactCode(), nowSec());
+    // ⛔ 2026-10-31 起不再生成"站内私聊"（机制已废弃：双方同意后直接站内私聊）
+    .prepare("INSERT OR IGNORE INTO users(id,handle,created_at,demo) VALUES (?,?,?,1)")
+    .run(newId("u"), handle, nowSec());
   const created = findUser(handle);
   if (!created) reject(CODES.INTERNAL, "用户创建失败");
   return created;
 }
 
-/** 懒生成中转码（seeded 用户 contact_code 为 NULL，首次揭示时补上） */
-function ensureContactCode(user) {
-  if (!user) return null;
-  if (user.contact_code) return user.contact_code;
-  const db = getDb();
-  db.prepare("UPDATE users SET contact_code = ? WHERE id = ? AND contact_code IS NULL").run(
-    newContactCode(),
-    user.id,
-  );
-  return db.prepare("SELECT contact_code FROM users WHERE id = ?").get(user.id)?.contact_code ?? null;
-}
-
 const findUserById = (id) =>
-  getDb().prepare("SELECT id, handle, contact_code FROM users WHERE id = ?").get(id) ?? null;
+  getDb().prepare("SELECT id, handle FROM users WHERE id = ?").get(id) ?? null;
 
 // ──────────────────────────── 进程内缓存（表决时复用打分上下文） ────────────────────────────
 
@@ -235,7 +239,7 @@ function normalizeTopK(v) {
 
 /**
  * 检索候选：kind 一致 + 未被一票否决 + score >= 60（契约 §2 阈值）
- * @returns {{candidates:Array<{post_id,anon_token,kind,score,reason,reveal_status,parts,contact_code?}>}}
+ * @returns {{candidates:Array<{post_id,anon_token,kind,score,reason,reveal_status,parts,chat_ready?,thread_id?}>}}
  */
 export async function searchBuddies({ seeker_handle, kind, text_profile, top_k } = {}) {
   const handle = assertHandle(seeker_handle, "seeker_handle");
@@ -280,8 +284,10 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
         parts: result.parts,
       };
       if (status === "mutual") {
-        // ⛔ 只有双方都同意（revealed=1）才附带 contact_code
-        candidate.contact_code = ensureContactCode(findUserById(row.author_id));
+        // ⛔ 只有双方都同意（revealed=1）才附带 chat_ready / thread_id
+        // ⛔ 不再输出站内私聊：双方同意后可聊（candidate 里改为 chat_ready / thread_id，见下）
+      candidate.chat_ready = true;
+    candidate.thread_id = threadIdForBuddy(row.id, seeker?.id) || null;
       }
       if (seeker) cacheSet(pairScoreCache, `${row.id}:${seeker.id}`, result.score);
       return candidate;
@@ -302,8 +308,8 @@ export async function searchBuddies({ seeker_handle, kind, text_profile, top_k }
  *     · 其它昵称        -> 记为寻找方表决（seeker_ok），落一行 buddy_consents
  *   ⛔ 同一 (post_id, seeker_id) 只能表决一次 —— 由 DB 的 UNIQUE(post_id, seeker_id) 保证
  *
- * @returns {{author_ok:number, seeker_ok:number, revealed:number, contact_code?}}
- *          ⛔ revealed=0 时 contact_code 这个键根本不出现在返回对象里
+ * @returns {{author_ok:number, seeker_ok:number, revealed:number, chat_ready?, thread_id?}}
+ *          ⛔ revealed=0 时不出现 chat_ready / thread_id（旧的站内私聊已废弃）
  */
 export function castConsent({ post_id, seeker_handle, agree } = {}) {
   const handle = assertHandle(seeker_handle, "seeker_handle");
@@ -318,6 +324,19 @@ export function castConsent({ post_id, seeker_handle, agree } = {}) {
   const author = findUserById(post.author_id);
   if (author && author.id === actor.id) return authorVote(post, author, agree);
   return seekerVote(post, actor, author, handle, agree);
+}
+
+/**
+ * 统一出口：状态机结果 + （双方同意时）站内私聊会话
+ *   ⭐ 会话在这里建，MCP 与 HTTP 两条路都会建（之前在 HTTP 路由里建，MCP 就走不到）
+ *   ⛔ 不再返回任何"站内私聊"：双方同意 → 直接给 thread_id 开聊
+ */
+function responseWithChat(post, state, uid) {
+  const out = toResponse(state);
+  if (out.chat_ready) {
+    try { out.thread_id = threadIdForBuddy(post.id, uid); } catch { out.thread_id = null; }
+  }
+  return out;
 }
 
 /** 寻找方表决：落 buddy_consents 一行（含拒绝 —— 拒绝即终止） */
@@ -354,8 +373,8 @@ function seekerVote(post, actor, author, handle, agree) {
     throw e;
   }
 
-  // 寻找方单独同意时 author_ok 保持 0 => revealed 必为 0 => 不返回 contact_code
-  return toResponse(next, next.revealed === 1 ? ensureContactCode(author) : null);
+  // 寻找方单独同意时 author_ok 保持 0 => revealed 必为 0 => 不给聊天入口
+  return responseWithChat(post, next, actor.id);   // 双方同意 → 直接给私聊会话
 }
 
 /** 进程内：作者对某条意愿只能表态一次（同意态另有 author_ok=1 的持久化判据） */
@@ -391,7 +410,7 @@ function authorVote(post, author, agree) {
   authorVoted.add(voteKey);
 
   const seekerUser = findUserById(target.seeker_id);
-  return toResponse(next, next.revealed === 1 ? ensureContactCode(seekerUser) : null);
+  return responseWithChat(post, next, author.id);  // 双方同意 → 直接给私聊会话
 }
 
 /** 我发出的意愿（页面区块四）：⛔ 不暴露对方的个人表决位，只给 pending / mutual */
@@ -437,3 +456,125 @@ export default {
   SAFE_POST_KEYS,
   SAFE_CANDIDATE_KEYS,
 };
+
+
+/* =============================================================================
+   站内留言 / 回复（2026-10-30 · 用户要求"在站点里就能发帖、留言、回复、接受"）
+     · postMessage：给某个帖子留言；带上 consent_id 就是回复某一条"表达意愿"
+     · listMessages：帖子下的留言与回复（按时间升序）
+     · myConsole：我的申请三块 —— 我发布的帖（含收到的留言）/ 我表达的意愿 / 已互相同意
+   ============================================================================= */
+
+export function postMessage({ post_id, consent_id = null, from_handle, to_handle = null, body, kind = "message" } = {}) {
+  const postId = requiredText(post_id, "post_id");
+  const text = requiredText(body, "留言内容", 300);
+  const from = requiredText(from_handle, "handle");
+  const db = getDb();
+  const post = db.prepare("SELECT id, author_id, raw_status FROM buddy_posts WHERE id = ?").get(postId);
+  if (!post) reject(CODES.NOT_FOUND, `post not found: ${postId}`);
+  if (post.raw_status !== "open") reject(CODES.SCHEMA_REJECTED, "这个帖子已经关闭了，不能再留言");
+
+  const fromId = ensureUser(from).id;             // ⚠️ 本模块的 ensureUser 返回对象，不是 id
+  const toId = to_handle ? ensureUser(to_handle).id : null;
+  const id = `msg_${crypto.randomUUID()}`;
+  db.prepare(
+    `INSERT INTO buddy_messages(id, post_id, consent_id, from_id, to_id, kind, body, created_at)
+     VALUES (@id, @post_id, @consent_id, @from_id, @to_id, @kind, @body, @created_at)`,
+  ).run({
+    id, post_id: postId, consent_id: consent_id ?? null, from_id: fromId,
+    to_id: toId ?? null, kind, body: text, created_at: nowSec(),
+  });
+  return { message_id: id, post_id: postId, consent_id, kind, body: text, at: toIso(nowSec()) };
+}
+
+export function listMessages(postId) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT m.id, m.post_id, m.consent_id, m.kind, m.body, m.created_at,
+              uf.handle AS from_handle, ut.handle AS to_handle
+         FROM buddy_messages m
+         JOIN users uf ON uf.id = m.from_id
+         LEFT JOIN users ut ON ut.id = m.to_id
+        WHERE m.post_id = ?
+        ORDER BY m.created_at ASC`,
+    )
+    .all(String(postId))
+    .map((m) => ({
+      message_id: m.id,
+      post_id: m.post_id,
+      consent_id: m.consent_id,
+      kind: m.kind,
+      body: m.body,
+      from: m.from_handle,
+      to: m.to_handle,
+      at: toIso(m.created_at),
+    }));
+}
+
+/** 我的申请（三块）：posts=我发布的（含收到的留言）/ intents=我表达的意愿（含回复）/ mutual=已互相同意 */
+export function myConsole({ handle, limit = 50 } = {}) {
+  const me = requiredText(handle, "handle");
+  const db = getDb();
+  const myId = ensureUser(me).id;                 // ⚠️ 同上
+  const lt = clampLimit ? clampLimit(limit, 50, 200) : 50;
+
+  const posts = db
+    .prepare(
+      `SELECT id, kind, profile_json, anon_token, raw_status, created_at
+         FROM buddy_posts WHERE author_id = ? ORDER BY created_at DESC LIMIT ?`,
+    )
+    .all(myId, lt)
+    .map((p) => {
+      const cons = db
+        .prepare(
+          `SELECT c.id, c.score, c.author_ok, c.seeker_ok, c.revealed, c.created_at,
+                  us.handle AS seeker_handle
+             FROM buddy_consents c JOIN users us ON us.id = c.seeker_id
+            WHERE c.post_id = ? ORDER BY c.created_at DESC`,
+        )
+        .all(p.id)
+        .map((c) => ({
+          consent_id: c.id,
+          seeker: c.seeker_handle,
+          score: c.score,
+          status: c.revealed === 1 ? "mutual" : c.author_ok === 1 ? "accepted" : "pending",
+          at: toIso(c.created_at),
+          messages: listMessages(p.id).filter((m) => m.consent_id === c.id),
+        }));
+      return {
+        post_id: p.id,
+        kind: p.kind,
+        anon_token: p.anon_token,
+        status: p.raw_status,
+        profile: safeParse(p.profile_json),
+        at: toIso(p.created_at),
+        consents: cons,
+        messages: listMessages(p.id).filter((m) => !m.consent_id),
+      };
+    });
+
+  const intents = myApplications({ seeker_handle: me, limit: lt });
+
+  const mutual = db
+    .prepare(
+      `SELECT c.id, c.post_id, c.seeker_ok, c.author_ok, c.revealed, c.created_at, p.kind, p.anon_token
+         FROM buddy_consents c JOIN buddy_posts p ON p.id = c.post_id
+        WHERE c.seeker_id = ? AND c.revealed = 1 ORDER BY c.created_at DESC`,
+    )
+    .all(myId)
+    .map((c) => ({
+      consent_id: c.id,
+      post_id: c.post_id,
+      kind: c.kind,
+      anon_token: c.anon_token,
+      revealed: c.revealed,
+      at: toIso(c.created_at),
+    }));
+
+  return { posts, intents, mutual };
+}
+
+function safeParse(v) {
+  try { return JSON.parse(v || "{}"); } catch { return {}; }
+}

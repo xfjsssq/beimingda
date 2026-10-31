@@ -10,7 +10,7 @@
  *   5. 无外部 CDN、无课表上传控件、无真实令牌
  *   6. api.js 行为：解信封 / 写接口带 X-Demo-Token / 未就绪安全降级返回 null
  *   7. nav.js 的 6 页导航与当前页高亮
- *   8. 14 个工具名与 docs/MCP-TOOLS.md 完全一致
+ *   8. 15 个工具名与 docs/MCP-TOOLS.md 完全一致
  */
 import assert from "node:assert/strict";
 import fs from "node:fs";
@@ -148,14 +148,14 @@ test("/agent：复制出来的 MCP 配置是合法 JSON、令牌为占位符、U
   assert.equal(mcpConfig.resolveMcpUrl({ origin: "http://127.0.0.1:3000/", mode: "origin" }), "http://127.0.0.1:3000/mcp");
 });
 
-test("/agent：14 个工具名与 docs/MCP-TOOLS.md 完全一致（防文档漂移）", () => {
+test("/agent：15 个工具名与 docs/MCP-TOOLS.md 完全一致（防文档漂移）", () => {
   const doc = readText("docs/MCP-TOOLS.md");
-  const section = doc.split("## 14 个工具")[1].split("## 返回格式")[0];
+  const section = doc.split("## 15 个工具")[1].split("## 返回格式")[0];
   // 工具表是「3 列」：| `工具名` | 作用 | 关键约束 |（协议方法表只有 2 列，不会被匹配）
   const inDoc = [...section.matchAll(/^\|\s*`([a-z][a-z0-9_]*)`[^|]*\|[^|]*\|[^|]*\|/gm)].map((m) => m[1]);
   const inCode = mcpConfig.toolNames();
-  assert.equal(inDoc.length, 14, `docs 里解析到 ${inDoc.length} 个工具，应为 14`);
-  assert.equal(mcpConfig.toolCount(), 14);
+  assert.equal(inDoc.length, 15, `docs 里解析到 ${inDoc.length} 个工具，应为 15`);
+  assert.equal(mcpConfig.toolCount(), 15);
   assert.deepEqual([...inCode].sort(), [...inDoc].sort(), "前端工具清单与 docs/MCP-TOOLS.md 不一致");
   for (const g of mcpConfig.TOOLS_BY_MODULE) {
     assert.equal(g.tools.length, g.count, `${g.module} 的数量标注与实际不符`);
@@ -427,7 +427,7 @@ test("HTTP：/ 与 /agent 及全部共用资源 200，JS 的 MIME 必须是 java
       const r = await fetch(base + p);
       assert.equal(r.status, 200, `${p} 应 200`);
       const html = await r.text();
-      assert.ok(html.includes("北名大小助手"), `${p} 内容不对`);
+      assert.ok(html.includes("北民大小助手"), `${p} 内容不对`);
     }
 
     const assets = ["/css/app.css", "/js/api.js", "/js/nav.js", "/js/demo.js", "/js/mcp-config.js", "/config.js"];

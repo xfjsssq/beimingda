@@ -1,7 +1,7 @@
 {
   "name": "beimingda",
   "version": "0.1.0",
-  "description": "北名大小助手 · 智慧校园 Agent（银移杯赛道17）—— 代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 Streamable HTTP MCP 开放给 WorkBuddy",
+  "description": "北民大小助手 · 智慧校园 Agent（银移杯赛道一）—— 代取撮合 / 搭子匹配 / 迎新导览 / 日程提醒，能力通过远程 Streamable HTTP MCP 开放给 WorkBuddy",
   "type": "module",
   "private": true,
   "engines": {
