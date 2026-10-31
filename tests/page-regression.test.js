@@ -51,12 +51,11 @@ test("页面：/takeout 与 /buddy 必须接入 ?demo=1 演示模式（路演与
   }
 });
 
-test("合规：全站只有 /takeout 有文件上传控件（代取截图），其余页面不许有", () => {
+test("合规：全站都不许有文件上传控件（代取也已于 2026-10-31 下线上传入口）", () => {
   for (const p of PAGES) {
     const html = read(`static/${p}.html`);
     const hasFileInput = /type\s*=\s*["']file["']/.test(html);
-    if (p === "takeout") assert.ok(hasFileInput, "takeout 负责截图上传，应保留上传控件");
-    else assert.ok(!hasFileInput, `static/${p}.html 不应有 input[type=file]（frontend.md §7）`);
+    assert.ok(!hasFileInput, `static/${p}.html 不应有 input[type=file]（frontend.md §7）`);
   }
 });
 

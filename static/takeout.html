@@ -339,6 +339,7 @@
         <p>匹配结果由引擎算：可达性 40 + 时段 30 + 报酬 30，阈值 60，低于 60 分一律不出现；
            平台单任务同时最多推 3 名，其余先排队。</p>
         <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
+        <p>需要自动识别取件截图时，请在 WorkBuddy 里把截图直接发给对话方（站内不提供上传入口）。</p>
       </details>
     </aside>
 
@@ -421,7 +422,7 @@
 </main>
 
 <footer class="site-footer">
-  <p>北民大小助手 · 赛道 17 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
+  <p>北民大小助手 · 赛道一 智慧校园 Agent｜本页所有数据均为演示数据（demo=1），昵称一律「同学A / 同学B」。</p>
   <p>平台不参与交易、不代收款、不承诺履约；代取报酬由双方线下协商。⛔ 不收集姓名 / 学号 / 手机号 / 身份证。</p>
 <nav class="site-footer__legal" aria-label="法律与来源">
     <a href="/agent#p-compliance">隐私与合规说明</a>
@@ -1405,10 +1406,6 @@ function buildCard(t) {
   if (t.note) note.title = t.note;
   card.appendChild(note);
 
-  // 第 3.5 层：取件照片缩略图（可选）
-  const photo = photoFigure(t);
-  if (photo) card.appendChild(photo);
-
   // 第 4 层：候选（我发布的）或规则说明（别人的）
   const cands = el("div", "tk-card__cands");
   card.appendChild(cands);
@@ -2072,7 +2069,7 @@ async function boot() {
   // 演示别名先把「我」占住同学A，别人的发布者才不会也被显示成「同学A」（否则分不清谁发的单）
   aliasFor(ME, 0);
   showLoading("#board", "正在读取开放任务…");
-  // 两个侧栏先建好（默认是关着的）：这样「取件照片」控件始终在页面里，且点开按钮零延迟
+  // 两个侧栏先建好（默认是关着的）：点开按钮零延迟
   publishSheet = buildPublishSheet();
   registerSheet = buildRegisterSheet();
   mountEmojiRow();

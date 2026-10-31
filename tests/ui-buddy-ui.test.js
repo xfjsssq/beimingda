@@ -184,7 +184,11 @@ test("数据：演示留言/回复是服务端数据文件，页面只读、⛔ 
   assert.ok(intents.length >= 2, "「我表达的意愿」演示数据至少 2 条");
   assert.ok(intents.filter((i) => i.reply_text).length >= 2, "至少 2 条意愿收到对方回复");
   const mutual = (DEMO.my && DEMO.my.mutual) || [];
-  assert.ok(mutual.length >= 1 && (mutual[0].chat_ready || mutual[0].thread_id), "至少 1 对已互相同意（可开私聊）");
+  assert.ok(mutual.length >= 1, "至少 1 对已互相同意（演示数据）");
+    // 不变量：**不许"声称可聊却没有会话"**；没有 thread_id 的只能是演示样例（页面要如实标注、不给入口）
+    for (const m of mutual) {
+      if (m.chat_ready) assert.ok(m.thread_id, "chat_ready=true 必须同时给 thread_id");
+    }
   assert.ok(((DEMO.my && DEMO.my.posts) || []).length >= 1, "演示里要有「我发布的帖」");
 
   const anons = new Set(POSTS_FIXTURE.posts.map((p) => p.anon_token));

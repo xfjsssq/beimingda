@@ -11,8 +11,8 @@
  *      · ⭐ 权限模型：只有「我发布的单」才列候选、才有「选 TA 接单」；
  *        别人的单只能「我想接这一单」表达意愿，⛔ 不许出现替别人挑人的按钮
  *      · 页面上 ⛔ 没有任何凭据字样 / 输入框（演示身份由服务端注入）
- *      · 发布可带取件照片（前端压到 ≤120KB 的 dataURL），卡片上有 96px 缩略图 + 点击放大
- *      · 图标一律 vendor/phosphor svg，⛔ 无 emoji；上传控件只剩一处
+ *      · ⛔ 站内不做取件图片上传 / 截图识别：全页没有 input[type=file]，只留一句「去 WorkBuddy 发截图」的说明
+ *      · 图标一律 vendor/phosphor svg，⛔ 无 emoji
  *   2) 设计刻度：字阶只从 12/14/16/18/20/24/30/36/48/60 取，间距只从 0/2/4/8/12/16/24/32/40/48/64/80/96 取
  *   3) service `setMatchState`：状态机与错误码
  *   4) HTTP `POST /api/matches/:id/accept` / `:id/decline`：鉴权、状态迁移、重复操作被拒
@@ -197,24 +197,24 @@ test("/takeout：页面上没有任何凭据字样与控件", () => {
   assert.match(PAGE, /from "\/js\/api\.js"/);
 });
 
-test("/takeout：发布可带取件照片（压到 ≤120KB），卡片上有 96px 缩略图并可放大", () => {
-  assert.ok(PAGE.includes("取件照片（可选）"), "文件选择要写成「取件照片（可选）」");
-  assert.match(PAGE, /PHOTO_MAX_BYTES = 120 \* 1024/, "上限应是 120KB");
-  assert.match(PAGE, /async function compressPhoto\(/, "应有前端压缩函数");
-  assert.match(PAGE, /toDataURL\("image\/jpeg"/, "压缩成 jpeg dataURL");
-  assert.match(PAGE, /dataUrlBytes\(dataUrl\)/, "要按 dataURL 估算字节数");
-  // 提交时放进 payload.photo
-  assert.match(PAGE, /body: withPhoto \? \{ \.\.\.base, photo: photo\.dataUrl \} : base/);
-  // 服务端还没放开 photo 时去掉照片重发，不让照片挡住发布
-  assert.match(PAGE, /非法字段\|photo/, "要有「服务端不认 photo 就去掉重发」的兜底");
-  // 表单里显示缩略预览
-  assert.match(PAGE, /id="photo-out"/, "表单里要有照片预览容器");
-  assert.match(PAGE, /\.photo-pick img\s*\{[^}]*width:\s*96px/, "预览缩略图 96px");
-  // 卡片缩略图 + 点击放大
-  assert.match(PAGE, /\.tk-photo img\s*\{[^}]*width:\s*96px/, "卡片缩略图 96px");
-  assert.match(PAGE, /function photoFigure\(t\)/, "卡片照片渲染函数");
-  assert.match(PAGE, /openModal\(\{ title: "取件照片"/, "点击缩略图用 openModal 放大");
-  assert.match(PAGE, /typeof t\.photo === "string"/, "photo 是可选字段");
+test("/takeout：站内不做取件图片上传，也不做截图识别（只剩一句去向说明）", () => {
+  // 1) ⛔ 全页不许有任何上传控件 / 上传相关容器与函数
+  assert.equal((PAGE.match(/type\s*=\s*["']file["']/g) || []).length, 0, "⛔ 不许有 input[type=file]");
+  for (const gone of ['id="p-shot"', 'id="btn-parse"', 'id="photo-out"', 'id="parse-out"', "PHOTO_MAX_BYTES",
+    "compressPhoto", "photoFigure", "openPhoto", "dataUrlBytes", "payload.photo", 'accept="image/*"']) {
+    assert.ok(!PAGE.includes(gone), `⛔ 取件图片/截图识别相关痕迹必须删干净：${gone}`);
+  }
+  assert.doesNotMatch(PAGE, /photo/i, "页面里不该再出现 photo 字样（含 payload.photo / t.photo）");
+  // 2) ⛔ 不许再有"识别截图字段"这类按钮文案
+  assert.doesNotMatch(PAGE, /识别截图字段|上传截图|选择图片|正在压缩照片/, "⛔ 不许再出现截图识别 / 上传相关文案");
+  // 3) ✅ 只留一句如实说明：去 WorkBuddy 发截图给对话方
+  assert.ok(PAGE.includes("需要自动识别取件截图时，请在 WorkBuddy 里把截图直接发给对话方（站内不提供上传入口）"),
+    "要留下 WorkBuddy 那句如实说明");
+  // 4) 说明区里除了那一句，不许再冒出"上传"「选择图片」字样
+  const note = (PAGE.match(/<details[^>]*class="rail__note"[\s\S]*?<\/details>/) || [""])[0];
+  assert.ok(note.includes("WorkBuddy"), "说明区应包含那句去向说明");
+  const uploads = [...note.matchAll(/上传/g)].length;
+  assert.equal(uploads, 1, `说明区里「上传」只允许出现在那一句里，实际 ${uploads} 次`);
 });
 
 test("/takeout：干掉「查看匹配」，候选直接铺在卡片里（含 score / reason 原文）", () => {
@@ -248,9 +248,9 @@ test("/takeout：图标走 vendor/phosphor svg、⛔ 无 emoji、⛔ 无外链",
   assert.deepEqual(srcs, ["/config.js"], "外链脚本只允许 /config.js");
 });
 
-test("/takeout：取件照片控件仍在，且全页只有这一处 input[type=file]", () => {
-  assert.equal((PAGE.match(/type="file"/g) || []).length, 1, "只允许一处上传控件（frontend.md §7）");
-  assert.match(PAGE, /id="p-shot"/);
+test("/takeout：全页没有任何 input[type=file]（站内不做图片上传）", () => {
+  assert.equal((PAGE.match(/type\s*=\s*["']file["']/g) || []).length, 0, "⛔ 不该再有任何上传控件");
+  assert.ok(!PAGE.includes('id="p-shot"'), "旧的取件照片控件必须删掉");
 });
 
 /* ============================================================ 2) 设计刻度 */
