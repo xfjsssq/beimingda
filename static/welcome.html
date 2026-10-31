@@ -171,6 +171,18 @@
   .sat-marker--draft .sat-marker__dot { background: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,.28); }
   .sat-marker--draft .sat-marker__label { border-color: rgba(124,58,237,.55); color: #5b21b6; }
   .sat-marker--draft.is-dragging .sat-marker__dot { transform: scale(1.35); }
+
+  /* ---------- 街景入口编辑器（双击画面放热点） ---------- */
+  .hs-editor { position: absolute; left: 12px; bottom: 12px; z-index: 1200; display: flex; align-items: center;
+    gap: 8px; padding: 6px 10px; border-radius: 9999px; background: rgba(255,255,255,.94);
+    border: 1px solid rgba(31,78,140,.18); box-shadow: 0 6px 20px -10px rgba(16,24,40,.4); }
+  .hs-editor__hint { font-size: 12px; color: var(--color-muted); }
+  .hs-editor__count { font-size: 13px; color: var(--color-primary); min-width: 18px; }
+  /* 编辑期的入口：看得出来是"我们自己放的"，并且可拖 */
+  .pnlm-hotspot.hs-edit { cursor: move !important; }
+  .pnlm-hotspot.hs-edit::after { content: ""; position: absolute; inset: -10px; border: 2px dashed rgba(124,58,237,.85);
+    border-radius: 9999px; pointer-events: none; }
+  .pnlm-hotspot.hs-edit.is-dragging { opacity: .85; }
 </style>
   <meta name="description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
   <meta property="og:title" content="迎新导览：校园地图与 3D 街景" />
@@ -254,6 +266,14 @@
     <button id="panoClose" type="button">关闭</button>
   </div>
   <div id="pano"></div>
+  <!-- ⭐ 入口编辑器：在画面里双击 = 放一个「去某个点位」的入口，可拖动微调 -->
+  <div class="hs-editor" id="hsEditor" hidden>
+    <span class="hs-editor__hint">双击画面 = 在这里放去别处的入口</span>
+    <b class="hs-editor__count" id="hsCount">0</b>
+    <button class="btn btn--sm" type="button" id="hsExport">导出 JSON</button>
+    <button class="btn btn--sm btn--ghost" type="button" id="hsUndo">撤销</button>
+    <button class="btn btn--sm btn--ghost" type="button" id="hsClear">清空本场景</button>
+  </div>
   <!-- 没有实景素材时的如实提示（⛔ 绝不拿别的图冒充实景） -->
   <div class="street-fallback" id="streetFallback" hidden>
     <div class="card">
@@ -658,6 +678,20 @@ function openStreetScene(sceneId) {
       minPitch: -18, maxPitch: 18, pitch: 0,
       compass: false,
     });
+    window.__sv = streetViewer;                    // 调试/自动化：暴露查看器
+    // ⭐ 入口编辑器：双击画面放入口；进场景先应用已保存的入口
+    setTimeout(() => {
+      hsApply(sceneId);
+      const el2 = $("#pano");
+      if (el2 && !el2.__hsBound) {
+        el2.__hsBound = true;
+        el2.addEventListener("dblclick", onPanoDblClick);
+      }
+      // 热点点击会在查看器内部切场景 → 监听场景变化，重新应用该场景的入口
+      try {
+        streetViewer.on("scenechange", () => { const sc = streetViewer.getScene(); if (sc) { streetScene = sc; $("#panoTitle").textContent = "3D 街景 · " + hsTitle(sc); hsApply(sc); renderStreetPick(); } });
+      } catch { /* 事件名不支持就算了，靠 openStreetScene 兜底 */ }
+    }, 300);
   } catch (e) {
     streetViewer = null;
     showStreetEmpty("查看器启动失败：" + (e && e.message ? e.message : e));
@@ -669,6 +703,192 @@ function showStreetEmpty(msg) {
   if (!box) return;
   box.hidden = false;
   $("#streetFallbackMsg").textContent = msg || "";
+}
+
+/* ============================================================================
+   街景入口编辑器：在画面里双击 → 放一个"去某个点位"的入口（Pannellum 场景热点）
+     · 存 localStorage["beimingda.hotspots"] = { "<场景id>": [{target, pitch, yaw}] }
+     · 可拖动微调；点入口即跳过去；「导出 JSON」给我固化进 pano/manifest.json
+   ========================================================================== */
+const HS_KEY = "beimingda.hotspots";
+let hotspotStore = {};
+try { hotspotStore = JSON.parse(localStorage.getItem(HS_KEY) || "{}") || {}; } catch { hotspotStore = {}; }
+const hsIndexOf = (sceneId) => hotspotStore[sceneId] || (hotspotStore[sceneId] = []);
+const hsCount = () => Object.values(hotspotStore).reduce((n, a) => n + a.length, 0);
+
+function hsSave() {
+  try {
+    // ⛔ 内部字段（__id，用于删除热点）不要写进存储
+    const clean = {};
+    for (const [k, arr] of Object.entries(hotspotStore)) {
+      clean[k] = arr.map((h) => ({ target: h.target, pitch: h.pitch, yaw: h.yaw }));
+    }
+    localStorage.setItem(HS_KEY, JSON.stringify(clean));
+  } catch { /* 隐私模式：本次会话仍生效 */ }
+  hsSyncUI();
+}
+
+function hsSyncUI() {
+  const bar = $("#hsEditor");
+  if (bar) bar.hidden = !(streetViewer && streetScene);
+  const c = $("#hsCount");
+  if (c) c.textContent = String(streetScene ? hsIndexOf(streetScene).length : 0) + (streetScene ? " 个入口" : "");
+}
+
+function hsTitle(sceneId) {
+  const sc = (MANIFEST.scenes || {})[sceneId];
+  return (sc && sc.title) || sceneId;
+}
+
+/** 在 DOM 里认领这个入口对应的热点 div（2.5.7 没有 getHotSpotDiv，只能按文案找） */
+function hsClaimDiv(sceneId, hs, idx, tries = 8) {
+  const key = sceneId + "|" + hs.target + "|" + idx;
+  const find = () => {
+    const nodes = [...document.querySelectorAll("#pano .pnlm-hotspot")];
+    let div = nodes.find((d) => d.dataset && d.dataset.hsKey === key);
+    if (div) return div;
+    const label = "去 " + hsTitle(hs.target);
+    div = nodes.find((d) => (d.textContent || "").trim() === label && !(d.dataset && d.dataset.hsKey));
+    if (div) {
+      div.dataset.hsKey = key;
+      div.classList.add("hs-edit");
+      return div;
+    }
+    return null;
+  };
+  const hit = find();
+  if (hit || tries <= 0) return hit;
+  setTimeout(() => hsClaimDiv(sceneId, hs, idx, tries - 1), 60);   // div 是异步插进来的
+  return null;
+}
+
+/** 把一个入口画到查看器里（Pannellum 场景热点：点它 = 跳过去）+ 让它可拖动 */
+function hsRender(sceneId, hs, idx) {
+  if (!streetViewer) return;
+  const id = "hs-" + sceneId + "-" + idx;
+  hs.__id = id;
+  try {
+    // ⚠️ 不能传 cssClass：2.5.7 传了之后 addHotSpot 不生效
+    streetViewer.addHotSpot({
+      id, pitch: hs.pitch, yaw: hs.yaw, type: "scene", sceneId: hs.target,
+      text: "去 " + hsTitle(hs.target),
+    }, sceneId);
+  } catch (e) { console.warn("[hs] addHotSpot 失败:", e); return; }
+
+  const div = hsClaimDiv(sceneId, hs, idx);
+  if (!div) return;
+  let dragging = false, moved = false, raf = 0, lastCoords = null;
+  const onMove = (ev) => {
+    if (!dragging) return;
+    moved = true;
+    const co = hsCoordsFrom(ev);
+    if (!co) return;
+    lastCoords = co;
+    if (raf) return;
+    raf = requestAnimationFrame(() => {
+      raf = 0;
+      if (!lastCoords) return;
+      hs.pitch = lastCoords[0]; hs.yaw = lastCoords[1];
+      try { streetViewer.removeHotSpot(id, sceneId); } catch { /* 忽略 */ }
+      hsRender(sceneId, hs, idx);                       // 就地重画（位置跟随鼠标）
+    });
+  };
+  const onUp = () => {
+    if (!dragging) return;
+    dragging = false;
+    div.classList.remove("is-dragging");
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    if (moved) { hsSave(); toast("入口位置已保存（去 " + hsTitle(hs.target) + "）"); }
+  };
+  div.addEventListener("mousedown", (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    dragging = true; moved = false;
+    div.classList.add("is-dragging");
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  });
+  div.addEventListener("click", (ev) => {
+    if (moved) { ev.preventDefault(); ev.stopPropagation(); moved = false; }
+    // 没拖动就按默认行为：跳过去
+  });
+}
+
+function hsCoordsFrom(ev) {
+  try {
+    const c = streetViewer.mouseEventToCoords(ev);
+    const one = Array.isArray(c[0]) ? c[0] : c;
+    return [Number(one[0].toFixed(2)), Number(one[1].toFixed(2))];   // [pitch, yaw]
+  } catch { return null; }
+}
+
+/** 应用某场景的全部入口（进场景/切场景都调一次） */
+function hsApply(sceneId) {
+  if (!streetViewer || !sceneId) return;
+  hsIndexOf(sceneId).forEach((hs, i) => hsRender(sceneId, hs, i));
+  hsSyncUI();
+}
+
+/** 双击画面：选目标点位 → 在当前方向生成入口 */
+function onPanoDblClick(ev) {
+  if (!streetViewer || !streetScene) return;
+  const co = hsCoordsFrom(ev);
+  if (!co) return;
+  const targets = Object.keys(MANIFEST.scenes || {}).filter((id) => id !== streetScene);
+  if (!targets.length) { toast("只有这一个场景，没有别处可去"); return; }
+  const body = el("div", "stack stack--sm");
+  body.appendChild(el("p", "small muted",
+    "这个方向放一个去别处的入口（就在你双击的位置）。放完可以拖动微调，点它就是跳过去。"));
+  const grid = el("div", "chip-row");
+  targets.forEach((id) => {
+    const used = hsIndexOf(streetScene).some((h) => h.target === id);
+    const b = el("button", "chip" + (used ? " is-picked" : ""), hsTitle(id));
+    b.type = "button";
+    b.addEventListener("click", () => {
+      const arr = hsIndexOf(streetScene);
+      const exist = arr.find((h) => h.target === id);
+      if (exist) { exist.pitch = co[0]; exist.yaw = co[1]; }        // 同名目标 = 移动它
+      else arr.push({ target: id, pitch: co[0], yaw: co[1] });
+      hsSave();
+      hsApply(streetScene);
+      sheet.close();
+      toast("已放好入口：去「" + hsTitle(id) + "」（拖动可微调）");
+    });
+    grid.appendChild(b);
+  });
+  body.appendChild(grid);
+  const sheet = createSheet({ title: "放一个「去这里」的入口", iconName: "map-pin", body });
+  sheet.open();
+}
+
+/** 导出（给我固化进 pano/manifest.json） */
+function hsExport() {
+  const out = {};
+  for (const [scene, arr] of Object.entries(hotspotStore)) {
+    if (!arr.length) continue;
+    out[scene] = arr.map((h) => ({ sceneId: h.target, pitch: h.pitch, yaw: h.yaw,
+                                   text: "去 " + hsTitle(h.target) }));
+  }
+  const json = JSON.stringify({
+    _comment: "由 /welcome 街景入口编辑器导出的热点（Pannellum hotSpots）。",
+    _howto: "把 scenes 里每个场景的数组合并进 pano/manifest.json 对应场景的 hotSpots 即可。",
+    _progress: hsCount() + " 个入口",
+    scenes: out,
+  }, null, 2);
+  const body = el("div", "stack stack--sm");
+  body.appendChild(el("p", "small muted", "共 " + hsCount() + " 个入口。复制发给管理员即可固化（已自动复制一份）。"));
+  const pre = el("pre", "code code--scroll");
+  pre.textContent = json;
+  body.appendChild(pre);
+  const f = el("div", "stack stack--sm");
+  const b = el("button", "btn", "复制 JSON");
+  b.type = "button";
+  b.addEventListener("click", async () => {
+    (await copyText(json)) ? toast("JSON 已复制") : toast("复制失败，请手动选中");
+  });
+  f.appendChild(b);
+  createSheet({ title: "导出街景入口", iconName: "export", body, footer: f }).open();
+  copyText(json).catch(() => {});
 }
 
 /** 打开 3D 街景：有点位就用它的场景，没有就按"如实提示 + 列出可用场景"处理 */
@@ -1260,6 +1480,25 @@ function removeSpot(id) {
   const panoCount = NODES.filter((n) => Boolean(sceneOf(n))).length;
   $("#source").textContent = (BG.attribution || "底图为示意截图") +
     " · 底图只做缩放浏览，点位标注已移到「3D 街景」（卫星底图）上，共 " + panoCount + " 处实景";
+
+  // ⭐ 街景入口编辑器工具条
+  $("#hsExport")?.addEventListener("click", hsExport);
+  $("#hsUndo")?.addEventListener("click", () => {
+    const arr = streetScene ? hsIndexOf(streetScene) : [];
+    if (!arr.length) { toast("当前场景还没有入口"); return; }
+    const last = arr.pop();
+    hsSave();
+    if (streetViewer) { try { streetViewer.removeHotSpot(last.__id, streetScene); } catch { /* 忽略 */ } }
+    toast("已撤销一个入口");
+  });
+  $("#hsClear")?.addEventListener("click", () => {
+    if (!streetScene) return;
+    const arr = hsIndexOf(streetScene);
+    arr.forEach((h) => { if (streetViewer && h.__id) { try { streetViewer.removeHotSpot(h.__id, streetScene); } catch { /* 忽略 */ } } });
+    hotspotStore[streetScene] = [];
+    hsSave();
+    toast("已清空本场景的入口");
+  });
 
   // ⭐ 点位校准工具条
   $("#calibExport")?.addEventListener("click", exportCalib);
