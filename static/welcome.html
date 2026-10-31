@@ -163,7 +163,27 @@
   #panoOverlay, #amapOverlay { z-index: 1200; }
   .sat-pop { min-width: 180px; }
 
-</style></style>
+  /* ---------- ⭐ 缩放进度条：示意图 / 卫星图各一条，共用同一套视觉 ----------
+     两条分别放在各自的视图容器（#mapWrap / #satWrap）里：切视图时随容器一起隐藏，
+     天然不会出现"两个视图叠在一起"。视觉沿用 app.css 的 .map-zoom 胶囊条
+     （同一套尺寸/圆角/±按钮/数值位），这里只补复位按钮、触摸细节与底部让位。 */
+  .map-zoom__reset {
+    border: 1px solid rgba(31, 78, 140, 0.22); background: #fff; color: var(--color-primary);
+    font-family: inherit; font-size: 12px; line-height: 1; padding: 5px 8px;
+    border-radius: 9999px; cursor: pointer; white-space: nowrap;
+  }
+  .map-zoom__reset:hover { background: var(--color-primary-soft); }
+  .map-zoom__val { font-variant-numeric: tabular-nums; }
+  /* 手机上拖滑块时别被页面平移手势抢走（#mapWrap 是 touch-action: pan-y） */
+  .map-zoom__range { touch-action: none; }
+  /* 底部状态条抬到缩放条上方：说明文字与缩放条都完整可读，互不遮挡 */
+  .map-badge { bottom: 58px; }
+  @media (max-width: 640px) {
+    /* 窄屏缩放条占满整行 → 影像署名再抬一层，不被压住 */
+    .map-credit { bottom: 52px; }
+  }
+
+</style>
   <meta name="description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
   <meta property="og:title" content="迎新导览：校园地图与 3D 街景" />
   <meta property="og:description" content="学校校园示意图打底，15 个点位，明湖一带可进 3D 街景环视。" />
@@ -187,6 +207,16 @@
             <img class="base" id="baseImg" src="/map/campus-map.jpg" alt="校园楼宇编号示意图底图" />
           </div>
           <!-- 标记由 JS 按 /map/map-bg.json 的百分比坐标渲染 -->
+          <!-- ⭐ 示意图缩放进度条：只缩放内层 #mapInner（标点层不动）；
+               放在本视图容器内 → 切到别的视图时随容器一起隐藏，不会叠在别的视图上 -->
+          <div class="map-zoom" id="zoomBarShot" role="group" aria-label="示意图缩放">
+            <button class="map-zoom__btn" id="zoomOut" type="button" aria-label="缩小示意图">−</button>
+            <input class="map-zoom__range" id="zoomRange" type="range" min="100" max="320" value="100"
+                   step="5" aria-label="示意图缩放比例（百分比）" />
+            <button class="map-zoom__btn" id="zoomIn" type="button" aria-label="放大示意图">+</button>
+            <span class="map-zoom__val" id="zoomVal">100%</span>
+            <button class="map-zoom__reset" id="zoomReset" type="button" aria-label="复位到 100%" title="复位到 100%">复位</button>
+          </div>
         </div>
         <div class="map-wrap" id="amapWrap" hidden>
           <div id="amapCanvas"></div>
@@ -195,13 +225,16 @@
         <div class="map-wrap" id="satWrap" hidden>
           <div id="satMap"></div>
           <p class="map-credit" id="satCredit"></p>
- role="group" aria-label="地图缩放">
-        <button class="map-zoom__btn" id="zoomOut" type="button" aria-label="缩小">−</button>
-        <input class="map-zoom__range" id="zoomRange" type="range" min="100" max="320" value="100"
-               step="5" aria-label="缩放比例" />
-        <button class="map-zoom__btn" id="zoomIn" type="button" aria-label="放大">+</button>
-        <span class="map-zoom__val" id="zoomVal">100%</span>
-      </div>
+          <!-- ⭐ 3D 街景 / 卫星图缩放条：驱动 Leaflet 的 setZoom()，与 Leaflet 自带 +/− 双向同步 -->
+          <div class="map-zoom" id="zoomBarSat" role="group" aria-label="卫星图缩放" hidden>
+            <button class="map-zoom__btn" id="satZoomOut" type="button" aria-label="缩小卫星图">−</button>
+            <input class="map-zoom__range" id="satZoomRange" type="range" min="14" max="19" value="16"
+                   step="1" aria-label="卫星图缩放档位" />
+            <button class="map-zoom__btn" id="satZoomIn" type="button" aria-label="放大卫星图">+</button>
+            <span class="map-zoom__val" id="satZoomVal">16 档</span>
+            <button class="map-zoom__reset" id="satZoomReset" type="button" aria-label="复位到默认档位" title="复位到默认档位">复位</button>
+          </div>
+        </div>
 
       <div class="map-hud">
           <div class="segmented" id="viewSeg" role="group" aria-label="地图视图">
@@ -444,6 +477,7 @@ async function useAmapBase() {
     $("#mapWrap").hidden = true;
     $("#amapWrap").hidden = false;
     setBasePressed("amap");
+    syncZoomUI("amap");     // 高德视图有自己的控件：两条进度条都收起来
     amapState.active = true;
     const n = NODES.filter((x) => coordsOf(x)).length;
     amapTip(n
@@ -463,6 +497,7 @@ async function useAmapBase() {
       : "已留在示意图底图：" + why;
     amapTip(msg);
     setBasePressed("shot");
+    syncZoomUI("shot");                 // 加载失败等于留在示意图视图：进度条状态跟着退回
     amapState.active = false;
     if (domainRelated && typeof openAmapEmbed === "function") openAmapEmbed();   // 兜底：照样能看卫星图
   }
@@ -541,6 +576,7 @@ function setupMapHud() {
 
   // 「添加点位」：在当前视图（示意图或 3D 街景）上点位置即可添加
   setBasePressed("shot");
+  setupSatZoomBar();     // 卫星图进度条的事件（地图实例是懒创建的，这里只绑按钮）
 }
 
 /* ---------- ⭐ 3D 街景（Pannellum；素材由 tools/stitch-pano.py 从实拍 180°×2 拼出） ---------- */
@@ -704,12 +740,15 @@ function setupMapZoom() {
   $("#zoomReset")?.addEventListener("click", () => setZoom(1));
   rng?.addEventListener("input", () => setZoom(Number(rng.value) / 100));
   wrap.addEventListener("wheel", (e) => {
+    if (e.target.closest?.(".map-zoom")) return;   // 缩放条上的滚轮交给滑块/浏览器，不驱动底图
     if (zoomState.z === 1 && e.deltaY > 0) return;
     e.preventDefault();
     setZoom(zoomState.z + (e.deltaY < 0 ? 0.15 : -0.15));
   }, { passive: false });
   wrap.addEventListener("pointerdown", (e) => {
-    if (zoomState.z <= 1 || e.target.closest(".marker") || e.target.closest(".map-hud")) return;
+    // ⚠️ 缩放条也在 #mapWrap 里：拖滑块时绝不能同时触发底图平移
+    if (zoomState.z <= 1 || e.target.closest(".marker") || e.target.closest(".map-hud") ||
+        e.target.closest(".map-zoom")) return;
     zoomState.dragging = true; zoomState.sx = e.clientX - zoomState.x; zoomState.sy = e.clientY - zoomState.y;
     wrap.setPointerCapture?.(e.pointerId);
   });
@@ -720,6 +759,9 @@ function setupMapZoom() {
   });
   wrap.addEventListener("pointerup", () => { zoomState.dragging = false; });
   wrap.addEventListener("pointercancel", () => { zoomState.dragging = false; });
+  // 首屏就把进度条/数值对齐到 zoomState（默认 100%），并只显示示意图这条
+  applyZoom();
+  syncZoomUI("shot");
 }
 
 
@@ -857,10 +899,77 @@ function updateSatTip() {
     : "卫星图层已就绪。还没有点位坐标 —— 点「添加点位」在图上逐个点出位置，导出后我固化。";
 }
 
-/** 示意图的缩放条只在示意图视图显示（卫星图有自己的缩放控件） */
+/* ---------- ⭐ 两条缩放进度条（示意图 / 卫星图），共用同一套视觉 ----------
+   ① 示意图进度条：驱动 zoomState（只 scale 内层 #mapInner，标点层不动）
+   ② 卫星图进度条：驱动 Leaflet 的 setZoom()，并与 Leaflet 自带 +/− 双向同步
+   两条各自放在自己的视图容器里（#mapWrap / #satWrap），切视图随容器隐藏 →
+   同一时刻只可能有一条可见，不会出现"两个视图叠在一起"。 */
+let satZoomDefault = 16;   // 由 /map/map-bg.json 的 satellite.zoom 决定
+
+/** 卫星图档位范围以 Leaflet 实例为准，避免与真实地图状态脱节 */
+function satZoomBounds() {
+  const m = satState.map;
+  if (!m) return { min: 14, max: 19 };
+  const min = Number(m.getMinZoom());
+  const max = Number(m.getMaxZoom());
+  return {
+    min: Number.isFinite(min) ? min : 14,
+    max: Number.isFinite(max) ? max : 19,
+  };
+}
+
+/** 把 Leaflet 的**真实 zoom** 回写到进度条（自带 +/− 或双指/滚轮缩放后也走这里） */
+function syncSatZoomUI() {
+  const m = satState.map;
+  if (!m) return;
+  const b = satZoomBounds();
+  const z = Math.round(m.getZoom());
+  const rng = $("#satZoomRange");
+  if (rng) {
+    rng.min = String(b.min);
+    rng.max = String(b.max);
+    rng.step = "1";
+    if (Number(rng.value) !== z) rng.value = String(z);
+    rng.setAttribute("aria-valuetext", "第 " + z + " 档（共 " + b.min + "～" + b.max + " 档）");
+  }
+  const val = $("#satZoomVal");
+  if (val) {
+    val.textContent = z + " 档";
+    val.title = "Leaflet zoom " + z + "（范围 " + b.min + "～" + b.max + "）";
+  }
+  const reset = $("#satZoomReset");
+  if (reset) {
+    reset.title = "复位到默认档位（" + satZoomDefault + " 档）";
+    reset.setAttribute("aria-label", "复位到默认档位（" + satZoomDefault + " 档）");
+  }
+}
+
+/** 进度条 → 地图（档位取整并夹到 min/max 内） */
+function setSatZoom(z) {
+  const m = satState.map;
+  if (!m) return;
+  const b = satZoomBounds();
+  m.setZoom(Math.max(b.min, Math.min(b.max, Math.round(Number(z) || satZoomDefault))));
+  syncSatZoomUI();
+}
+
+/** 两条进度条的显隐：同一时刻只显示当前视图那一条 */
 function syncZoomUI(mode) {
-  const z = document.querySelector(".map-zoom");
-  if (z) z.hidden = mode !== "shot";
+  const shot = $("#zoomBarShot");
+  const sat = $("#zoomBarSat");
+  if (shot) shot.hidden = mode !== "shot";
+  if (sat) sat.hidden = mode !== "sat";
+  // ⭐ 切回卫星图时先按真实 zoom 对齐进度条，绝不与地图状态不同步
+  if (mode === "sat") syncSatZoomUI();
+}
+
+/** 卫星图进度条事件绑定（与 Leaflet 自带 +/− 等价：点一次走一档） */
+function setupSatZoomBar() {
+  const cur = () => (satState.map ? Math.round(satState.map.getZoom()) : satZoomDefault);
+  $("#satZoomIn")?.addEventListener("click", () => setSatZoom(cur() + 1));
+  $("#satZoomOut")?.addEventListener("click", () => setSatZoom(cur() - 1));
+  $("#satZoomReset")?.addEventListener("click", () => setSatZoom(satZoomDefault));
+  $("#satZoomRange")?.addEventListener("input", (e) => setSatZoom(Number(e.currentTarget.value)));
 }
 
 function useSatBase() {
@@ -872,8 +981,6 @@ function useSatBase() {
   $("#mapWrap").hidden = true;
   $("#amapWrap").hidden = true;
   $("#satWrap").hidden = false;
-  syncZoomUI("sat");
-  syncZoomUI("sat");
   if (!satState.map) {
     const c = gcj2wgs((cfg.center && cfg.center.lng) || 106.1077, (cfg.center && cfg.center.lat) || 38.4977);
     satState.map = L.map("satMap", {
@@ -883,6 +990,10 @@ function useSatBase() {
       maxZoom: cfg.max_zoom || 19,
       zoomControl: true,
     });
+    satZoomDefault = Number(cfg.zoom) || 16;
+    window.__satMap = satState.map;   // 调试/自动化：暴露 Leaflet 实例（与 window.__sv 同口径）
+    // ⭐ Leaflet 自带 +/− 与滚轮/双指缩放都会触发 zoom/zoomend → 回写进度条，双向同步
+    satState.map.on("zoom zoomend", syncSatZoomUI);
     // ⭐ 限制在校园范围：别滑出去找不到学校
     if (cfg.bounds) {
       const b = cfg.bounds;
@@ -900,6 +1011,7 @@ function useSatBase() {
   setTimeout(() => satState.map.invalidateSize(), 60);
   renderSatMarkers();
   setBasePressed("sat");
+  syncZoomUI("sat");     // 显示卫星图进度条，并按真实 zoom 对齐（切回来的场景也走这里）
 }
 
 /** 3D 街景视图：沿用卫星底图，只放实景点位 */
